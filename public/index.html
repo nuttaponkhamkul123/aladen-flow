@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kanban</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="theme-dark">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">K</span>
+      <span class="title">Kanban</span>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="board">Boards</button>
+      <button class="tab" data-tab="cms">CMS</button>
+    </nav>
+    <div class="topbar-actions">
+      <div class="board-switcher" data-tab-show="board">
+        <label>Board</label>
+        <select id="boardSelect"></select>
+        <button id="newBoardBtn" class="btn ghost" title="New board">+</button>
+        <button id="deleteBoardBtn" class="btn ghost danger" title="Delete board">x</button>
+      </div>
+      <div class="search-wrap" data-tab-show="board">
+        <input id="searchInput" type="text" placeholder="Search cards..." />
+        <div id="searchResults" class="search-results hidden"></div>
+      </div>
+      <button id="activityBtn" class="btn" data-tab-show="board">Activity</button>
+      <button id="themeBtn" class="btn ghost" title="Toggle theme">Theme</button>
+    </div>
+  </header>
+
+  <main id="board" class="board" data-tab-panel="board"></main>
+  <button id="addColumnBtn" class="add-column-btn" data-tab-show="board">+ Add column</button>
+
+  <main id="cms" class="cms hidden" data-tab-panel="cms">
+    <aside class="cms-sidebar">
+      <button id="newPageBtn" class="btn full">+ New page</button>
+      <div class="cms-search">
+        <input id="cmsSearchInput" type="text" placeholder="Search pages..." />
+      </div>
+      <div class="cms-filter">
+        <label>Status</label>
+        <select id="cmsStatusFilter">
+          <option value="">All</option>
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+        </select>
+      </div>
+      <div class="cms-tags-wrap">
+        <label>Tags</label>
+        <div id="cmsTags" class="cms-tags"></div>
+      </div>
+      <div class="cms-pages-list-wrap">
+        <label>Pages</label>
+        <div id="cmsPagesList" class="cms-pages-list"></div>
+      </div>
+    </aside>
+    <section class="cms-main">
+      <div id="cmsEmpty" class="cms-empty">
+        <p>Select a page or create a new one to start building.</p>
+      </div>
+      <div id="cmsEditorWrap" class="cms-editor-wrap hidden">
+        <div class="cms-page-bar">
+          <input id="cmsTitle" class="cms-title" placeholder="Page title" />
+          <input id="cmsSlug" class="cms-slug" placeholder="slug" />
+          <select id="cmsStatus" class="cms-status-select">
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+          <input id="cmsTagsInput" class="cms-tags-input" placeholder="tags (comma separated)" />
+          <div class="cms-page-actions">
+            <a id="cmsPreviewLink" class="btn ghost" target="_blank">Preview</a>
+            <button id="cmsSaveBtn" class="btn">Save</button>
+            <button id="cmsDeleteBtn" class="btn ghost danger">Delete</button>
+          </div>
+        </div>
+        <div class="cms-workspace">
+          <aside class="cms-palette">
+            <h4>Blocks</h4>
+            <div class="palette-list">
+              <div class="palette-item" draggable="true" data-block-type="heading">
+                <span class="palette-icon">H</span>
+                <span class="palette-label">Heading</span>
+              </div>
+              <div class="palette-item" draggable="true" data-block-type="paragraph">
+                <span class="palette-icon">P</span>
+                <span class="palette-label">Paragraph</span>
+              </div>
+              <div class="palette-item" draggable="true" data-block-type="button">
+                <span class="palette-icon">B</span>
+                <span class="palette-label">Button</span>
+              </div>
+              <div class="palette-item" draggable="true" data-block-type="image">
+                <span class="palette-icon">I</span>
+                <span class="palette-label">Image</span>
+              </div>
+              <div class="palette-item" draggable="true" data-block-type="divider">
+                <span class="palette-icon">/</span>
+                <span class="palette-label">Divider</span>
+              </div>
+              <div class="palette-item" draggable="true" data-block-type="spacer">
+                <span class="palette-icon">.</span>
+                <span class="palette-label">Spacer</span>
+              </div>
+              <div class="palette-item" draggable="true" data-block-type="table">
+                <span class="palette-icon">⊞</span>
+                <span class="palette-label">Table</span>
+              </div>
+              <div class="palette-item" draggable="true" data-block-type="container">
+                <span class="palette-icon">☷</span>
+                <span class="palette-label">Container</span>
+              </div>
+            </div>
+            <p class="muted" style="font-size:11px;margin-top:12px">Drag blocks to the canvas</p>
+          </aside>
+          <div class="cms-canvas-wrap">
+            <div id="cmsCanvas" class="cms-canvas"></div>
+          </div>
+          <aside class="cms-props">
+            <h4>Properties</h4>
+            <div id="cmsPropsBody" class="cms-props-body">
+              <p class="muted">Select a block to edit its properties.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="cardModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <input id="cardTitle" class="card-title-input" placeholder="Card title" />
+        <button class="btn ghost close-modal">x</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-main">
+          <div class="field-row">
+            <span class="badge" id="cardPriorityBadge">priority</span>
+            <span class="muted" id="cardCreatedAt"></span>
+          </div>
+
+          <section>
+            <h4>Description</h4>
+            <textarea id="cardDescription" placeholder="Add a more detailed description..."></textarea>
+          </section>
+
+          <section>
+            <h4>Checklist</h4>
+            <div id="cardChecklist" class="checklist"></div>
+            <div class="checklist-add">
+              <input id="newChecklistInput" placeholder="Add an item" />
+              <button id="addChecklistBtn" class="btn">Add</button>
+            </div>
+          </section>
+
+          <section>
+            <h4>Activity</h4>
+            <div id="cardActivity" class="activity"></div>
+          </section>
+        </div>
+
+        <aside class="modal-aside">
+          <h4>Details</h4>
+          <div class="aside-row">
+            <label>Due date</label>
+            <input id="cardDueDate" type="date" />
+          </div>
+          <div class="aside-row">
+            <label>Priority</label>
+            <select id="cardPriority">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div class="aside-row">
+            <label>Labels</label>
+            <div id="cardLabels" class="labels-list"></div>
+            <div class="label-add">
+              <input id="newLabelName" placeholder="New label" />
+              <input id="newLabelColor" type="color" value="#6366f1" />
+              <button id="addLabelBtn" class="btn">Add</button>
+            </div>
+          </div>
+          <div class="aside-row danger-zone">
+            <button id="archiveCardBtn" class="btn ghost">Archive</button>
+            <button id="deleteCardBtn" class="btn danger">Delete</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div id="activityPanel" class="side-panel hidden">
+    <div class="side-panel-header">
+      <h3>Recent activity</h3>
+      <button id="closeActivityBtn" class="btn ghost">x</button>
+    </div>
+    <div id="activityList" class="side-panel-body"></div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
