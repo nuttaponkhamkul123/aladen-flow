@@ -1,6 +1,12 @@
 node_modules/
-data/*.db
-data/*.db-shm
-data/*.db-wal
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+data/*
 *.log
 .DS_Store
+.agents/
+.env*
+
+

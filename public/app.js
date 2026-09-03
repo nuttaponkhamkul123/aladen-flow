@@ -12,7 +12,8 @@ const api = {
   get: (u) => api.req('GET', u),
   post: (u, b) => api.req('POST', u, b),
   patch: (u, b) => api.req('PATCH', u, b),
-  del: (u) => api.req('DELETE', u)
+  del: (u) => api.req('DELETE', u),
+  delete: (u) => api.req('DELETE', u)
 };
 
 const state = {
@@ -33,7 +34,18 @@ const state = {
     openPage: null,
     drag: null,
     dropIdx: 0,
-    indicator: null
+    indicator: null,
+    clipboardBlock: null,
+    sidebarTab: 'blocks',
+    blocksSubTab: 'standard',
+    reusableBlocks: [],
+    pageDrag: null,
+    pageCollapsed: {},
+    viewportMode: 'desktop',
+    viewportWidth: null,
+    viewportOrientation: 'portrait',
+    deviceFrame: true,
+    isPreviewMode: false
   }
 };
 
@@ -54,6 +66,32 @@ const el = (tag, attrs = {}, children = []) => {
   });
   return node;
 };
+
+function createSvg(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html.trim();
+  return div.firstElementChild;
+}
+
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = el('div', { class: `toast toast-${type}` }, [
+    createSvg(type === 'success' 
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+      : type === 'danger'
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+    ),
+    el('span', {}, message)
+  ]);
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => toast.remove(), 250);
+  }, 2500);
+}
 
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, m => ({
@@ -156,9 +194,14 @@ function renderCard(card) {
     ]));
   }
 
-  meta.appendChild(el('span', { class: `badge priority-${card.priority}` }, card.priority));
+  meta.appendChild(el('span', { class: `badge priority-${card.priority}` }, [
+    el('span', { style: 'font-size:9px' }, '●'),
+    card.priority
+  ]));
+
   if (due.label) {
-    meta.appendChild(el('span', { class: `due ${due.cls}` }, [due.label, el('span', {}, '\ud83d\udcc5')]));
+    const calSvg = createSvg('<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>');
+    meta.appendChild(el('span', { class: `due ${due.cls}` }, [calSvg, due.label]));
   }
 
   const cardNode = el('div', {
@@ -181,23 +224,24 @@ function renderCard(card) {
 }
 
 function renderAddCardForm(columnId) {
-  const textarea = el('textarea', { placeholder: 'Enter a title for this card...' });
+  const textarea = el('textarea', { placeholder: 'Enter a card title...' });
   const form = el('div', { class: 'add-card-form' }, [
     textarea,
     el('div', { class: 'form-actions' }, [
       el('button', {
-        class: 'btn',
+        class: 'btn primary btn-sm',
         onclick: async () => {
           const title = textarea.value.trim();
           if (!title) return;
           await api.post(`/api/columns/${columnId}/cards`, { title });
           textarea.value = '';
           form.classList.remove('open');
+          showToast('Card added', 'success');
           await loadBoard();
         }
-      }, 'Add card'),
+      }, 'Add Card'),
       el('button', {
-        class: 'btn ghost',
+        class: 'btn ghost btn-sm',
         onclick: () => { form.classList.remove('open'); textarea.value = ''; }
       }, 'Cancel')
     ])
@@ -212,6 +256,7 @@ function renderColumn(col) {
     class: 'column-title',
     value: col.name,
     readonly: 'readonly',
+    title: 'Double-click to rename',
     ondblclick: e => { e.target.removeAttribute('readonly'); e.target.focus(); e.target.select(); },
     onblur: async e => {
       e.target.setAttribute('readonly', 'readonly');
@@ -219,6 +264,7 @@ function renderColumn(col) {
       if (newName !== col.name) {
         await api.patch(`/api/columns/${col.id}`, { name: newName });
         col.name = newName;
+        showToast('Column renamed');
       }
     },
     onkeydown: e => { if (e.key === 'Enter') e.target.blur(); }
@@ -235,6 +281,7 @@ function renderColumn(col) {
     if (!listEl.contains(e.relatedTarget)) listEl.classList.remove('drop-target');
   });
 
+  const plusIcon = createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
   const addBtn = el('button', {
     class: 'add-card-btn',
     onclick: () => {
@@ -242,7 +289,7 @@ function renderColumn(col) {
       form.classList.add('open');
       form.querySelector('textarea').focus();
     }
-  }, '+ Add a card');
+  }, [plusIcon, el('span', {}, 'Add a card')]);
 
   const form = renderAddCardForm(col.id);
 
@@ -252,16 +299,22 @@ function renderColumn(col) {
     onclick: async () => {
       if (!confirm(`Delete column "${col.name}" and its cards?`)) return;
       await api.del(`/api/columns/${col.id}`);
+      showToast('Column deleted', 'danger');
       await loadBoard();
     }
-  }, '\u00d7');
+  }, [createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>')]);
+
+  const headerLeft = el('div', { class: 'column-header-left' }, [
+    el('div', { class: 'column-dot' }),
+    titleEl,
+    el('span', { class: 'column-count' }, String(cards.length))
+  ]);
 
   const header = el('div', {
     class: 'column-header',
     draggable: 'true'
   }, [
-    titleEl,
-    el('span', { class: 'column-count' }, String(cards.length)),
+    headerLeft,
     deleteBtn
   ]);
   header.addEventListener('dragstart', onColumnDragStart);
@@ -283,6 +336,20 @@ function renderBoard() {
     return;
   }
   state.board.columns.forEach(col => board.appendChild(renderColumn(col)));
+
+  // Interactive Ghost Add Column Card
+  const ghostPlus = createSvg('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
+  const ghostCol = el('div', {
+    class: 'add-column-ghost',
+    title: 'Add new column',
+    onclick: () => {
+      document.getElementById('addColumnBtn').click();
+    }
+  }, [
+    el('div', { class: 'ghost-icon' }, [ghostPlus]),
+    el('span', {}, 'Add New Column')
+  ]);
+  board.appendChild(ghostCol);
 }
 
 function setBoardEvents() {
@@ -293,12 +360,13 @@ function setBoardEvents() {
   };
 
   document.getElementById('newBoardBtn').onclick = async () => {
-    const name = prompt('Board name:');
-    if (!name) return;
-    const b = await api.post('/api/boards', { name });
+    const name = prompt('Enter new board name:');
+    if (!name || !name.trim()) return;
+    const b = await api.post('/api/boards', { name: name.trim() });
     await loadBoards();
     state.currentBoardId = b.id;
     sel.value = b.id;
+    showToast(`Board "${b.name}" created`, 'success');
     await loadBoard();
   };
 
@@ -307,15 +375,17 @@ function setBoardEvents() {
     if (!confirm('Delete this board and all its data?')) return;
     await api.del(`/api/boards/${state.currentBoardId}`);
     state.currentBoardId = null;
+    showToast('Board deleted', 'danger');
     await loadBoards();
     await loadBoard();
   };
 
   document.getElementById('addColumnBtn').onclick = async () => {
-    if (!state.currentBoardId) return alert('Create a board first');
-    const name = prompt('Column name:');
-    if (!name) return;
-    await api.post(`/api/boards/${state.currentBoardId}/columns`, { name });
+    if (!state.currentBoardId) return alert('Please create or select a board first');
+    const name = prompt('Enter column name:');
+    if (!name || !name.trim()) return;
+    await api.post(`/api/boards/${state.currentBoardId}/columns`, { name: name.trim() });
+    showToast('Column added', 'success');
     await loadBoard();
   };
 
@@ -331,12 +401,12 @@ function setBoardEvents() {
       const results = await api.get(`/api/search?q=${encodeURIComponent(q)}`);
       resultsEl.innerHTML = '';
       if (!results.length) {
-        resultsEl.appendChild(el('div', { class: 'result muted' }, 'No results'));
+        resultsEl.appendChild(el('div', { class: 'result muted' }, 'No matching cards found'));
       } else {
         results.forEach(r => {
           const div = el('div', { class: 'result' }, [
-            el('div', {}, r.title),
-            el('div', { class: 'muted', style: 'font-size:11px' }, (r.description || '').slice(0, 80))
+            el('div', { style: 'font-weight:600;font-size:13px;color:var(--text-primary)' }, r.title),
+            el('div', { class: 'muted', style: 'font-size:11.5px;margin-top:2px' }, (r.description || '').slice(0, 80))
           ]);
           div.onclick = () => {
             resultsEl.classList.add('hidden');
@@ -351,6 +421,15 @@ function setBoardEvents() {
   };
   document.addEventListener('click', e => {
     if (!e.target.closest('.search-wrap')) resultsEl.classList.add('hidden');
+  });
+
+  // Global Keyboard Shortcuts (Cmd+K / Ctrl+K, Escape)
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+    }
   });
 
   document.getElementById('activityBtn').onclick = openActivityPanel;
@@ -370,6 +449,7 @@ function setBoardEvents() {
     if (e.key === 'Escape') {
       closeCardModal();
       document.getElementById('activityPanel').classList.add('hidden');
+      resultsEl.classList.add('hidden');
     }
   });
 
@@ -392,6 +472,7 @@ function setBoardEvents() {
     if (!state.openCardId) return;
     await api.patch(`/api/cards/${state.openCardId}`, { archived: 1 });
     closeCardModal();
+    showToast('Card archived');
     await loadBoard();
   };
   document.getElementById('deleteCardBtn').onclick = async () => {
@@ -399,6 +480,7 @@ function setBoardEvents() {
     if (!confirm('Delete this card permanently?')) return;
     await api.del(`/api/cards/${state.openCardId}`);
     closeCardModal();
+    showToast('Card deleted', 'danger');
     await loadBoard();
   };
 }
@@ -699,16 +781,88 @@ document.getElementById('board').addEventListener('drop', async e => {
   await loadBoard();
 });
 
-// ---------- Tabs ----------
+// ---------- Tabs & Pages Popup ----------
+function togglePagesPopup() {
+  const popup = document.getElementById('cmsPagesPopup');
+  const trigger = document.getElementById('cmsPagesDropdownTrigger');
+  if (!popup) return;
+  const isHidden = popup.classList.contains('hidden');
+  if (isHidden) {
+    popup.classList.remove('hidden');
+    if (trigger) {
+      trigger.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+    renderCmsPages();
+    const search = document.getElementById('cmsSearchInput');
+    if (search) search.focus();
+  } else {
+    closePagesPopup();
+  }
+}
+
+function closePagesPopup() {
+  const popup = document.getElementById('cmsPagesPopup');
+  const trigger = document.getElementById('cmsPagesDropdownTrigger');
+  if (popup) popup.classList.add('hidden');
+  if (trigger) {
+    trigger.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function updateCurrentPageTopbarLabel() {
+  const labelEl = document.getElementById('cmsCurrentPageLabel');
+  if (!labelEl) return;
+  if (state.cms.openPage) {
+    const title = (state.cms.openPage.title || '').trim();
+    labelEl.textContent = title ? title : 'Untitled';
+    labelEl.title = title ? `Current Page: ${title}` : 'Current Page: Untitled';
+  } else {
+    labelEl.textContent = 'Pages';
+    labelEl.title = 'Pages & Documents Explorer';
+  }
+}
+
 function setupTabs() {
-  document.querySelectorAll('.tab').forEach(t => {
+  document.querySelectorAll('.main-tabs-group .tab').forEach(t => {
     t.onclick = () => switchTab(t.dataset.tab);
+  });
+
+  const trigger = document.getElementById('cmsPagesDropdownTrigger');
+  if (trigger) {
+    trigger.onclick = e => {
+      e.stopPropagation();
+      togglePagesPopup();
+    };
+  }
+
+  const closeBtn = document.getElementById('cmsClosePagesPopupBtn');
+  if (closeBtn) {
+    closeBtn.onclick = e => {
+      e.stopPropagation();
+      closePagesPopup();
+    };
+  }
+
+  document.addEventListener('click', e => {
+    const popup = document.getElementById('cmsPagesPopup');
+    const group = document.querySelector('.cms-sub-tabs-group');
+    if (popup && !popup.classList.contains('hidden') && group && !group.contains(e.target)) {
+      closePagesPopup();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closePagesPopup();
+    }
   });
 }
 
 function switchTab(name) {
   state.currentTab = name;
-  document.querySelectorAll('.tab').forEach(t => {
+  document.querySelectorAll('.main-tabs-group .tab').forEach(t => {
     t.classList.toggle('active', t.dataset.tab === name);
   });
   document.querySelectorAll('[data-tab-panel]').forEach(p => {
@@ -717,18 +871,76 @@ function switchTab(name) {
   document.querySelectorAll('[data-tab-show]').forEach(s => {
     s.classList.toggle('hidden', s.dataset.tabShow !== name);
   });
-  if (name === 'cms') loadCms();
+  if (name === 'cms') {
+    loadCms();
+  }
 }
 
 // ---------- CMS (block-based site builder) ----------
 const BLOCK_DEFAULTS = {
-  heading:   { level: 2, text: 'New heading' },
-  paragraph: { text: 'New paragraph. Click to edit.' },
-  button:    { label: 'Click me', url: 'https://example.com', color: '#6366f1' },
-  image:     { url: '', alt: '' },
-  divider:   {},
-  spacer:    { height: 24 },
-  table:     {
+  heading: {
+    level: 2,
+    text: 'New heading',
+    align: 'left',
+    color: '',
+    margin: 12
+  },
+  paragraph: {
+    text: 'New paragraph. Click to edit.',
+    align: 'left',
+    size: 'normal',
+    color: '',
+    bold: false,
+    italic: false
+  },
+  button: {
+    label: 'Click me',
+    url: 'https://example.com',
+    color: '#6366f1',
+    textColor: '#ffffff',
+    variant: 'filled',
+    size: 'medium',
+    align: 'left',
+    borderRadius: 8,
+    newTab: true
+  },
+  image: {
+    url: '',
+    alt: '',
+    caption: '',
+    linkUrl: '',
+    width: '100%',
+    align: 'center',
+    objectFit: 'cover',
+    borderRadius: 8,
+    shadow: false,
+    border: false
+  },
+  carousel: {
+    slides: [
+      { url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1000&auto=format&fit=crop', caption: 'Dynamic Abstract Composition' },
+      { url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=1000&auto=format&fit=crop', caption: 'Cyberpunk Neon Horizon' },
+      { url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1000&auto=format&fit=crop', caption: 'Tropical Ocean Sunset' }
+    ],
+    aspectRatio: '16/9',
+    autoplay: false,
+    interval: 4,
+    showArrows: true,
+    showDots: true,
+    showCaptions: true,
+    borderRadius: 10
+  },
+  divider: {
+    style: 'solid',
+    thickness: 1,
+    width: '100%',
+    margin: 16,
+    color: ''
+  },
+  spacer: {
+    height: 24
+  },
+  table: {
     headers: ['Feature', 'Description', 'Status'],
     rows: [
       ['Kanban Board', 'Interactive drag-and-drop workflow tracking', 'Completed'],
@@ -752,6 +964,7 @@ const BLOCK_DEFAULTS = {
     bg: 'surface',
     border: true,
     borderRadius: 8,
+    shadow: false,
     children: []
   }
 };
@@ -761,6 +974,7 @@ const BLOCK_LABELS = {
   paragraph: 'Paragraph',
   button: 'Button',
   image: 'Image',
+  carousel: 'Carousel (Slider)',
   divider: 'Divider',
   spacer: 'Spacer',
   table: 'Table',
@@ -772,15 +986,141 @@ function newBlockId() {
 }
 
 function makeBlock(type) {
+  const defaults = BLOCK_DEFAULTS[type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[type])) : {};
   return {
     id: newBlockId(),
     type,
-    props: { ...(BLOCK_DEFAULTS[type] || {}) }
+    props: defaults
   };
 }
 
 async function loadCms() {
-  await Promise.all([loadCmsPages(), loadCmsTags()]);
+  await Promise.all([loadCmsPages(), loadCmsTags(), loadReusableBlocks()]);
+}
+
+async function loadReusableBlocks() {
+  try {
+    state.cms.reusableBlocks = await api.get('/api/reusable-blocks');
+    renderReusableBlocks();
+  } catch (err) {
+    console.error('Failed to load reusable blocks:', err);
+  }
+}
+
+function renderReusableBlocks() {
+  const list = document.getElementById('cmsCustomBlocksList');
+  const countBadge = document.getElementById('cmsReusableCountBadge');
+  if (!list) return;
+  list.innerHTML = '';
+
+  const count = (state.cms.reusableBlocks || []).length;
+  if (countBadge) countBadge.textContent = String(count);
+
+  if (!count) {
+    list.appendChild(el('div', { class: 'tree-empty-state', style: 'padding:24px 12px;' }, [
+      createSvg('<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;opacity:0.6;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'),
+      el('p', { style: 'font-size:11.5px;line-height:1.4;' }, 'No saved components yet.'),
+      el('p', { style: 'font-size:10.5px;color:var(--text-tertiary);margin-top:4px;' }, 'Select any component on canvas and click "Save Reusable" in the inspector.')
+    ]));
+    return;
+  }
+
+  state.cms.reusableBlocks.forEach(r => {
+    const rootType = r.block_data?.type || 'container';
+    const isContainer = rootType === 'container';
+    let subSnippet = `Custom ${BLOCK_LABELS[rootType] || rootType}`;
+    if (isContainer && Array.isArray(r.block_data?.props?.children)) {
+      subSnippet = `${r.block_data.props.children.length} nested item(s)`;
+    }
+
+    const item = el('div', {
+      class: 'palette-item',
+      draggable: 'true',
+      dataset: { blockType: 'reusable', reusableId: String(r.id) },
+      ondragstart: onPaletteDragStart,
+      ondragend: onPaletteDragEnd
+    }, [
+      el('div', { class: `palette-icon-wrap ${rootType}-icon` }, [
+        getBlockIconSvg(rootType)
+      ]),
+      el('div', { class: 'palette-info' }, [
+        el('span', { class: 'palette-label', title: r.name }, r.name),
+        el('span', { class: 'palette-sub' }, subSnippet)
+      ]),
+      el('button', {
+        type: 'button',
+        class: 'custom-block-delete',
+        title: 'Delete saved component',
+        onclick: e => {
+          e.stopPropagation();
+          deleteReusableBlock(r.id, r.name);
+        }
+      }, [
+        createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>')
+      ])
+    ]);
+
+    list.appendChild(item);
+  });
+}
+
+async function deleteReusableBlock(id, name) {
+  if (!confirm(`Delete saved reusable component "${name}"?`)) return;
+  try {
+    await api.delete(`/api/reusable-blocks/${id}`);
+    await loadReusableBlocks();
+    showToast('Reusable component deleted', 'info');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to delete reusable component', 'error');
+  }
+}
+
+function switchBlocksSubTab(tab) {
+  state.cms.blocksSubTab = tab;
+  const stdBtn = document.getElementById('cmsSubTabStandard');
+  const customBtn = document.getElementById('cmsSubTabCustom');
+  const stdView = document.getElementById('cmsStandardBlocksView');
+  const customView = document.getElementById('cmsCustomBlocksView');
+
+  if (tab === 'custom') {
+    if (stdBtn) stdBtn.classList.remove('active');
+    if (customBtn) customBtn.classList.add('active');
+    if (stdView) stdView.classList.add('hidden');
+    if (customView) customView.classList.remove('hidden');
+    renderReusableBlocks();
+  } else {
+    if (customBtn) customBtn.classList.remove('active');
+    if (stdBtn) stdBtn.classList.add('active');
+    if (customView) customView.classList.add('hidden');
+    if (stdView) stdView.classList.remove('hidden');
+  }
+}
+
+async function saveSelectedAsReusableBlock(blockId) {
+  const block = findBlock(blockId);
+  if (!block) return;
+  const defaultName = (block.props && (block.props.text || block.props.label || block.props.caption))
+    ? `${BLOCK_LABELS[block.type] || block.type}: ${(block.props.text || block.props.label || block.props.caption).slice(0, 20)}`
+    : `Custom ${BLOCK_LABELS[block.type] || block.type}`;
+
+  const name = prompt('Enter a name for this reusable component:', defaultName);
+  if (!name || !name.trim()) return;
+
+  try {
+    const cleanBlock = JSON.parse(JSON.stringify(block));
+    await api.post('/api/reusable-blocks', {
+      name: name.trim(),
+      category: block.type,
+      block_data: cleanBlock
+    });
+    await loadReusableBlocks();
+    switchBlocksSubTab('custom');
+    showToast(`Saved "${name.trim()}" to Reusable Blocks!`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to save reusable block', 'error');
+  }
 }
 
 async function loadCmsPages() {
@@ -797,27 +1137,357 @@ async function loadCmsTags() {
   renderCmsTags();
 }
 
+function getPageFullPath(pageId) {
+  const segments = [];
+  let curr = state.cms.pages.find(p => p.id === pageId);
+  const visited = new Set();
+  while (curr && !visited.has(curr.id)) {
+    visited.add(curr.id);
+    segments.unshift(curr.slug || 'untitled');
+    curr = curr.parent_id != null ? state.cms.pages.find(p => p.id === curr.parent_id) : null;
+  }
+  return '/' + segments.join('/');
+}
+
+function showPathTooltip(e, pathText) {
+  let tip = document.getElementById('cmsPathTooltip');
+  if (!tip) {
+    tip = el('div', { id: 'cmsPathTooltip', class: 'cms-path-tooltip' });
+    document.body.appendChild(tip);
+  }
+  tip.textContent = pathText;
+  tip.classList.add('visible');
+
+  const rect = e.currentTarget.getBoundingClientRect();
+  const tipWidth = tip.offsetWidth;
+  let top = rect.top - tip.offsetHeight - 6;
+  let left = rect.left + (rect.width / 2) - (tipWidth / 2);
+
+  if (top < 10) top = rect.bottom + 6;
+  if (left < 10) left = 10;
+
+  tip.style.top = `${top}px`;
+  tip.style.left = `${left}px`;
+}
+
+function hidePathTooltip() {
+  const tip = document.getElementById('cmsPathTooltip');
+  if (tip) tip.classList.remove('visible');
+}
+
+function isPageDescendant(parentPageId, testPageId) {
+  if (Number(parentPageId) === Number(testPageId)) return true;
+  const children = state.cms.pages.filter(p => Number(p.parent_id) === Number(parentPageId));
+  for (const child of children) {
+    if (Number(child.id) === Number(testPageId) || isPageDescendant(child.id, testPageId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function renderCmsPages() {
   const list = document.getElementById('cmsPagesList');
+  if (!list) return;
   list.innerHTML = '';
+
   if (!state.cms.pages.length) {
-    list.appendChild(el('div', { class: 'muted', style: 'font-size:12px; padding:8px;' }, 'No pages'));
+    list.appendChild(el('div', { class: 'muted', style: 'font-size:12px; padding:12px;' }, 'No pages yet. Click "+ New Page" to create one.'));
     return;
   }
+
+  // Build tree hierarchy
+  const topCount = document.getElementById('cmsTopPagesCount');
+  if (topCount) topCount.textContent = String(state.cms.pages.length);
+
+  const pageMap = new Map();
   state.cms.pages.forEach(p => {
-    const item = el('div', {
-      class: `cms-page-item ${p.id === state.cms.openPageId ? 'selected' : ''}`,
-      onclick: () => openCmsPage(p.id)
-    }, [
-      el('div', { class: 'p-title' }, p.title || '(untitled)'),
+    pageMap.set(p.id, { ...p, children: [] });
+  });
+
+  const roots = [];
+  state.cms.pages.forEach(p => {
+    const node = pageMap.get(p.id);
+    if (p.parent_id != null && pageMap.has(Number(p.parent_id))) {
+      pageMap.get(Number(p.parent_id)).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  function sortNodes(nodes) {
+    nodes.sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+    nodes.forEach(n => sortNodes(n.children));
+  }
+  sortNodes(roots);
+
+  function renderPageNode(pageNode, depth = 0) {
+    const hasChildren = pageNode.children && pageNode.children.length > 0;
+    const isSelected = pageNode.id === state.cms.openPageId;
+    const isCollapsed = !!state.cms.pageCollapsed?.[pageNode.id];
+
+    const wrap = el('div', { class: `cms-page-tree-node ${isSelected ? 'selected' : ''}` });
+    const row = el('div', {
+      class: `cms-page-item ${isSelected ? 'selected' : ''}`,
+      draggable: 'true',
+      dataset: { pageId: String(pageNode.id) },
+      onclick: () => openCmsPage(pageNode.id),
+      ondragstart: e => {
+        e.stopPropagation();
+        state.cms.pageDrag = { id: pageNode.id };
+        wrap.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', String(pageNode.id));
+        e.dataTransfer.effectAllowed = 'move';
+      },
+      ondragend: e => {
+        e.stopPropagation();
+        document.querySelectorAll('.cms-page-tree-node.dragging').forEach(n => n.classList.remove('dragging'));
+        document.querySelectorAll('.cms-page-item').forEach(r => {
+          r.classList.remove('drag-target-before', 'drag-target-after', 'drag-target-inside');
+          delete r.dataset.dropPos;
+        });
+        state.cms.pageDrag = null;
+      },
+      ondragover: e => {
+        if (!state.cms.pageDrag || Number(state.cms.pageDrag.id) === Number(pageNode.id) || isPageDescendant(state.cms.pageDrag.id, pageNode.id)) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+
+        const rect = row.getBoundingClientRect();
+        const relY = (e.clientY - rect.top) / rect.height;
+
+        row.classList.remove('drag-target-before', 'drag-target-after', 'drag-target-inside');
+        if (relY >= 0.25 && relY <= 0.75) {
+          row.classList.add('drag-target-inside');
+          row.dataset.dropPos = 'inside';
+        } else if (relY < 0.25) {
+          row.classList.add('drag-target-before');
+          row.dataset.dropPos = 'before';
+        } else {
+          row.classList.add('drag-target-after');
+          row.dataset.dropPos = 'after';
+        }
+      },
+      ondragleave: e => {
+        if (e.relatedTarget && row.contains(e.relatedTarget)) return;
+        row.classList.remove('drag-target-before', 'drag-target-after', 'drag-target-inside');
+        delete row.dataset.dropPos;
+      },
+      ondrop: async e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const dropPos = row.dataset.dropPos || 'after';
+        row.classList.remove('drag-target-before', 'drag-target-after', 'drag-target-inside');
+        delete row.dataset.dropPos;
+
+        if (!state.cms.pageDrag || Number(state.cms.pageDrag.id) === Number(pageNode.id) || isPageDescendant(state.cms.pageDrag.id, pageNode.id)) {
+          return;
+        }
+
+        const draggedId = Number(state.cms.pageDrag.id);
+        state.cms.pageDrag = null;
+
+        let newParentId = null;
+        let newSiblings = [];
+
+        if (dropPos === 'inside') {
+          newParentId = Number(pageNode.id);
+          if (!state.cms.pageCollapsed) state.cms.pageCollapsed = {};
+          state.cms.pageCollapsed[pageNode.id] = false;
+          const currentChildren = state.cms.pages
+            .filter(p => (p.parent_id != null ? Number(p.parent_id) : null) === newParentId && Number(p.id) !== draggedId)
+            .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+          newSiblings = [...currentChildren, { id: draggedId }];
+        } else {
+          newParentId = pageNode.parent_id != null ? Number(pageNode.parent_id) : null;
+          const currentSiblings = state.cms.pages
+            .filter(p => (p.parent_id != null ? Number(p.parent_id) : null) === newParentId && Number(p.id) !== draggedId)
+            .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+          
+          const targetIndex = currentSiblings.findIndex(p => Number(p.id) === Number(pageNode.id));
+          if (targetIndex >= 0) {
+            const insertIdx = dropPos === 'before' ? targetIndex : targetIndex + 1;
+            currentSiblings.splice(insertIdx, 0, { id: draggedId });
+            newSiblings = currentSiblings;
+          } else {
+            newSiblings = [...currentSiblings, { id: draggedId }];
+          }
+        }
+
+        const items = newSiblings.map((item, idx) => ({
+          id: Number(item.id),
+          parent_id: newParentId,
+          position: idx
+        }));
+
+        try {
+          await api.post('/api/pages/reorder', { items });
+          await loadCmsPages();
+          showToast('Page order updated', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Failed to move page', 'error');
+        }
+      }
+    });
+
+    // Left Toggle Arrow or Spacer
+    if (hasChildren) {
+      const toggle = el('button', {
+        type: 'button',
+        class: `page-tree-toggle ${isCollapsed ? 'collapsed' : ''}`,
+        title: isCollapsed ? 'Expand subpages' : 'Collapse subpages',
+        onclick: e => {
+          e.stopPropagation();
+          if (!state.cms.pageCollapsed) state.cms.pageCollapsed = {};
+          state.cms.pageCollapsed[pageNode.id] = !isCollapsed;
+          renderCmsPages();
+        }
+      }, [createSvg('<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>')]);
+      row.appendChild(toggle);
+    } else {
+      row.appendChild(el('span', { class: 'page-tree-spacer' }));
+    }
+
+    // Page Icon
+    const iconSvg = hasChildren
+      ? createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>')
+      : createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>');
+    row.appendChild(el('span', { class: `page-node-icon ${hasChildren ? 'folder-icon' : ''}` }, [iconSvg]));
+
+    // Content
+    const fullPath = getPageFullPath(pageNode.id);
+    const info = el('div', { class: 'page-node-info' }, [
+      el('div', { class: 'p-title', title: pageNode.title || '(untitled)' }, pageNode.title || '(untitled)'),
       el('div', { class: 'p-meta' }, [
-        el('span', { class: `p-status ${p.status}` }, p.status),
-        el('span', {}, `/${p.slug}`),
-        el('span', {}, relativeTime(p.updated_at))
+        el('span', { class: `p-status ${pageNode.status}` }, pageNode.status),
+        el('span', {
+          class: 'p-slug',
+          onmouseenter: e => showPathTooltip(e, fullPath),
+          onmouseleave: hidePathTooltip
+        }, `/${pageNode.slug}`)
       ])
     ]);
-    list.appendChild(item);
+    row.appendChild(info);
+
+    // Actions (Add subpage & Delete)
+    const actions = el('div', { class: 'page-node-actions' }, [
+      el('button', {
+        type: 'button',
+        class: 'page-action-btn',
+        title: 'Add child subpage inside this page',
+        onclick: e => {
+          e.stopPropagation();
+          newCmsPage(pageNode.id);
+        }
+      }, [createSvg('<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>')]),
+      el('button', {
+        type: 'button',
+        class: 'page-action-btn delete-btn',
+        title: 'Delete page',
+        onclick: e => {
+          e.stopPropagation();
+          deleteCmsPage(pageNode.id);
+        }
+      }, [createSvg('<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>')])
+    ]);
+    row.appendChild(actions);
+
+    wrap.appendChild(row);
+
+    // Render child subpages
+    if (hasChildren && !isCollapsed) {
+      const childWrap = el('div', { class: 'page-tree-children' });
+      pageNode.children.forEach(child => {
+        childWrap.appendChild(renderPageNode(child, depth + 1));
+      });
+      wrap.appendChild(childWrap);
+    }
+
+    return wrap;
+  }
+
+  roots.forEach(rootNode => {
+    list.appendChild(renderPageNode(rootNode, 0));
   });
+
+  // Root drop target for moving back to top level
+  const rootDropzone = el('div', {
+    class: 'page-root-dropzone',
+    ondragover: e => {
+      if (!state.cms.pageDrag) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      rootDropzone.classList.add('active');
+    },
+    ondragleave: () => {
+      rootDropzone.classList.remove('active');
+    },
+    ondrop: async e => {
+      e.preventDefault();
+      rootDropzone.classList.remove('active');
+      if (!state.cms.pageDrag) return;
+      const draggedId = Number(state.cms.pageDrag.id);
+      state.cms.pageDrag = null;
+
+      const topLevelPages = state.cms.pages
+        .filter(p => (p.parent_id == null || p.parent_id === '') && Number(p.id) !== draggedId)
+        .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+
+      topLevelPages.push({ id: draggedId });
+
+      const items = topLevelPages.map((item, idx) => ({
+        id: Number(item.id),
+        parent_id: null,
+        position: idx
+      }));
+
+      try {
+        await api.post('/api/pages/reorder', { items });
+        await loadCmsPages();
+        showToast('Moved page to top level', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to move page', 'error');
+      }
+    }
+  }, 'Drop here to move to top level (no parent)');
+
+  list.appendChild(rootDropzone);
+}
+
+async function deleteCmsPage(id = null) {
+  const targetId = id != null ? Number(id) : (state.cms.openPageId ? Number(state.cms.openPageId) : null);
+  if (!targetId) {
+    state.cms.openPageId = null;
+    state.cms.openPage = null;
+    document.getElementById('cmsEmpty')?.classList.remove('hidden');
+    document.getElementById('cmsEditorWrap')?.classList.add('hidden');
+    return;
+  }
+  const targetPage = state.cms.pages.find(x => Number(x.id) === targetId) || (Number(state.cms.openPageId) === targetId ? state.cms.openPage : null);
+  const title = targetPage ? targetPage.title || 'Untitled' : 'this page';
+  if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+  try {
+    await api.del(`/api/pages/${targetId}`);
+    if (Number(state.cms.openPageId) === targetId) {
+      state.cms.openPageId = null;
+      state.cms.openPage = null;
+      state.cms.selectedBlockId = null;
+      document.getElementById('cmsEditorWrap')?.classList.add('hidden');
+      document.getElementById('cmsEmpty')?.classList.remove('hidden');
+      updateCurrentPageTopbarLabel();
+      switchSidebarTab('blocks');
+    }
+    await loadCms();
+    showToast('Page deleted', 'info');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to delete page', 'error');
+  }
 }
 
 function renderCmsTags() {
@@ -843,6 +1513,18 @@ async function openCmsPage(id) {
   state.cms.openPage = page;
   state.cms.selectedBlockId = null;
   page.blocks = Array.isArray(page.blocks) ? page.blocks : [];
+  page.settings = (page.settings && typeof page.settings === 'object') ? page.settings : {
+    maxWidth: '820px',
+    bg: 'default',
+    customBg: '#0f172a',
+    paddingX: 36,
+    paddingY: 44,
+    marginY: 0,
+    marginX: 0,
+    borderRadius: 16,
+    fontFamily: 'system',
+    align: 'center'
+  };
   document.getElementById('cmsEmpty').classList.add('hidden');
   document.getElementById('cmsEditorWrap').classList.remove('hidden');
   document.getElementById('cmsTitle').value = page.title || '';
@@ -850,16 +1532,48 @@ async function openCmsPage(id) {
   document.getElementById('cmsStatus').value = page.status || 'draft';
   document.getElementById('cmsTagsInput').value = (page.tags || []).join(', ');
   const previewLink = document.getElementById('cmsPreviewLink');
-  previewLink.href = `/p/${page.slug}`;
-  previewLink.classList.toggle('hidden', page.status !== 'published');
+  if (previewLink) {
+    if (page.slug) {
+      previewLink.href = `/p/${page.slug}`;
+      previewLink.classList.remove('hidden');
+      previewLink.title = page.status === 'published' ? 'View live published website' : 'Open live draft preview in new tab';
+    } else {
+      previewLink.classList.add('hidden');
+    }
+  }
+  setSaveStatus('saved');
+  updateViewportUI();
+  applyCanvasSettings();
   renderCanvas();
   renderProps();
   renderCmsPages();
+  updateCurrentPageTopbarLabel();
+  closePagesPopup();
+  switchSidebarTab('blocks');
 }
 
-function newCmsPage() {
+function newCmsPage(parentId = null) {
   state.cms.openPageId = null;
-  state.cms.openPage = { title: '', slug: '', status: 'draft', tags: [], blocks: [] };
+  state.cms.openPage = {
+    title: '',
+    slug: '',
+    status: 'draft',
+    parent_id: parentId != null ? Number(parentId) : null,
+    tags: [],
+    blocks: [],
+    settings: {
+      maxWidth: '820px',
+      bg: 'default',
+      customBg: '#0f172a',
+      paddingX: 36,
+      paddingY: 44,
+      marginY: 0,
+      marginX: 0,
+      borderRadius: 16,
+      fontFamily: 'system',
+      align: 'center'
+    }
+  };
   state.cms.selectedBlockId = null;
   document.getElementById('cmsEmpty').classList.add('hidden');
   document.getElementById('cmsEditorWrap').classList.remove('hidden');
@@ -868,29 +1582,116 @@ function newCmsPage() {
   document.getElementById('cmsStatus').value = 'draft';
   document.getElementById('cmsTagsInput').value = '';
   document.getElementById('cmsPreviewLink').classList.add('hidden');
+  setSaveStatus('saved');
+  updateViewportUI();
+  applyCanvasSettings();
   renderCanvas();
   renderProps();
   document.getElementById('cmsTitle').focus();
   renderCmsPages();
+  updateCurrentPageTopbarLabel();
+  closePagesPopup();
+  switchSidebarTab('blocks');
+}
+
+let autoSaveTimer = null;
+
+function setSaveStatus(status) {
+  const badge = document.getElementById('cmsAutoSaveBadge');
+  if (!badge) return;
+  badge.className = `auto-save-badge ${status}`;
+  const txt = badge.querySelector('.save-status-text');
+  if (txt) {
+    if (status === 'saving') txt.textContent = 'Saving...';
+    else if (status === 'saved') txt.textContent = 'Saved';
+    else if (status === 'error') txt.textContent = 'Save error';
+  }
+}
+
+function triggerAutoSave(delay = 350) {
+  if (!state.cms.openPage) return;
+  setSaveStatus('saving');
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(async () => {
+    await autoSaveCmsPage();
+  }, delay);
+}
+
+async function autoSaveCmsPage() {
+  if (!state.cms.openPage) return;
+  const titleInput = document.getElementById('cmsTitle');
+  const title = (titleInput && titleInput.value ? titleInput.value : state.cms.openPage.title || '').trim() || 'Untitled Page';
+  const statusEl = document.getElementById('cmsStatus');
+  const status = statusEl && statusEl.value ? statusEl.value : (state.cms.openPage.status || 'draft');
+  const tagsInput = document.getElementById('cmsTagsInput');
+  const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : (state.cms.openPage.tags || []);
+  const blocks = state.cms.openPage.blocks || [];
+  const settings = state.cms.openPage.settings || {};
+
+  const parent_id = state.cms.openPage.parent_id ?? null;
+
+  try {
+    if (state.cms.openPageId) {
+      await api.patch(`/api/pages/${state.cms.openPageId}`, { title, blocks, status, tags, settings, parent_id });
+    } else {
+      const r = await api.post('/api/pages', { title, blocks, status, tags, settings, parent_id });
+      state.cms.openPageId = r.id;
+      state.cms.openPage.slug = r.slug;
+      const slugInput = document.getElementById('cmsSlug');
+      if (slugInput) slugInput.value = r.slug;
+    }
+    state.cms.openPage.title = title;
+    state.cms.openPage.status = status;
+    state.cms.openPage.tags = tags;
+    state.cms.openPage.settings = settings;
+    state.cms.openPage.parent_id = parent_id;
+
+    const previewLink = document.getElementById('cmsPreviewLink');
+    if (previewLink) {
+      if (state.cms.openPage.slug) {
+        previewLink.href = `/p/${state.cms.openPage.slug}`;
+        previewLink.classList.remove('hidden');
+        previewLink.title = status === 'published' ? 'View live published website' : 'Open live draft preview in new tab';
+      } else {
+        previewLink.classList.add('hidden');
+      }
+    }
+
+    setSaveStatus('saved');
+    // Silently update page list
+    state.cms.pages = await api.get('/api/pages');
+    renderCmsPages();
+  } catch (err) {
+    console.error('Auto-save error:', err);
+    setSaveStatus('error');
+  }
 }
 
 async function saveCmsPage() {
+  clearTimeout(autoSaveTimer);
   const title = document.getElementById('cmsTitle').value.trim();
   const status = document.getElementById('cmsStatus').value;
   const tags = document.getElementById('cmsTagsInput').value
     .split(',').map(t => t.trim()).filter(Boolean);
   const blocks = state.cms.openPage ? state.cms.openPage.blocks : [];
+  const settings = state.cms.openPage ? state.cms.openPage.settings || {} : {};
+  const parent_id = state.cms.openPage ? (state.cms.openPage.parent_id ?? null) : null;
   if (!title) return alert('Title is required');
+  setSaveStatus('saving');
   if (state.cms.openPageId) {
-    await api.patch(`/api/pages/${state.cms.openPageId}`, { title, blocks, status, tags });
+    await api.patch(`/api/pages/${state.cms.openPageId}`, { title, blocks, status, tags, settings, parent_id });
   } else {
-    const r = await api.post('/api/pages', { title, blocks, status, tags });
+    const r = await api.post('/api/pages', { title, blocks, status, tags, settings, parent_id });
     state.cms.openPageId = r.id;
     state.cms.openPage.slug = r.slug;
+    const slugInput = document.getElementById('cmsSlug');
+    if (slugInput) slugInput.value = r.slug;
   }
   state.cms.openPage.title = title;
   state.cms.openPage.status = status;
   state.cms.openPage.tags = tags;
+  state.cms.openPage.settings = settings;
+  state.cms.openPage.parent_id = parent_id;
   await loadCms();
   const previewLink = document.getElementById('cmsPreviewLink');
   if (status === 'published' && state.cms.openPage.slug) {
@@ -899,34 +1700,19 @@ async function saveCmsPage() {
   } else {
     previewLink.classList.add('hidden');
   }
+  setSaveStatus('saved');
   flashSaved();
+  showToast('Page saved successfully', 'success');
 }
 
 function flashSaved() {
   const btn = document.getElementById('cmsSaveBtn');
-  const orig = btn.textContent;
-  btn.textContent = 'Saved \u2713';
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span>Saved</span>';
   btn.disabled = true;
-  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
+  setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1400);
 }
 
-async function deleteCmsPage() {
-  if (!state.cms.openPageId) {
-    state.cms.openPageId = null;
-    state.cms.openPage = null;
-    document.getElementById('cmsEmpty').classList.remove('hidden');
-    document.getElementById('cmsEditorWrap').classList.add('hidden');
-    return;
-  }
-  if (!confirm('Delete this page?')) return;
-  await api.del(`/api/pages/${state.cms.openPageId}`);
-  state.cms.openPageId = null;
-  state.cms.openPage = null;
-  state.cms.selectedBlockId = null;
-  document.getElementById('cmsEmpty').classList.remove('hidden');
-  document.getElementById('cmsEditorWrap').classList.add('hidden');
-  await loadCms();
-}
 
 // ---------- Canvas ----------
 // ---------- Canvas ----------
@@ -948,7 +1734,7 @@ function findBlock(id, list = getBlocks()) {
 function findBlockLocation(id, list = getBlocks(), parentBlock = null) {
   for (let i = 0; i < list.length; i++) {
     if (list[i].id === id) {
-      return { parentArray: list, index: i, parentBlock };
+      return { parentArray: list, index: i, parentBlock, parentContainerId: parentBlock ? parentBlock.id : null };
     }
     if (list[i].type === 'container' && Array.isArray(list[i].props && list[i].props.children)) {
       const loc = findBlockLocation(id, list[i].props.children, list[i]);
@@ -972,60 +1758,351 @@ function isDescendant(parentBlockId, testBlockId) {
   return false;
 }
 
+function handleComponentNavigation(url, newTab = false, e = null) {
+  if (!url || url === '#' || url === 'javascript:void(0)') return;
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  // Check internal page navigation: e.g., /p/slug or /p/
+  if (url.startsWith('/p/')) {
+    const slug = url.slice(3).split('?')[0].split('#')[0];
+    const targetPage = state.cms.pages.find(p => p.slug === slug);
+    if (targetPage) {
+      showToast(`Navigating to "${targetPage.title || targetPage.slug}"`, 'info');
+      openCmsPage(targetPage.id);
+      return;
+    }
+  }
+
+  // Check anchor scroll:
+  if (url.startsWith('#')) {
+    const targetEl = document.querySelector(url);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+  }
+
+  // External URL
+  if (newTab) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } else {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    showToast(`Opening external link: ${url}`, 'info');
+  }
+}
+
+function applyCustomCssOverride(targetElement, customCssString) {
+  if (!targetElement || !customCssString || typeof customCssString !== 'string') return;
+  const cleaned = customCssString.trim();
+  if (!cleaned) return;
+
+  const declarations = cleaned.split(';');
+  declarations.forEach(decl => {
+    const colonIdx = decl.indexOf(':');
+    if (colonIdx === -1) return;
+    const prop = decl.slice(0, colonIdx).trim();
+    let val = decl.slice(colonIdx + 1).trim();
+    if (!prop || !val) return;
+
+    let priority = 'important';
+    if (val.toLowerCase().includes('!important')) {
+      val = val.replace(/!important/gi, '').trim();
+    }
+
+    try {
+      targetElement.style.setProperty(prop, val, priority);
+    } catch (_) {
+      try { targetElement.style[prop] = val; } catch (__) {}
+    }
+  });
+}
+
 function renderBlockContent(block) {
   const p = block.props || {};
   switch (block.type) {
     case 'heading': {
-      const lvl = Math.min(3, Math.max(1, Number(p.level) || 2));
-      return el('div', { class: `block block-heading lvl-${lvl}` }, p.text || '');
+      const lvl = Math.min(6, Math.max(1, Number(p.level) || 2));
+      const align = p.align || 'left';
+      const colorStyle = p.color ? `color:${p.color};` : '';
+      const marginStyle = p.margin != null ? `margin-bottom:${p.margin}px;` : '';
+      const hasLink = !!p.linkUrl;
+      const headingEl = el('div', {
+        class: `block block-heading lvl-${lvl}${hasLink ? ' has-nav-link' : ''}`,
+        style: `text-align:${align};${colorStyle}${marginStyle}${hasLink ? 'cursor:pointer;' : ''}`
+      }, p.text || '');
+      if (hasLink) {
+        headingEl.addEventListener('click', e => {
+          if (state.cms.isPreviewMode) {
+            handleComponentNavigation(p.linkUrl, p.newTab, e);
+          }
+        });
+      }
+      applyCustomCssOverride(headingEl, p.customCss);
+      return headingEl;
     }
     case 'paragraph': {
-      const cls = `block block-paragraph${p.text ? '' : ' empty'}`;
-      return el('div', { class: cls }, p.text || '');
+      const align = p.align || 'left';
+      const sizeMap = { small: '13px', normal: '15px', large: '18px', lead: '21px' };
+      const fontSize = sizeMap[p.size] || '15px';
+      const colorStyle = p.color ? `color:${p.color};` : '';
+      const hasLink = !!p.linkUrl;
+      const cls = `block block-paragraph${p.text ? '' : ' empty'}${p.italic ? ' is-italic' : ''}${p.bold ? ' is-bold' : ''}${hasLink ? ' has-nav-link' : ''}`;
+      const pEl = el('div', {
+        class: cls,
+        style: `text-align:${align};font-size:${fontSize};${colorStyle}${hasLink ? 'cursor:pointer;text-decoration:underline;' : ''}`
+      }, p.text || '');
+      if (hasLink) {
+        pEl.addEventListener('click', e => {
+          if (state.cms.isPreviewMode) {
+            handleComponentNavigation(p.linkUrl, p.newTab, e);
+          }
+        });
+      }
+      applyCustomCssOverride(pEl, p.customCss);
+      return pEl;
     }
     case 'button': {
-      return el('div', { class: 'block block-button' }, [
-        el('span', {
-          class: 'btn-render',
-          style: `background:${p.color || '#6366f1'}`
-        }, p.label || 'Button')
-      ]);
+      const align = p.align || 'left';
+      const variant = p.variant || 'filled';
+      const size = p.size || 'medium';
+      const color = p.color || '#6366f1';
+      const textColor = p.textColor || '#ffffff';
+      const rad = p.borderRadius != null ? p.borderRadius : 8;
+
+      let btnStyle = `border-radius:${rad}px;`;
+      if (variant === 'filled') {
+        btnStyle += `background:${color};color:${textColor};border:1px solid transparent;`;
+      } else if (variant === 'outline') {
+        btnStyle += `background:transparent;color:${color};border:1.5px solid ${color};`;
+      } else if (variant === 'soft') {
+        btnStyle += `background:${color}22;color:${color};border:1px solid ${color}44;`;
+      }
+
+      const alignWrapperStyle = align === 'full'
+        ? 'display:block;width:100%;'
+        : `display:flex;justify-content:${align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'};`;
+      const fullClass = align === 'full' ? ' btn-full-width' : '';
+
+      const btnEl = el('span', {
+        class: `btn-render size-${size} variant-${variant}${fullClass}`,
+        style: btnStyle
+      }, p.label || 'Button');
+
+      applyCustomCssOverride(btnEl, p.customCss);
+
+      if (p.url) {
+        btnEl.addEventListener('click', e => {
+          if (state.cms.isPreviewMode) {
+            handleComponentNavigation(p.url, p.newTab, e);
+          }
+        });
+      }
+
+      const wrapEl = el('div', { class: 'block block-button-wrap', style: alignWrapperStyle }, [btnEl]);
+      return wrapEl;
     }
     case 'image': {
       if (p.url) {
-        return el('div', { class: 'block block-image' }, [
-          el('img', { src: p.url, alt: p.alt || '' })
-        ]);
+        const align = p.align || 'center';
+        const width = p.width || '100%';
+        const rad = p.borderRadius != null ? p.borderRadius : 8;
+        const fit = p.objectFit || 'cover';
+        const shadowStyle = p.shadow ? 'box-shadow: 0 10px 25px -5px rgba(0,0,0,0.35);' : '';
+        const borderStyle = p.border ? 'border: 1px solid var(--border-medium);' : '';
+        const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+
+        const imgEl = el('img', {
+          src: p.url,
+          alt: p.alt || '',
+          style: `width:${width};max-width:100%;border-radius:${rad}px;object-fit:${fit};${shadowStyle}${borderStyle}display:block;`
+        });
+
+        applyCustomCssOverride(imgEl, p.customCss);
+
+        if (p.linkUrl) {
+          imgEl.style.cursor = 'pointer';
+          imgEl.addEventListener('click', e => {
+            if (state.cms.isPreviewMode) {
+              handleComponentNavigation(p.linkUrl, p.newTab, e);
+            }
+          });
+        }
+
+        const wrapChildren = [imgEl];
+        if (p.caption) {
+          wrapChildren.push(el('div', { class: 'image-caption-text' }, p.caption));
+        }
+
+        return el('div', {
+          class: `block block-image-wrap${p.linkUrl ? ' has-nav-link' : ''}`,
+          style: `display:flex;flex-direction:column;align-items:${justify};`
+        }, wrapChildren);
       }
       return el('div', { class: 'block block-image placeholder' }, 'Image placeholder \u2014 set URL in properties');
     }
-    case 'divider':
-      return el('div', { class: 'block block-divider' }, el('hr'));
+    case 'carousel': {
+      const slides = Array.isArray(p.slides) ? p.slides : [];
+      if (!slides.length) {
+        return el('div', { class: 'block block-carousel placeholder' }, 'Carousel placeholder \u2014 add slides in properties');
+      }
+      if (!state.cms.carouselIdx) state.cms.carouselIdx = {};
+      let currentIdx = state.cms.carouselIdx[block.id] || 0;
+      if (currentIdx >= slides.length) currentIdx = 0;
+      if (currentIdx < 0) currentIdx = slides.length - 1;
+      state.cms.carouselIdx[block.id] = currentIdx;
+
+      const activeSlide = slides[currentIdx] || slides[0] || {};
+      const ratioStyle = p.aspectRatio && p.aspectRatio !== 'auto' ? `aspect-ratio:${p.aspectRatio};` : 'min-height:220px;';
+      const radStyle = `border-radius:${p.borderRadius != null ? p.borderRadius : 10}px;`;
+
+      const carouselWrap = el('div', {
+        class: 'block block-carousel',
+        style: `${ratioStyle}${radStyle}`
+      });
+
+      applyCustomCssOverride(carouselWrap, p.customCss);
+
+      const slideEl = el('div', { class: 'carousel-slide-view' });
+      if (activeSlide.url) {
+        slideEl.appendChild(el('img', { src: activeSlide.url, alt: activeSlide.caption || '' }));
+      } else {
+        slideEl.appendChild(el('div', { class: 'carousel-no-img' }, 'No image URL provided for this slide'));
+      }
+
+      if (activeSlide.linkUrl) {
+        slideEl.style.cursor = 'pointer';
+        slideEl.addEventListener('click', e => {
+          if (state.cms.isPreviewMode) {
+            handleComponentNavigation(activeSlide.linkUrl, activeSlide.newTab, e);
+          }
+        });
+      }
+
+      if (p.showCaptions !== false && activeSlide.caption) {
+        slideEl.appendChild(el('div', { class: 'carousel-caption-overlay' }, [
+          el('span', { class: 'carousel-caption-text' }, activeSlide.caption)
+        ]));
+      }
+
+      carouselWrap.appendChild(slideEl);
+
+      // Slide counter badge
+      carouselWrap.appendChild(el('div', { class: 'carousel-badge' }, `${currentIdx + 1} / ${slides.length}`));
+
+      // Navigation arrows
+      if (p.showArrows !== false && slides.length > 1) {
+        const prevBtn = el('button', {
+          type: 'button',
+          class: 'carousel-nav-btn prev',
+          title: 'Previous slide',
+          onclick: (e) => {
+            e.stopPropagation();
+            state.cms.carouselIdx[block.id] = (currentIdx - 1 + slides.length) % slides.length;
+            renderCanvas();
+          }
+        }, [createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>')]);
+
+        const nextBtn = el('button', {
+          type: 'button',
+          class: 'carousel-nav-btn next',
+          title: 'Next slide',
+          onclick: (e) => {
+            e.stopPropagation();
+            state.cms.carouselIdx[block.id] = (currentIdx + 1) % slides.length;
+            renderCanvas();
+          }
+        }, [createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>')]);
+
+        carouselWrap.appendChild(prevBtn);
+        carouselWrap.appendChild(nextBtn);
+      }
+
+      // Indicator dots
+      if (p.showDots !== false && slides.length > 1) {
+        const dotsWrap = el('div', { class: 'carousel-dots-wrap' });
+        slides.forEach((_, idx) => {
+          const dot = el('button', {
+            type: 'button',
+            class: `carousel-dot${idx === currentIdx ? ' active' : ''}`,
+            title: `Go to slide ${idx + 1}`,
+            onclick: (e) => {
+              e.stopPropagation();
+              state.cms.carouselIdx[block.id] = idx;
+              renderCanvas();
+            }
+          });
+          dotsWrap.appendChild(dot);
+        });
+        carouselWrap.appendChild(dotsWrap);
+      }
+
+      return carouselWrap;
+    }
+    case 'divider': {
+      const style = p.style || 'solid';
+      const thickness = Math.max(1, Math.min(8, Number(p.thickness) || 1));
+      const width = p.width || '100%';
+      const margin = p.margin != null ? Number(p.margin) : 16;
+      const color = p.color || 'var(--border-subtle)';
+
+      const hrEl = el('hr', {
+        class: `block-divider style-${style}`,
+        style: `width:${width};border-top-width:${thickness}px;border-top-style:${style};border-top-color:${color};`
+      });
+
+      applyCustomCssOverride(hrEl, p.customCss);
+
+      return el('div', {
+        class: 'block block-divider-wrap',
+        style: `padding:${margin}px 0;display:flex;justify-content:center;`
+      }, [hrEl]);
+    }
     case 'spacer': {
-      const h = Math.max(8, Math.min(300, Number(p.height) || 24));
-      return el('div', { class: 'block block-spacer', style: `height:${h}px` });
+      const h = Number(p.height) || 24;
+      const spEl = el('div', {
+        class: 'block block-spacer',
+        style: `height:${h}px;`,
+        dataset: { height: `${h}px` }
+      });
+      applyCustomCssOverride(spEl, p.customCss);
+      return spEl;
     }
     case 'table': {
-      const headers = Array.isArray(p.headers) ? p.headers : ['Feature', 'Description', 'Status'];
-      const rows = Array.isArray(p.rows) ? p.rows : [];
+      const headers = Array.isArray(p.headers) ? p.headers : ['Header 1', 'Header 2'];
+      const rows = Array.isArray(p.rows) ? p.rows : [['Cell 1', 'Cell 2']];
       const hasHeader = p.hasHeader !== false;
-      const classes = ['block-table'];
-      if (p.striped) classes.push('striped');
-      if (p.bordered) classes.push('bordered');
-      if (p.compact) classes.push('compact');
+      const striped = p.striped ? ' striped' : '';
+      const bordered = p.bordered ? ' bordered' : '';
+      const compact = p.compact ? ' compact' : '';
 
-      const thead = hasHeader && headers.length > 0
-        ? el('thead', {}, el('tr', {}, headers.map(h => el('th', {}, h))))
-        : null;
+      const tableEl = el('table', { class: `cms-table${striped}${bordered}${compact}` });
 
-      const tbody = el('tbody', {}, rows.map(r => {
-        const rowCells = Array.isArray(r) ? r : [];
+      if (hasHeader && headers.length) {
+        const thead = el('thead');
+        const tr = el('tr');
+        headers.forEach(h => tr.appendChild(el('th', {}, h)));
+        thead.appendChild(tr);
+        tableEl.appendChild(thead);
+      }
+
+      const tbody = el('tbody');
+      rows.forEach(row => {
+        const tr = el('tr');
+        const rowCells = Array.isArray(row) ? row : [];
         const cols = headers.length ? headers : rowCells;
-        return el('tr', {}, cols.map((_, i) => el('td', {}, rowCells[i] || '')));
-      }));
+        cols.forEach((_, cIdx) => {
+          tr.appendChild(el('td', {}, rowCells[cIdx] || ''));
+        });
+        tbody.appendChild(tr);
+      });
+      tableEl.appendChild(tbody);
 
-      const tableEl = el('table', { class: classes.join(' ') }, [thead, tbody].filter(Boolean));
-      return el('div', { class: 'block block-table-wrap' }, tableEl);
+      applyCustomCssOverride(tableEl, p.customCss);
+
+      return el('div', { class: 'block block-table-wrap' }, [tableEl]);
     }
     default:
       return el('div', { class: 'block' }, 'Unknown block');
@@ -1035,8 +2112,10 @@ function renderBlockContent(block) {
 function renderBlockWrap(block, parentContainerId = null) {
   const isSelected = block.id === state.cms.selectedBlockId;
   const isContainer = block.type === 'container';
+  const hasLink = !!block.props?.linkUrl;
   const wrap = el('div', {
-    class: `block-wrap${isContainer ? ' is-container' : ''}${isSelected ? ' selected' : ''}`,
+    id: block.id,
+    class: `block-wrap${isContainer ? ' is-container' : ''}${isSelected ? ' selected' : ''}${hasLink ? ' has-nav-link' : ''}`,
     dataset: { blockId: block.id },
     draggable: 'true'
   });
@@ -1045,20 +2124,24 @@ function renderBlockWrap(block, parentContainerId = null) {
     el('span', {
       class: 'drag-handle',
       title: 'Drag to reorder'
-    }, '\u2630'),
+    }, [createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>')]),
     el('button', {
       title: 'Move up/left',
       onclick: e => { e.stopPropagation(); moveBlock(block.id, -1); }
-    }, '\u2191'),
+    }, [createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>')]),
     el('button', {
       title: 'Move down/right',
       onclick: e => { e.stopPropagation(); moveBlock(block.id, +1); }
-    }, '\u2193'),
+    }, [createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>')]),
+    el('button', {
+      title: 'Duplicate / Copy component (Ctrl+D)',
+      onclick: e => { e.stopPropagation(); duplicateBlock(block.id); }
+    }, [createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>')]),
     el('button', {
       class: 'delete-btn',
       title: 'Delete block',
       onclick: e => { e.stopPropagation(); deleteBlock(block.id); }
-    }, '\u00d7')
+    }, [createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>')])
   ]);
 
   wrap.appendChild(toolbar);
@@ -1068,7 +2151,7 @@ function renderBlockWrap(block, parentContainerId = null) {
     const mode = p.mode || 'grid';
     const children = Array.isArray(p.children) ? p.children : [];
     const containerEl = el('div', {
-      class: `block-container mode-${mode}${p.border ? ' has-border' : ''}${p.bg && p.bg !== 'transparent' ? ' bg-' + p.bg : ''}`,
+      class: `block-container mode-${mode}${p.border ? ' has-border' : ''}${p.shadow ? ' has-shadow' : ''}${p.bg && p.bg !== 'transparent' ? ' bg-' + p.bg : ''}${p.linkUrl ? ' is-clickable-card' : ''}`,
       dataset: { containerId: block.id }
     });
 
@@ -1080,9 +2163,19 @@ function renderBlockWrap(block, parentContainerId = null) {
     }
     containerEl.style.cssText = style;
 
+    if (p.linkUrl) {
+      containerEl.addEventListener('click', e => {
+        if (state.cms.isPreviewMode) {
+          handleComponentNavigation(p.linkUrl, p.newTab, e);
+        }
+      });
+    }
+
+    applyCustomCssOverride(containerEl, p.customCss);
+
     if (!children.length) {
       const dropzone = el('div', { class: 'container-dropzone empty' }, [
-        el('span', { class: 'dropzone-icon' }, '\u2637'),
+        createSvg('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>'),
         el('span', {}, 'Container (' + (mode === 'grid' ? (p.columns || 2) + ' cols' : p.direction || 'row') + ') \u2014 Drag & drop blocks here')
       ]);
       containerEl.appendChild(dropzone);
@@ -1098,35 +2191,569 @@ function renderBlockWrap(block, parentContainerId = null) {
 
     wrap.appendChild(containerEl);
   } else {
-    wrap.appendChild(renderBlockContent(block));
+    const rendered = renderBlockContent(block);
+    applyCustomCssOverride(rendered, block.props?.customCss);
+    wrap.appendChild(rendered);
   }
 
   wrap.addEventListener('click', e => {
     e.stopPropagation();
+    if (state.cms.isPreviewMode) {
+      if (block.props?.url) {
+        handleComponentNavigation(block.props.url, block.props.newTab, e);
+      } else if (block.props?.linkUrl) {
+        handleComponentNavigation(block.props.linkUrl, block.props.newTab, e);
+      }
+      return;
+    }
     selectBlock(block.id);
   });
   wrap.addEventListener('dragstart', e => onBlockDragStart(e, block));
   wrap.addEventListener('dragend', onBlockDragEnd);
+
+  wrap.addEventListener('mouseenter', () => {
+    const treeRow = document.querySelector(`.tree-node-row[data-tree-block-id="${block.id}"]`);
+    if (treeRow) treeRow.classList.add('canvas-hover-highlight');
+  });
+  wrap.addEventListener('mouseleave', () => {
+    const treeRow = document.querySelector(`.tree-node-row[data-tree-block-id="${block.id}"]`);
+    if (treeRow) treeRow.classList.remove('canvas-hover-highlight');
+  });
+
   return wrap;
 }
 
+function setViewportMode(mode) {
+  state.cms.viewportMode = mode;
+  state.cms.viewportWidth = null;
+  updateViewportUI();
+  applyCanvasSettings();
+}
+
+function toggleViewportOrientation() {
+  state.cms.viewportOrientation = state.cms.viewportOrientation === 'portrait' ? 'landscape' : 'portrait';
+  updateViewportUI();
+  applyCanvasSettings();
+}
+
+function toggleDeviceFrame() {
+  state.cms.deviceFrame = !state.cms.deviceFrame;
+  updateViewportUI();
+  applyCanvasSettings();
+}
+
+function togglePreviewMode(enable) {
+  state.cms.isPreviewMode = typeof enable === 'boolean' ? enable : !state.cms.isPreviewMode;
+  if (state.cms.isPreviewMode) {
+    state.cms.selectedBlockId = null;
+  }
+  updateViewportUI();
+  renderCanvas();
+  renderProps();
+}
+
+function getViewportWidthDisplay() {
+  const mode = state.cms.viewportMode || 'desktop';
+  const isLandscape = state.cms.viewportOrientation === 'landscape';
+  if (state.cms.viewportWidth != null) {
+    return `${Math.round(state.cms.viewportWidth)}px`;
+  }
+  if (mode === 'mobile') {
+    return isLandscape ? '667px' : '375px';
+  }
+  if (mode === 'tablet') {
+    return isLandscape ? '1024px' : '768px';
+  }
+  const pageMaxWidth = state.cms.openPage?.settings?.maxWidth || '820px';
+  return pageMaxWidth === '100%' ? '100% (Full)' : pageMaxWidth;
+}
+
+function updateViewportUI() {
+  const mode = state.cms.viewportMode || 'desktop';
+  const isLandscape = state.cms.viewportOrientation === 'landscape';
+  const isPreview = !!state.cms.isPreviewMode;
+
+  document.getElementById('cmsViewportDesktopBtn')?.classList.toggle('active', mode === 'desktop');
+  document.getElementById('cmsViewportTabletBtn')?.classList.toggle('active', mode === 'tablet');
+  document.getElementById('cmsViewportMobileBtn')?.classList.toggle('active', mode === 'mobile');
+
+  const rotateBtn = document.getElementById('cmsViewportRotateBtn');
+  if (rotateBtn) {
+    rotateBtn.classList.toggle('hidden', mode === 'desktop');
+    rotateBtn.classList.toggle('active', isLandscape);
+  }
+
+  const frameBtn = document.getElementById('cmsViewportFrameToggle');
+  if (frameBtn) {
+    frameBtn.classList.toggle('hidden', mode === 'desktop');
+    frameBtn.classList.toggle('active', state.cms.deviceFrame);
+  }
+
+  const dimText = document.getElementById('cmsViewportDimText');
+  if (dimText) {
+    dimText.textContent = getViewportWidthDisplay();
+  }
+
+  document.getElementById('cmsEditModeBtn')?.classList.toggle('active', !isPreview);
+  document.getElementById('cmsPreviewModeBtn')?.classList.toggle('active', isPreview);
+
+  const workspace = document.querySelector('.cms-workspace');
+  if (workspace) {
+    workspace.classList.toggle('is-preview-mode', isPreview);
+  }
+
+  const banner = document.getElementById('cmsPreviewBanner');
+  if (banner) {
+    banner.classList.toggle('hidden', !isPreview);
+    const infoText = document.getElementById('cmsPreviewInfoText');
+    if (infoText) {
+      let label = mode.toUpperCase();
+      if (mode !== 'desktop') {
+        label += ` (${isLandscape ? 'Landscape' : 'Portrait'})`;
+      }
+      infoText.textContent = `${label} · ${getViewportWidthDisplay()}`;
+    }
+  }
+}
+
+function initViewportResizers() {
+  const container = document.getElementById('canvasViewportContainer');
+  const viewport = document.querySelector('.canvas-viewport');
+  const leftResizer = document.querySelector('.viewport-resizer.left');
+  const rightResizer = document.querySelector('.viewport-resizer.right');
+  if (!container || !viewport || !leftResizer || !rightResizer) return;
+
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+  let activeHandle = null;
+
+  const onMouseDown = (e, handle) => {
+    e.preventDefault();
+    isResizing = true;
+    activeHandle = handle;
+    startX = e.clientX;
+    startWidth = viewport.getBoundingClientRect().width;
+    handle.classList.add('is-resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  leftResizer.addEventListener('mousedown', e => onMouseDown(e, leftResizer));
+  rightResizer.addEventListener('mousedown', e => onMouseDown(e, rightResizer));
+
+  window.addEventListener('mousemove', e => {
+    if (!isResizing) return;
+    const deltaX = e.clientX - startX;
+    const multiplier = activeHandle === rightResizer ? 2 : -2;
+    let newWidth = Math.max(320, Math.min(1400, startWidth + deltaX * multiplier));
+    state.cms.viewportMode = 'custom';
+    state.cms.viewportWidth = newWidth;
+    updateViewportUI();
+    applyCanvasSettings();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      leftResizer.classList.remove('is-resizing');
+      rightResizer.classList.remove('is-resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  });
+}
+
+function applyCanvasSettings() {
+  const settings = (state.cms.openPage && state.cms.openPage.settings) || {};
+  const viewport = document.querySelector('.canvas-viewport');
+  const canvas = document.getElementById('cmsCanvas');
+  const frameTop = document.getElementById('cmsDeviceFrameTop');
+  const frameBottom = document.getElementById('cmsDeviceFrameBottom');
+  if (!canvas || !viewport) return;
+
+  const mode = state.cms.viewportMode || 'desktop';
+  const isLandscape = state.cms.viewportOrientation === 'landscape';
+  const showFrame = state.cms.deviceFrame && (mode === 'mobile' || mode === 'tablet');
+
+  let targetWidth;
+  if (state.cms.viewportWidth != null) {
+    targetWidth = `${Math.round(state.cms.viewportWidth)}px`;
+  } else if (mode === 'mobile') {
+    targetWidth = isLandscape ? '667px' : '375px';
+  } else if (mode === 'tablet') {
+    targetWidth = isLandscape ? '1024px' : '768px';
+  } else {
+    targetWidth = settings.maxWidth || '820px';
+  }
+
+  viewport.style.maxWidth = targetWidth;
+
+  viewport.classList.toggle('has-device-frame', showFrame);
+  viewport.classList.toggle('is-mobile-viewport', mode === 'mobile');
+  viewport.classList.toggle('is-tablet-viewport', mode === 'tablet');
+  viewport.classList.toggle('is-landscape', isLandscape);
+  if (frameTop) frameTop.classList.toggle('hidden', !showFrame);
+  if (frameBottom) frameBottom.classList.toggle('hidden', !showFrame);
+
+  const paddingX = settings.paddingX != null ? Number(settings.paddingX) : (mode === 'mobile' ? 20 : 36);
+  const paddingY = settings.paddingY != null ? Number(settings.paddingY) : (mode === 'mobile' ? 28 : 44);
+  const marginY = settings.marginY != null ? Number(settings.marginY) : 0;
+  const marginX = settings.marginX != null ? Number(settings.marginX) : 0;
+  const borderRadius = settings.borderRadius != null ? Number(settings.borderRadius) : (showFrame ? 24 : 16);
+  const bgType = settings.bg || 'default';
+  const align = settings.align || 'center';
+  const fontFamily = settings.fontFamily || 'system';
+
+  if (align === 'left' && mode === 'desktop') {
+    viewport.style.margin = `${marginY}px auto ${marginY}px ${marginX}px`;
+  } else if (marginX > 0 && mode === 'desktop') {
+    viewport.style.margin = `${marginY}px ${marginX}px`;
+  } else {
+    viewport.style.margin = `${marginY}px auto`;
+  }
+
+  const fontMap = {
+    inter: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    outfit: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    roboto: "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    mono: "'JetBrains Mono', 'Fira Code', monospace",
+    system: "inherit"
+  };
+  canvas.style.fontFamily = fontMap[fontFamily] || 'inherit';
+
+  let bgCss = 'var(--bg-surface)';
+  let borderCss = '1px solid var(--border-subtle)';
+  let textCss = 'var(--text-primary)';
+
+  if (bgType === 'pure-black') {
+    bgCss = '#000000';
+    borderCss = '1px solid rgba(255, 255, 255, 0.12)';
+  } else if (bgType === 'dark-card') {
+    bgCss = '#111827';
+    borderCss = '1px solid #1f2937';
+  } else if (bgType === 'deep-navy') {
+    bgCss = '#0a1324';
+    borderCss = '1px solid #1e293b';
+  } else if (bgType === 'light') {
+    bgCss = '#ffffff';
+    borderCss = '1px solid #e2e8f0';
+    textCss = '#0f172a';
+  } else if (bgType === 'custom' && settings.customBg) {
+    bgCss = settings.customBg;
+    borderCss = '1px solid rgba(255, 255, 255, 0.18)';
+  }
+
+  canvas.style.background = bgCss;
+  canvas.style.border = borderCss;
+  canvas.style.borderRadius = `${borderRadius}px`;
+  canvas.style.padding = `${paddingY}px ${paddingX}px`;
+
+  const isCanvasActive = !state.cms.selectedBlockId && !!state.cms.openPage && !state.cms.isPreviewMode;
+  canvas.classList.toggle('is-active', isCanvasActive);
+}
+
+function getBlockIconSvg(type) {
+  switch (type) {
+    case 'heading':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h12"/><path d="M6 4v16"/><path d="M18 4v16"/></svg>');
+    case 'paragraph':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/></svg>');
+    case 'button':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="4"/><circle cx="8" cy="12" r="1.5"/><line x1="12" y1="12" x2="16" y2="12"/></svg>');
+    case 'image':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>');
+    case 'carousel':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="8" y1="4" x2="8" y2="20"/><line x1="16" y1="4" x2="16" y2="20"/><path d="m10 9 4 3-4 3"/></svg>');
+    case 'container':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>');
+    case 'table':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>');
+    case 'divider':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/></svg>');
+    case 'spacer':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>');
+    default:
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>');
+  }
+}
+
+function switchSidebarTab(tab) {
+  state.cms.sidebarTab = tab;
+  const blocksBtn = document.getElementById('cmsTabBlocksBtn');
+  const treeBtn = document.getElementById('cmsTabTreeBtn');
+
+  const blocksView = document.getElementById('cmsPaletteView');
+  const treeView = document.getElementById('cmsTreeView');
+
+  if (blocksBtn) blocksBtn.classList.toggle('active', tab === 'blocks');
+  if (treeBtn) treeBtn.classList.toggle('active', tab === 'tree');
+
+  if (blocksView) blocksView.classList.toggle('hidden', tab !== 'blocks');
+  if (treeView) treeView.classList.toggle('hidden', tab !== 'tree');
+
+  if (tab === 'tree') {
+    renderComponentTree();
+  } else if (tab === 'blocks') {
+    if (state.cms.blocksSubTab === 'custom') {
+      renderReusableBlocks();
+    }
+  }
+}
+
+function renderComponentTree() {
+  const root = document.getElementById('cmsTreeRoot');
+  const countBadge = document.getElementById('cmsTreeCountBadge');
+  if (!root) return;
+  root.innerHTML = '';
+
+  const blocks = getBlocks();
+  let totalCount = 0;
+  function tally(list) {
+    list.forEach(b => {
+      totalCount++;
+      if (b.type === 'container' && Array.isArray(b.props?.children)) {
+        tally(b.props.children);
+      }
+    });
+  }
+  tally(blocks);
+  if (countBadge) countBadge.textContent = String(totalCount);
+  const topLayersCount = document.getElementById('cmsTopLayersCount');
+  if (topLayersCount) topLayersCount.textContent = String(totalCount);
+
+  if (!blocks.length) {
+    root.appendChild(el('div', { class: 'tree-empty-state' }, [
+      createSvg('<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>'),
+      el('p', {}, 'No components on this page yet.'),
+      el('button', {
+        type: 'button',
+        class: 'btn-sm-ghost',
+        style: 'margin-top:6px;',
+        onclick: () => switchSidebarTab('blocks')
+      }, '+ Add from Blocks')
+    ]));
+    return;
+  }
+
+function scrollToBlock(id) {
+  setTimeout(() => {
+    const blockEl = document.getElementById(id) || document.querySelector(`[data-block-id="${id}"]`);
+    if (!blockEl) return;
+    blockEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    blockEl.classList.remove('pulse-highlight');
+    void blockEl.offsetWidth; // Reflow to re-trigger animation
+    blockEl.classList.add('pulse-highlight');
+    setTimeout(() => {
+      blockEl.classList.remove('pulse-highlight');
+    }, 1200);
+  }, 40);
+}
+
+function renderTreeNode(block, depth = 0) {
+    const isContainer = block.type === 'container';
+    const isSelected = state.cms.selectedBlockId === block.id;
+    const children = isContainer && Array.isArray(block.props?.children) ? block.props.children : [];
+
+    let snippet = '';
+    if (block.props) {
+      if (block.type === 'heading') snippet = block.props.text || 'Heading';
+      else if (block.type === 'paragraph') snippet = block.props.text ? block.props.text.slice(0, 18) + (block.props.text.length > 18 ? '...' : '') : '';
+      else if (block.type === 'button') snippet = block.props.label || 'Button';
+      else if (block.type === 'image') snippet = block.props.caption || '';
+      else if (block.type === 'carousel') snippet = `${(block.props.slides || []).length} slides`;
+      else if (block.type === 'container') snippet = block.props.mode === 'grid' ? `${block.props.columns || 2} cols` : (block.props.direction || 'row');
+    }
+
+    const nodeWrap = el('div', { class: `tree-node ${isSelected ? 'selected' : ''}` });
+    const row = el('div', {
+      class: 'tree-node-row',
+      draggable: 'true',
+      dataset: { treeBlockId: block.id },
+      onclick: e => {
+        e.stopPropagation();
+        selectBlock(block.id);
+        scrollToBlock(block.id);
+      },
+      onmouseenter: () => {
+        const blockEl = document.getElementById(block.id) || document.querySelector(`[data-block-id="${block.id}"]`);
+        if (blockEl) blockEl.classList.add('tree-hover-highlight');
+      },
+      onmouseleave: () => {
+        const blockEl = document.getElementById(block.id) || document.querySelector(`[data-block-id="${block.id}"]`);
+        if (blockEl) blockEl.classList.remove('tree-hover-highlight');
+      },
+      ondragstart: e => {
+        e.stopPropagation();
+        state.cms.drag = { kind: 'block', id: block.id, fromTree: true };
+        nodeWrap.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', block.id);
+        e.dataTransfer.effectAllowed = 'move';
+      },
+      ondragend: e => {
+        e.stopPropagation();
+        document.querySelectorAll('.tree-node.dragging').forEach(n => n.classList.remove('dragging'));
+        document.querySelectorAll('.tree-node-row').forEach(r => {
+          r.classList.remove('drag-target-before', 'drag-target-after', 'drag-target-inside');
+          delete r.dataset.dropPos;
+        });
+        state.cms.drag = null;
+      },
+      ondragover: e => {
+        if (!state.cms.drag) return;
+        if (state.cms.drag.kind === 'block' && (state.cms.drag.id === block.id || isDescendant(state.cms.drag.id, block.id))) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = (state.cms.drag.kind === 'palette' || state.cms.drag.kind === 'reusable') ? 'copy' : 'move';
+
+        const rect = row.getBoundingClientRect();
+        const relY = (e.clientY - rect.top) / rect.height;
+
+        row.classList.remove('drag-target-before', 'drag-target-after', 'drag-target-inside');
+        if (isContainer && relY > 0.25 && relY < 0.75) {
+          row.classList.add('drag-target-inside');
+          row.dataset.dropPos = 'inside';
+        } else if (relY <= 0.5) {
+          row.classList.add('drag-target-before');
+          row.dataset.dropPos = 'before';
+        } else {
+          row.classList.add('drag-target-after');
+          row.dataset.dropPos = 'after';
+        }
+      },
+      ondragleave: e => {
+        if (e.relatedTarget && row.contains(e.relatedTarget)) return;
+        row.classList.remove('drag-target-before', 'drag-target-after', 'drag-target-inside');
+        delete row.dataset.dropPos;
+      },
+      ondrop: e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const dropPos = row.dataset.dropPos || 'after';
+        row.classList.remove('drag-target-before', 'drag-target-after', 'drag-target-inside');
+        delete row.dataset.dropPos;
+
+        if (!state.cms.drag) return;
+        if (state.cms.drag.kind === 'block' && (state.cms.drag.id === block.id || isDescendant(state.cms.drag.id, block.id))) {
+          return;
+        }
+
+        const drag = state.cms.drag;
+        state.cms.drag = null;
+
+        let targetParentId = null;
+        let targetIdx = 0;
+
+        if (dropPos === 'inside' && isContainer) {
+          targetParentId = block.id;
+          const container = findBlock(block.id);
+          targetIdx = (container && container.props && Array.isArray(container.props.children)) ? container.props.children.length : 0;
+          block._treeCollapsed = false;
+        } else {
+          const targetLoc = findBlockLocation(block.id);
+          if (targetLoc) {
+            targetParentId = targetLoc.parentContainerId || (targetLoc.parentBlock ? targetLoc.parentBlock.id : null);
+            targetIdx = dropPos === 'before' ? targetLoc.index : targetLoc.index + 1;
+          }
+        }
+
+        if (drag.kind === 'palette') {
+          insertBlockAt(drag.type, targetParentId, targetIdx);
+        } else if (drag.kind === 'reusable') {
+          insertReusableBlockAt(drag.reusableId, targetParentId, targetIdx);
+        } else if (drag.kind === 'block') {
+          moveBlockTo(drag.id, targetParentId, targetIdx);
+          showToast('Component moved', 'info');
+        }
+        renderCanvas();
+        renderProps();
+        renderComponentTree();
+      }
+    });
+
+    if (isContainer) {
+      const isCollapsed = !!block._treeCollapsed;
+      const toggle = el('button', {
+        type: 'button',
+        class: `tree-toggle-btn ${isCollapsed ? 'collapsed' : ''}`,
+        onclick: e => {
+          e.stopPropagation();
+          block._treeCollapsed = !block._treeCollapsed;
+          renderComponentTree();
+        }
+      }, [createSvg('<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>')]);
+      row.appendChild(toggle);
+    } else {
+      row.appendChild(el('span', { style: 'width:16px;' }));
+    }
+
+    const iconWrap = el('div', { class: `tree-node-icon ${block.type}-icon` }, [
+      getBlockIconSvg(block.type)
+    ]);
+    row.appendChild(iconWrap);
+
+    const labelWrap = el('div', { class: 'tree-node-label' }, [
+      BLOCK_LABELS[block.type] || block.type,
+      snippet ? el('span', { class: 'tree-node-sub' }, ` (${snippet})`) : null
+    ]);
+    row.appendChild(labelWrap);
+
+    const actions = el('div', { class: 'tree-node-actions' }, [
+      el('button', {
+        type: 'button',
+        class: 'tree-node-btn',
+        title: 'Duplicate (Ctrl+D)',
+        onclick: e => { e.stopPropagation(); duplicateBlock(block.id); }
+      }, [createSvg('<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>')]),
+      el('button', {
+        type: 'button',
+        class: 'tree-node-btn delete-btn',
+        title: 'Delete block',
+        onclick: e => { e.stopPropagation(); deleteBlock(block.id); }
+      }, [createSvg('<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>')])
+    ]);
+    row.appendChild(actions);
+
+    nodeWrap.appendChild(row);
+
+    if (isContainer && children.length > 0) {
+      const childrenWrap = el('div', { class: `tree-children ${block._treeCollapsed ? 'collapsed' : ''}` });
+      children.forEach(child => {
+        childrenWrap.appendChild(renderTreeNode(child, depth + 1));
+      });
+      nodeWrap.appendChild(childrenWrap);
+    }
+
+    return nodeWrap;
+  }
+
+  blocks.forEach(b => {
+    root.appendChild(renderTreeNode(b, 0));
+  });
+}
+
 function renderCanvas() {
+  applyCanvasSettings();
   const canvas = document.getElementById('cmsCanvas');
   canvas.innerHTML = '';
   const blocks = getBlocks();
   if (!blocks.length) {
     canvas.appendChild(el('div', { class: 'cms-empty-canvas' }, 'Drag a block from the palette to get started.'));
-    return;
+  } else {
+    blocks.forEach(block => {
+      canvas.appendChild(renderBlockWrap(block));
+    });
   }
-  blocks.forEach(block => {
-    canvas.appendChild(renderBlockWrap(block));
-  });
+  renderComponentTree();
 }
 
 function selectBlock(id) {
   state.cms.selectedBlockId = id;
   renderCanvas();
   renderProps();
+  renderComponentTree();
 }
 
 function moveBlock(id, dir) {
@@ -1138,6 +2765,7 @@ function moveBlock(id, dir) {
   const [b] = parentArray.splice(index, 1);
   parentArray.splice(newIdx, 0, b);
   renderCanvas();
+  triggerAutoSave(100);
 }
 
 function deleteBlock(id) {
@@ -1148,6 +2776,71 @@ function deleteBlock(id) {
   if (state.cms.selectedBlockId === id) state.cms.selectedBlockId = null;
   renderCanvas();
   renderProps();
+  triggerAutoSave(100);
+}
+
+function cloneBlockWithNewIds(originalBlock) {
+  const cloned = JSON.parse(JSON.stringify(originalBlock));
+  cloned.id = 'b_' + Math.random().toString(36).slice(2, 9);
+  if (cloned.type === 'container' && Array.isArray(cloned.props?.children)) {
+    cloned.props.children = cloned.props.children.map(child => cloneBlockWithNewIds(child));
+  }
+  return cloned;
+}
+
+function copySelectedBlock(id) {
+  const blockId = id || state.cms.selectedBlockId;
+  if (!blockId) return;
+  const block = findBlock(blockId);
+  if (!block) return;
+  state.cms.clipboardBlock = JSON.parse(JSON.stringify(block));
+  showToast(`Copied "${BLOCK_LABELS[block.type] || block.type}" (Ctrl+V to paste)`, 'info');
+}
+
+function pasteCopiedBlock() {
+  if (!state.cms.clipboardBlock) {
+    showToast('Clipboard is empty. Select a component and press Ctrl+C first.', 'warning');
+    return;
+  }
+  const cloned = cloneBlockWithNewIds(state.cms.clipboardBlock);
+
+  if (state.cms.selectedBlockId) {
+    const loc = findBlockLocation(state.cms.selectedBlockId);
+    if (loc) {
+      const selected = loc.parentArray[loc.index];
+      if (selected.type === 'container' && Array.isArray(selected.props?.children)) {
+        selected.props.children.push(cloned);
+      } else {
+        loc.parentArray.splice(loc.index + 1, 0, cloned);
+      }
+    } else {
+      const blocks = getBlocks();
+      blocks.push(cloned);
+    }
+  } else {
+    const blocks = getBlocks();
+    blocks.push(cloned);
+  }
+
+  state.cms.selectedBlockId = cloned.id;
+  renderCanvas();
+  renderProps();
+  triggerAutoSave(100);
+  showToast(`Pasted "${BLOCK_LABELS[cloned.type] || cloned.type}"`, 'success');
+}
+
+function duplicateBlock(id) {
+  const loc = findBlockLocation(id);
+  if (!loc) return;
+  const { parentArray, index } = loc;
+  const original = parentArray[index];
+  const cloned = cloneBlockWithNewIds(original);
+  parentArray.splice(index + 1, 0, cloned);
+  state.cms.selectedBlockId = cloned.id;
+  renderCanvas();
+  renderProps();
+  triggerAutoSave(100);
+  showToast('Component duplicated', 'success');
 }
 
 function insertBlockAt(type, targetContainerId, idx) {
@@ -1167,6 +2860,7 @@ function insertBlockAt(type, targetContainerId, idx) {
   state.cms.selectedBlockId = block.id;
   renderCanvas();
   renderProps();
+  triggerAutoSave(100);
 }
 
 function moveBlockTo(blockId, targetContainerId, idx) {
@@ -1182,15 +2876,16 @@ function moveBlockTo(blockId, targetContainerId, idx) {
   if (targetContainerId) {
     const container = findBlock(targetContainerId);
     if (!container) return;
+    if (!container.props) container.props = {};
     if (!Array.isArray(container.props.children)) container.props.children = [];
     targetArray = container.props.children;
   } else {
     targetArray = getBlocks();
   }
 
-  let targetIdx = idx;
-  if (loc.parentArray === targetArray && loc.index < idx) {
-    targetIdx = Math.max(0, idx - 1);
+  let targetIdx = idx == null ? targetArray.length : idx;
+  if (loc.parentArray === targetArray && loc.index < targetIdx) {
+    targetIdx = Math.max(0, targetIdx - 1);
   }
   targetIdx = Math.max(0, Math.min(targetIdx, targetArray.length));
   targetArray.splice(targetIdx, 0, b);
@@ -1198,16 +2893,46 @@ function moveBlockTo(blockId, targetContainerId, idx) {
   state.cms.selectedBlockId = blockId;
   renderCanvas();
   renderProps();
+  renderComponentTree();
+  triggerAutoSave(100);
+}
+
+function insertReusableBlockAt(reusableId, targetContainerId, idx) {
+  const r = (state.cms.reusableBlocks || []).find(x => x.id === Number(reusableId));
+  if (!r || !r.block_data) return;
+  const cloned = cloneBlockWithNewIds(r.block_data);
+  if (targetContainerId) {
+    const container = findBlock(targetContainerId);
+    if (container) {
+      if (!container.props) container.props = {};
+      if (!Array.isArray(container.props.children)) container.props.children = [];
+      const safeIdx = Math.max(0, Math.min(idx ?? container.props.children.length, container.props.children.length));
+      container.props.children.splice(safeIdx, 0, cloned);
+    }
+  } else {
+    const blocks = getBlocks();
+    const safeIdx = Math.max(0, Math.min(idx ?? blocks.length, blocks.length));
+    blocks.splice(safeIdx, 0, cloned);
+  }
+  state.cms.selectedBlockId = cloned.id;
+  renderCanvas();
+  renderProps();
+  triggerAutoSave(100);
+  showToast(`Added reusable component "${r.name}"`, 'success');
 }
 
 // ---------- Drag & Drop ----------
 function onPaletteDragStart(e) {
   const t = e.currentTarget;
-  state.cms.drag = { kind: 'palette', type: t.dataset.blockType };
+  if (t.dataset.blockType === 'reusable') {
+    state.cms.drag = { kind: 'reusable', reusableId: Number(t.dataset.reusableId) };
+    e.dataTransfer.setData('text/plain', `reusable:${t.dataset.reusableId}`);
+  } else {
+    state.cms.drag = { kind: 'palette', type: t.dataset.blockType };
+    e.dataTransfer.setData('text/plain', t.dataset.blockType);
+  }
   t.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'copy';
-  try { e.dataTransfer.setData('application/x-block-type', t.dataset.blockType); } catch (_) {}
-  e.dataTransfer.setData('text/plain', t.dataset.blockType);
 }
 
 function onPaletteDragEnd() {
@@ -1255,32 +2980,136 @@ function showTopLevelDropIndicator(canvas, idx) {
   }
 }
 
-function getContainerInsertIndex(containerEl, clientX, clientY, isHorizontal) {
-  const childWraps = Array.from(containerEl.querySelectorAll(':scope > .block-wrap'));
-  for (let i = 0; i < childWraps.length; i++) {
-    const rect = childWraps[i].getBoundingClientRect();
-    if (isHorizontal) {
-      if (clientX < rect.left + rect.width / 2) return i;
-    } else {
+function getContainerInsertIndex(containerEl, clientX, clientY, isGridOrWrap) {
+  const childWraps = Array.from(containerEl.querySelectorAll(':scope > .block-wrap:not(.container-insert-indicator)'));
+  if (!childWraps.length) return 0;
+
+  // 1D Vertical Flex Column
+  if (!isGridOrWrap) {
+    for (let i = 0; i < childWraps.length; i++) {
+      const rect = childWraps[i].getBoundingClientRect();
       if (clientY < rect.top + rect.height / 2) return i;
     }
+    return childWraps.length;
   }
-  return childWraps.length;
+
+  // 2D Multi-row Grid or Wrapping Flex:
+  // Group elements by visual rows based on top coordinate
+  const rows = [];
+  childWraps.forEach((wrap, i) => {
+    const rect = wrap.getBoundingClientRect();
+    const existingRow = rows.find(r => Math.abs(r.top - rect.top) < 20);
+    if (existingRow) {
+      existingRow.items.push({ index: i, rect });
+      existingRow.bottom = Math.max(existingRow.bottom, rect.bottom);
+    } else {
+      rows.push({ top: rect.top, bottom: rect.bottom, items: [{ index: i, rect }] });
+    }
+  });
+
+  rows.sort((a, b) => a.top - b.top);
+
+  // If client is vertically above the first row's center
+  if (clientY < rows[0].top + (rows[0].bottom - rows[0].top) / 2) {
+    for (const item of rows[0].items) {
+      if (clientX < item.rect.left + item.rect.width / 2) return item.index;
+    }
+    return rows[0].items[rows[0].items.length - 1].index + 1;
+  }
+
+  // If client is vertically below the last row's center
+  const lastRow = rows[rows.length - 1];
+  if (clientY > lastRow.top + (lastRow.bottom - lastRow.top) / 2) {
+    for (const item of lastRow.items) {
+      if (clientX < item.rect.left + item.rect.width / 2) return item.index;
+    }
+    return childWraps.length;
+  }
+
+  // Find the closest visual row
+  let targetRow = rows[0];
+  let minRowDist = Infinity;
+  for (const r of rows) {
+    const rowCenterY = (r.top + r.bottom) / 2;
+    const dist = Math.abs(clientY - rowCenterY);
+    if (dist < minRowDist) {
+      minRowDist = dist;
+      targetRow = r;
+    }
+  }
+
+  // Find target item in that row
+  for (const item of targetRow.items) {
+    if (clientX < item.rect.left + item.rect.width / 2) {
+      return item.index;
+    }
+  }
+
+  return targetRow.items[targetRow.items.length - 1].index + 1;
 }
 
-function showContainerDropIndicator(containerEl, idx, isHorizontal) {
-  if (!state.cms.indicator) {
-    state.cms.indicator = el('div', { class: 'drop-indicator' });
+function showContainerDropIndicator(containerEl, idx, isGridOrWrap) {
+  if (!state.cms.containerIndicator) {
+    state.cms.containerIndicator = el('div', { class: 'container-insert-indicator' });
   }
-  state.cms.indicator.className = 'drop-indicator' + (isHorizontal ? ' vertical' : '');
-  const childWraps = containerEl.querySelectorAll(':scope > .block-wrap');
-  const empty = containerEl.querySelector('.container-dropzone');
-  if (empty) {
-    containerEl.appendChild(state.cms.indicator);
-  } else if (idx >= childWraps.length) {
-    containerEl.appendChild(state.cms.indicator);
+
+  const childWraps = Array.from(containerEl.querySelectorAll(':scope > .block-wrap:not(.container-insert-indicator)'));
+  if (!childWraps.length) {
+    if (state.cms.containerIndicator.parentNode) {
+      state.cms.containerIndicator.parentNode.removeChild(state.cms.containerIndicator);
+    }
+    return;
+  }
+
+  const cRect = containerEl.getBoundingClientRect();
+  let left, top, width, height;
+
+  if (idx < childWraps.length) {
+    const target = childWraps[idx];
+    const tRect = target.getBoundingClientRect();
+    if (isGridOrWrap) {
+      // Place a vertical bar on the left edge of the target element
+      left = tRect.left - cRect.left - 3;
+      top = tRect.top - cRect.top;
+      width = 4;
+      height = tRect.height;
+    } else {
+      // Place a horizontal bar on top edge of target element
+      left = tRect.left - cRect.left;
+      top = tRect.top - cRect.top - 3;
+      width = tRect.width;
+      height = 4;
+    }
   } else {
-    containerEl.insertBefore(state.cms.indicator, childWraps[idx]);
+    const last = childWraps[childWraps.length - 1];
+    const lRect = last.getBoundingClientRect();
+    if (isGridOrWrap) {
+      // Place a vertical bar on the right edge of last element
+      left = lRect.right - cRect.left - 1;
+      top = lRect.top - cRect.top;
+      width = 4;
+      height = lRect.height;
+    } else {
+      // Place a horizontal bar on bottom edge of last element
+      left = lRect.left - cRect.left;
+      top = lRect.bottom - cRect.top - 1;
+      width = lRect.width;
+      height = 4;
+    }
+  }
+
+  state.cms.containerIndicator.style.cssText = `
+    position: absolute;
+    left: ${Math.max(0, Math.round(left))}px;
+    top: ${Math.max(0, Math.round(top))}px;
+    width: ${Math.round(width)}px;
+    height: ${Math.round(height)}px;
+    pointer-events: none;
+    z-index: 40;
+  `;
+
+  if (state.cms.containerIndicator.parentNode !== containerEl) {
+    containerEl.appendChild(state.cms.containerIndicator);
   }
 }
 
@@ -1288,13 +3117,16 @@ function hideDropIndicator() {
   if (state.cms.indicator && state.cms.indicator.parentNode) {
     state.cms.indicator.parentNode.removeChild(state.cms.indicator);
   }
+  if (state.cms.containerIndicator && state.cms.containerIndicator.parentNode) {
+    state.cms.containerIndicator.parentNode.removeChild(state.cms.containerIndicator);
+  }
   document.querySelectorAll('.block-container.drag-over').forEach(el => el.classList.remove('drag-over'));
 }
 
 function onCanvasDragOver(e) {
   if (!state.cms.drag) return;
   e.preventDefault();
-  e.dataTransfer.dropEffect = state.cms.drag.kind === 'palette' ? 'copy' : 'move';
+  e.dataTransfer.dropEffect = (state.cms.drag.kind === 'palette' || state.cms.drag.kind === 'reusable') ? 'copy' : 'move';
   const canvas = document.getElementById('cmsCanvas');
   const idx = getTopLevelInsertIndex(canvas, e.clientY);
   showTopLevelDropIndicator(canvas, idx);
@@ -1314,6 +3146,8 @@ function onCanvasDrop(e) {
   if (!state.cms.drag) return;
   if (state.cms.drag.kind === 'palette') {
     insertBlockAt(state.cms.drag.type, null, idx);
+  } else if (state.cms.drag.kind === 'reusable') {
+    insertReusableBlockAt(state.cms.drag.reusableId, null, idx);
   } else if (state.cms.drag.kind === 'block') {
     moveBlockTo(state.cms.drag.id, null, idx);
   }
@@ -1327,15 +3161,15 @@ function onContainerDragOver(e, containerBlock) {
   }
   e.preventDefault();
   e.stopPropagation();
-  e.dataTransfer.dropEffect = state.cms.drag.kind === 'palette' ? 'copy' : 'move';
+  e.dataTransfer.dropEffect = (state.cms.drag.kind === 'palette' || state.cms.drag.kind === 'reusable') ? 'copy' : 'move';
 
   const containerEl = e.currentTarget;
   containerEl.classList.add('drag-over');
 
   const p = containerBlock.props || {};
-  const isHorizontal = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row')));
-  const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isHorizontal);
-  showContainerDropIndicator(containerEl, idx, isHorizontal);
+  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row')));
+  const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isGridOrWrap);
+  showContainerDropIndicator(containerEl, idx, isGridOrWrap);
 }
 
 function onContainerDragLeave(e, containerBlock) {
@@ -1358,15 +3192,226 @@ function onContainerDrop(e, containerBlock) {
   }
 
   const p = containerBlock.props || {};
-  const isHorizontal = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row')));
-  const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isHorizontal);
+  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row')));
+  const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isGridOrWrap);
 
   if (state.cms.drag.kind === 'palette') {
     insertBlockAt(state.cms.drag.type, containerBlock.id, idx);
+  } else if (state.cms.drag.kind === 'reusable') {
+    insertReusableBlockAt(state.cms.drag.reusableId, containerBlock.id, idx);
   } else if (state.cms.drag.kind === 'block') {
     moveBlockTo(state.cms.drag.id, containerBlock.id, idx);
   }
   state.cms.drag = null;
+}
+
+function renderCanvasSettings(body) {
+  if (!state.cms.openPage) {
+    body.appendChild(el('div', { class: 'no-selection-state' }, [
+      createSvg('<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>'),
+      el('p', {}, 'Open a page to edit canvas settings.')
+    ]));
+    return;
+  }
+
+  if (!state.cms.openPage.settings || typeof state.cms.openPage.settings !== 'object') {
+    state.cms.openPage.settings = {
+      maxWidth: '820px',
+      bg: 'default',
+      customBg: '#0f172a',
+      paddingX: '36px',
+      paddingY: '44px',
+      fontFamily: 'system',
+      align: 'center'
+    };
+  }
+  const s = state.cms.openPage.settings;
+
+  const onSettingsChange = (delay = 80) => {
+    applyCanvasSettings();
+    renderProps();
+    triggerAutoSave(delay);
+  };
+
+  const onSettingsInput = (delay = 300) => {
+    applyCanvasSettings();
+    triggerAutoSave(delay);
+  };
+
+  const header = el('div', { class: 'props-header-actions', style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;' }, [
+    el('div', { class: 'block-type-label', style: 'margin-bottom:0;' }, [
+      createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px;margin-right:4px;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>'),
+      el('span', { class: 'type-name' }, 'Canvas Settings')
+    ]),
+    el('span', { class: 'badge', style: 'font-size:10px;padding:2px 6px;background:var(--bg-surface-hover);border-radius:4px;color:var(--text-tertiary);' }, state.cms.openPage.status === 'published' ? '● Published' : '● Draft')
+  ]);
+  body.appendChild(header);
+
+  const wrap = el('div', { class: 'fields' });
+
+  // 1. Max Width
+  const widthPresets = [
+    ['640px', 'Narrow (640px)'],
+    ['760px', 'Standard (760px)'],
+    ['820px', 'Default (820px)'],
+    ['960px', 'Wide (960px)'],
+    ['100%', 'Full Width (100% of Viewport)']
+  ];
+  wrap.appendChild(field('Canvas Max Width', select(
+    widthPresets.map(([val, label]) => [val, label, s.maxWidth || '820px']),
+    v => { s.maxWidth = v; onSettingsChange(); }
+  )));
+
+  // 2. Alignment
+  wrap.appendChild(field('Canvas Alignment', select([
+    ['center', 'Center Aligned in Editor', s.align || 'center'],
+    ['left', 'Left Aligned in Editor', s.align || 'center']
+  ], v => { s.align = v; onSettingsChange(); })));
+
+  // 3. Background Theme
+  wrap.appendChild(field('Canvas Background Theme', select([
+    ['default', 'Default Studio Dark', s.bg || 'default'],
+    ['pure-black', 'OLED Pure Black (#000000)', s.bg || 'default'],
+    ['deep-navy', 'Deep Navy (#0a1324)', s.bg || 'default'],
+    ['dark-card', 'Slate Card (#111827)', s.bg || 'default'],
+    ['light', 'Clean Light Card (#ffffff)', s.bg || 'default'],
+    ['custom', 'Custom Background Color...', s.bg || 'default']
+  ], v => { s.bg = v; onSettingsChange(); })));
+
+  if (s.bg === 'custom') {
+    wrap.appendChild(colorField('Custom Background Color', s.customBg || '#0f172a', '#0f172a', v => {
+      s.customBg = v;
+      onSettingsInput();
+    }));
+  }
+
+  // 4. Typography
+  wrap.appendChild(field('Typography Font Family', select([
+    ['system', 'System Default (San Francisco / Segoe UI)', s.fontFamily || 'system'],
+    ['inter', 'Inter (Modern Tech / Clean)', s.fontFamily || 'system'],
+    ['outfit', 'Outfit (Modern Geometric / Display)', s.fontFamily || 'system'],
+    ['roboto', 'Roboto (Classic Sans)', s.fontFamily || 'system'],
+    ['mono', 'JetBrains Mono (Code / Editorial)', s.fontFamily || 'system']
+  ], v => { s.fontFamily = v; onSettingsChange(); })));
+
+  // 5. Canvas Inner Padding
+  wrap.appendChild(el('div', { class: 'field-group-title', style: 'font-size:11px;font-weight:700;color:var(--accent-primary);text-transform:uppercase;margin:16px 0 6px;letter-spacing:0.5px;display:flex;align-items:center;gap:4px;' }, [
+    createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>'),
+    el('span', {}, 'Canvas Inner Padding')
+  ]));
+  
+  const padYInput = input('number', s.paddingY != null ? s.paddingY : 44, v => {
+    s.paddingY = Math.max(0, Number(v) || 0);
+    onSettingsInput();
+  }, { min: 0, max: 300, step: 4 });
+  wrap.appendChild(field('Padding Top & Bottom (px)', padYInput));
+
+  const padXInput = input('number', s.paddingX != null ? s.paddingX : 36, v => {
+    s.paddingX = Math.max(0, Number(v) || 0);
+    onSettingsInput();
+  }, { min: 0, max: 200, step: 4 });
+  wrap.appendChild(field('Padding Left & Right (px)', padXInput));
+
+  // 6. Canvas Outer Margin
+  wrap.appendChild(el('div', { class: 'field-group-title', style: 'font-size:11px;font-weight:700;color:var(--accent-primary);text-transform:uppercase;margin:16px 0 6px;letter-spacing:0.5px;display:flex;align-items:center;gap:4px;' }, [
+    createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>'),
+    el('span', {}, 'Canvas Outer Margin')
+  ]));
+
+  const marginYInput = input('number', s.marginY != null ? s.marginY : 0, v => {
+    s.marginY = Math.max(0, Number(v) || 0);
+    onSettingsInput();
+  }, { min: 0, max: 200, step: 4 });
+  wrap.appendChild(field('Margin Top & Bottom (px)', marginYInput));
+
+  const marginXInput = input('number', s.marginX != null ? s.marginX : 0, v => {
+    s.marginX = Math.max(0, Number(v) || 0);
+    onSettingsInput();
+  }, { min: 0, max: 200, step: 4 });
+  wrap.appendChild(field('Margin Left & Right (px)', marginXInput));
+
+  // 7. Canvas Frame & Corners
+  wrap.appendChild(el('div', { class: 'field-group-title', style: 'font-size:11px;font-weight:700;color:var(--accent-primary);text-transform:uppercase;margin:16px 0 6px;letter-spacing:0.5px;display:flex;align-items:center;gap:4px;' }, [
+    createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>'),
+    el('span', {}, 'Canvas Frame & Corners')
+  ]));
+
+  const radiusInput = input('number', s.borderRadius != null ? s.borderRadius : 16, v => {
+    s.borderRadius = Math.max(0, Number(v) || 0);
+    onSettingsInput();
+  }, { min: 0, max: 64, step: 2 });
+  wrap.appendChild(field('Corner Border Radius (px)', radiusInput));
+
+  // 6. Page Statistics
+  const blocks = state.cms.openPage.blocks || [];
+  let wordCount = 0;
+  function countWords(b) {
+    if (b.props) {
+      if (b.props.text) wordCount += String(b.props.text).trim().split(/\s+/).filter(Boolean).length;
+      if (b.props.label) wordCount += String(b.props.label).trim().split(/\s+/).filter(Boolean).length;
+      if (b.props.caption) wordCount += String(b.props.caption).trim().split(/\s+/).filter(Boolean).length;
+      if (Array.isArray(b.props.slides)) {
+        b.props.slides.forEach(s => { if (s.caption) wordCount += String(s.caption).trim().split(/\s+/).filter(Boolean).length; });
+      }
+      if (Array.isArray(b.props.children)) {
+        b.props.children.forEach(countWords);
+      }
+    }
+  }
+  blocks.forEach(countWords);
+  const readTimeMin = Math.max(1, Math.ceil(wordCount / 200));
+
+  const statsCard = el('div', {
+    class: 'canvas-stats-card',
+    style: 'background:var(--bg-surface-hover);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:12px;margin:16px 0;'
+  }, [
+    el('div', { style: 'font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-bottom:8px;' }, 'Page Summary'),
+    el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;' }, [
+      el('div', {}, [el('span', { style: 'color:var(--text-tertiary);display:block;font-size:11px;' }, 'Total Blocks'), el('strong', { style: 'color:var(--text-primary);font-size:14px;' }, `${blocks.length}`)]),
+      el('div', {}, [el('span', { style: 'color:var(--text-tertiary);display:block;font-size:11px;' }, 'Word Count'), el('strong', { style: 'color:var(--text-primary);font-size:14px;' }, `${wordCount}`)]),
+      el('div', {}, [el('span', { style: 'color:var(--text-tertiary);display:block;font-size:11px;' }, 'Read Time'), el('strong', { style: 'color:var(--text-primary);font-size:14px;' }, `~${readTimeMin} min`)]),
+      el('div', {}, [el('span', { style: 'color:var(--text-tertiary);display:block;font-size:11px;' }, 'Live Status'), el('strong', { style: 'color:var(--accent-primary);font-size:13px;' }, state.cms.openPage.status === 'published' ? 'Published' : 'Draft')])
+    ])
+  ]);
+  wrap.appendChild(statsCard);
+
+  // 7. Quick Actions
+  const actionsWrap = el('div', { style: 'margin-top:14px;' }, [
+    el('label', { style: 'font-weight:700;font-size:11px;color:var(--text-tertiary);text-transform:uppercase;display:block;margin-bottom:6px;' }, 'Canvas Actions'),
+    el('div', { style: 'display:flex;flex-direction:column;gap:6px;' }, [
+      el('button', {
+        type: 'button',
+        class: 'btn ghost btn-sm',
+        style: 'width:100%;justify-content:center;',
+        onclick: () => {
+          if (state.cms.openPage.slug && state.cms.openPage.status === 'published') {
+            window.open(`/p/${state.cms.openPage.slug}`, '_blank');
+          } else {
+            showToast('Publish the page to view standalone live URL', 'info');
+          }
+        }
+      }, 'Open Live Preview \u2197'),
+      el('button', {
+        type: 'button',
+        class: 'btn ghost danger btn-sm',
+        style: 'width:100%;justify-content:center;',
+        onclick: () => {
+          if (!blocks.length) return;
+          if (confirm('Clear all blocks from this canvas?')) {
+            state.cms.openPage.blocks = [];
+            state.cms.selectedBlockId = null;
+            renderCanvas();
+            renderProps();
+            triggerAutoSave(100);
+            showToast('Canvas cleared', 'info');
+          }
+        }
+      }, 'Clear All Blocks')
+    ])
+  ]);
+  wrap.appendChild(actionsWrap);
+
+  body.appendChild(wrap);
 }
 
 // ---------- Properties panel ----------
@@ -1375,57 +3420,394 @@ function renderProps() {
   body.innerHTML = '';
   const block = findBlock(state.cms.selectedBlockId);
   if (!block) {
-    body.appendChild(el('p', { class: 'muted' }, 'Select a block to edit its properties.'));
+    renderCanvasSettings(body);
     return;
   }
-  body.appendChild(el('div', { class: 'block-type-label' }, [
-    'Type: ',
-    el('span', { class: 'type-name' }, BLOCK_LABELS[block.type] || block.type)
-  ]));
+  const headerActions = el('div', { class: 'props-header-actions', style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;' }, [
+    el('div', { class: 'block-type-label', style: 'margin-bottom:0;' }, [
+      'Type: ',
+      el('span', { class: 'type-name' }, BLOCK_LABELS[block.type] || block.type)
+    ]),
+    el('div', { style: 'display:flex;gap:5px;' }, [
+      el('button', {
+        type: 'button',
+        class: 'btn-sm-ghost',
+        title: 'Open Canvas / Page Settings',
+        onclick: () => {
+          state.cms.selectedBlockId = null;
+          renderCanvas();
+          renderProps();
+        }
+      }, [
+        createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>'),
+        el('span', { style: 'margin-left:3px;font-size:11px;' }, 'Canvas')
+      ]),
+      el('button', {
+        type: 'button',
+        class: 'btn-sm-ghost',
+        title: 'Save as Reusable Block / Template',
+        onclick: () => saveSelectedAsReusableBlock(block.id)
+      }, [
+        createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'),
+        el('span', { style: 'margin-left:3px;font-size:11px;' }, 'Save Reusable')
+      ]),
+      el('button', {
+        type: 'button',
+        class: 'btn-sm-ghost',
+        title: 'Copy component (Ctrl+C)',
+        onclick: () => copySelectedBlock(block.id)
+      }, [
+        createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'),
+        el('span', { style: 'margin-left:3px;font-size:11px;' }, 'Copy')
+      ]),
+      el('button', {
+        type: 'button',
+        class: 'btn-sm-danger',
+        title: 'Delete component',
+        onclick: () => deleteBlock(block.id)
+      }, [
+        createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>')
+      ])
+    ])
+  ]);
+  body.appendChild(headerActions);
 
   const wrap = el('div', { class: 'fields' });
   const p = block.props;
 
-  const onChange = () => {
+  const onChange = (delay = 80) => {
     renderCanvas();
     renderProps();
+    triggerAutoSave(delay);
+  };
+
+  const onPropInput = (delay = 350) => {
+    renderCanvas();
+    triggerAutoSave(delay);
   };
 
   switch (block.type) {
     case 'heading': {
       wrap.appendChild(field('Level', select([
-        ['1', 'Heading 1', String(p.level || 2)],
-        ['2', 'Heading 2', String(p.level || 2)],
-        ['3', 'Heading 3', String(p.level || 2)]
+        ['1', 'Heading 1 (H1)', String(p.level || 2)],
+        ['2', 'Heading 2 (H2)', String(p.level || 2)],
+        ['3', 'Heading 3 (H3)', String(p.level || 2)],
+        ['4', 'Heading 4 (H4)', String(p.level || 2)],
+        ['5', 'Heading 5 (H5)', String(p.level || 2)],
+        ['6', 'Heading 6 (H6)', String(p.level || 2)]
       ], v => { p.level = Number(v); onChange(); })));
-      wrap.appendChild(field('Text', textarea(p.text || '', v => { p.text = v; renderCanvas(); })));
+
+      wrap.appendChild(field('Text Content', textarea(p.text || '', v => { p.text = v; onPropInput(); })));
+
+      wrap.appendChild(field('Alignment', select([
+        ['left', 'Left Aligned', p.align || 'left'],
+        ['center', 'Centered', p.align || 'left'],
+        ['right', 'Right Aligned', p.align || 'left']
+      ], v => { p.align = v; onChange(); })));
+
+      wrap.appendChild(colorField('Text Color', p.color || '', '#ffffff', v => {
+        p.color = v;
+        onPropInput();
+      }));
+
+      wrap.appendChild(field('Bottom Spacing (px)', input('number', String(p.margin != null ? p.margin : 12), v => {
+        p.margin = Math.max(0, Math.min(64, Number(v) || 0));
+        onPropInput();
+      })));
+
+      wrap.appendChild(navigationLinkField('Click Action (Link to Page / URL)', p, onPropInput, 'linkUrl'));
       break;
     }
     case 'paragraph': {
-      wrap.appendChild(field('Text', textarea(p.text || '', v => { p.text = v; renderCanvas(); })));
+      wrap.appendChild(field('Body Text', textarea(p.text || '', v => { p.text = v; onPropInput(); })));
+
+      wrap.appendChild(field('Text Alignment', select([
+        ['left', 'Left', p.align || 'left'],
+        ['center', 'Center', p.align || 'left'],
+        ['right', 'Right', p.align || 'left'],
+        ['justify', 'Justify', p.align || 'left']
+      ], v => { p.align = v; onChange(); })));
+
+      wrap.appendChild(field('Font Size', select([
+        ['small', 'Small (13px)', p.size || 'normal'],
+        ['normal', 'Normal (15px)', p.size || 'normal'],
+        ['large', 'Large (18px)', p.size || 'normal'],
+        ['lead', 'Lead Text (21px)', p.size || 'normal']
+      ], v => { p.size = v; onChange(); })));
+
+      wrap.appendChild(colorField('Text Color', p.color || '', '#94a3b8', v => {
+        p.color = v;
+        onPropInput();
+      }));
+
+      wrap.appendChild(checkbox('Bold Text', !!p.bold, v => {
+        p.bold = v;
+        onChange();
+      }));
+
+      wrap.appendChild(checkbox('Italic Style', !!p.italic, v => {
+        p.italic = v;
+        onChange();
+      }));
+
+      wrap.appendChild(navigationLinkField('Click Action (Link to Page / URL)', p, onPropInput, 'linkUrl'));
       break;
     }
     case 'button': {
-      wrap.appendChild(field('Label', input('text', p.label || '', v => { p.label = v; renderCanvas(); })));
-      wrap.appendChild(field('URL', input('url', p.url || '', v => { p.url = v; renderCanvas(); })));
-      wrap.appendChild(field('Color', input('color', p.color || '#6366f1', v => { p.color = v; renderCanvas(); })));
+      wrap.appendChild(field('Button Label', input('text', p.label || '', v => { p.label = v; onPropInput(); })));
+      
+      wrap.appendChild(navigationLinkField('Button Click Destination (Page / URL)', p, onPropInput, 'url'));
+
+      wrap.appendChild(field('Button Style', select([
+        ['filled', 'Solid Filled', p.variant || 'filled'],
+        ['outline', 'Outline / Ghost', p.variant || 'filled'],
+        ['soft', 'Soft Tint', p.variant || 'filled']
+      ], v => { p.variant = v; onChange(); })));
+
+      wrap.appendChild(field('Button Size', select([
+        ['small', 'Small', p.size || 'medium'],
+        ['medium', 'Medium', p.size || 'medium'],
+        ['large', 'Large', p.size || 'medium']
+      ], v => { p.size = v; onChange(); })));
+
+      wrap.appendChild(field('Alignment', select([
+        ['left', 'Left', p.align || 'left'],
+        ['center', 'Center', p.align || 'left'],
+        ['right', 'Right', p.align || 'left'],
+        ['full', 'Full Width', p.align || 'left']
+      ], v => { p.align = v; onChange(); })));
+
+      wrap.appendChild(colorField('Button Color', p.color || '#6366f1', '#6366f1', v => {
+        p.color = v || '#6366f1';
+        onPropInput();
+      }));
+
+      wrap.appendChild(colorField('Text Color', p.textColor || '#ffffff', '#ffffff', v => {
+        p.textColor = v || '#ffffff';
+        onPropInput();
+      }));
+
+      wrap.appendChild(field('Border Radius (px)', input('number', String(p.borderRadius != null ? p.borderRadius : 8), v => {
+        p.borderRadius = Math.max(0, Math.min(32, Number(v) || 0));
+        onPropInput();
+      })));
       break;
     }
     case 'image': {
-      wrap.appendChild(field('Image URL', input('text', p.url || '', v => { p.url = v; renderCanvas(); })));
-      wrap.appendChild(field('Alt text', input('text', p.alt || '', v => { p.alt = v; renderCanvas(); })));
+      wrap.appendChild(field('Image URL', input('text', p.url || '', v => { p.url = v; onPropInput(); })));
+      wrap.appendChild(field('Alt Description', input('text', p.alt || '', v => { p.alt = v; onPropInput(); })));
+      wrap.appendChild(field('Caption (optional)', input('text', p.caption || '', v => { p.caption = v; onPropInput(); })));
+      
+      wrap.appendChild(navigationLinkField('Image Click Destination (Page / URL)', p, onPropInput, 'linkUrl'));
+
+      wrap.appendChild(field('Image Width', select([
+        ['100%', '100% (Full)', p.width || '100%'],
+        ['75%', '75% (Wide)', p.width || '100%'],
+        ['50%', '50% (Medium)', p.width || '100%'],
+        ['33%', '33% (Small)', p.width || '100%'],
+        ['auto', 'Auto / Original', p.width || '100%']
+      ], v => { p.width = v; onChange(); })));
+
+      wrap.appendChild(field('Alignment', select([
+        ['center', 'Center', p.align || 'center'],
+        ['left', 'Left', p.align || 'center'],
+        ['right', 'Right', p.align || 'center']
+      ], v => { p.align = v; onChange(); })));
+
+      wrap.appendChild(field('Object Fit', select([
+        ['cover', 'Cover (Fill Frame)', p.objectFit || 'cover'],
+        ['contain', 'Contain (Full Aspect)', p.objectFit || 'cover'],
+        ['fill', 'Stretch', p.objectFit || 'cover']
+      ], v => { p.objectFit = v; onChange(); })));
+
+      wrap.appendChild(field('Border Radius (px)', input('number', String(p.borderRadius != null ? p.borderRadius : 8), v => {
+        p.borderRadius = Math.max(0, Math.min(48, Number(v) || 0));
+        onPropInput();
+      })));
+
+      wrap.appendChild(checkbox('Drop Shadow', !!p.shadow, v => {
+        p.shadow = v;
+        onChange();
+      }));
+
+      wrap.appendChild(checkbox('Subtle Border', !!p.border, v => {
+        p.border = v;
+        onChange();
+      }));
+      break;
+    }
+    case 'carousel': {
+      if (!Array.isArray(p.slides)) p.slides = [];
+
+      wrap.appendChild(field('Aspect Ratio', select([
+        ['16/9', '16:9 (Widescreen)', p.aspectRatio || '16/9'],
+        ['4/3', '4:3 (Standard Photo)', p.aspectRatio || '16/9'],
+        ['21/9', '21:9 (Cinematic Banner)', p.aspectRatio || '16/9'],
+        ['1/1', '1:1 (Square)', p.aspectRatio || '16/9'],
+        ['auto', 'Auto / Variable', p.aspectRatio || '16/9']
+      ], v => { p.aspectRatio = v; onChange(); })));
+
+      wrap.appendChild(field('Border Radius (px)', input('number', String(p.borderRadius != null ? p.borderRadius : 10), v => {
+        p.borderRadius = Math.max(0, Math.min(32, Number(v) || 0));
+        onPropInput();
+      })));
+
+      wrap.appendChild(checkbox('Autoplay Slides', !!p.autoplay, v => {
+        p.autoplay = v;
+        onChange();
+      }));
+
+      if (p.autoplay) {
+        wrap.appendChild(field('Interval (seconds)', input('number', String(p.interval || 4), v => {
+          p.interval = Math.max(1, Math.min(30, Number(v) || 4));
+          onChange();
+        })));
+      }
+
+      wrap.appendChild(checkbox('Show Navigation Arrows', p.showArrows !== false, v => {
+        p.showArrows = v;
+        onChange();
+      }));
+
+      wrap.appendChild(checkbox('Show Indicator Dots', p.showDots !== false, v => {
+        p.showDots = v;
+        onChange();
+      }));
+
+      wrap.appendChild(checkbox('Show Captions', p.showCaptions !== false, v => {
+        p.showCaptions = v;
+        onChange();
+      }));
+
+      wrap.appendChild(el('div', { class: 'props-section-header' }, [
+        el('label', { style: 'font-weight:600;' }, `Slides (${p.slides.length})`),
+        el('button', {
+          type: 'button',
+          class: 'btn-sm-primary',
+          onclick: () => {
+            p.slides.push({
+              url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1000&auto=format&fit=crop',
+              caption: `Slide ${p.slides.length + 1}`
+            });
+            onChange();
+          }
+        }, '+ Add Slide')
+      ]));
+
+      const slidesList = el('div', { class: 'carousel-slides-editor' });
+      p.slides.forEach((slide, sIdx) => {
+        const slideItem = el('div', { class: 'carousel-slide-edit-item' });
+
+        const headerRow = el('div', { class: 'slide-edit-header' }, [
+          el('span', { class: 'slide-num' }, `Slide #${sIdx + 1}`),
+          el('div', { class: 'slide-actions' }, [
+            el('button', {
+              type: 'button',
+              title: 'Move up',
+              disabled: sIdx === 0,
+              onclick: () => {
+                const [item] = p.slides.splice(sIdx, 1);
+                p.slides.splice(sIdx - 1, 0, item);
+                onChange();
+              }
+            }, '\u2191'),
+            el('button', {
+              type: 'button',
+              title: 'Move down',
+              disabled: sIdx === p.slides.length - 1,
+              onclick: () => {
+                const [item] = p.slides.splice(sIdx, 1);
+                p.slides.splice(sIdx + 1, 0, item);
+                onChange();
+              }
+            }, '\u2193'),
+            el('button', {
+              type: 'button',
+              class: 'del',
+              title: 'Delete slide',
+              onclick: () => {
+                p.slides.splice(sIdx, 1);
+                onChange();
+              }
+            }, '\u00d7')
+          ])
+        ]);
+
+        const previewThumb = slide.url
+          ? el('div', { class: 'slide-preview-thumb', style: `background-image:url("${slide.url}")` })
+          : el('div', { class: 'slide-preview-thumb empty' }, 'No img');
+
+        const inputsWrap = el('div', { class: 'slide-inputs' }, [
+          field('Image URL', input('text', slide.url || '', v => {
+            slide.url = v;
+            onPropInput();
+            if (previewThumb) previewThumb.style.backgroundImage = v ? `url("${v}")` : 'none';
+          })),
+          field('Caption', input('text', slide.caption || '', v => {
+            slide.caption = v;
+            onPropInput();
+          })),
+          navigationLinkField('Slide Navigation Link', slide, () => { onPropInput(); }, 'linkUrl')
+        ]);
+
+        slideItem.appendChild(headerRow);
+        const rowBody = el('div', { class: 'slide-edit-body' }, [previewThumb, inputsWrap]);
+        slideItem.appendChild(rowBody);
+        slidesList.appendChild(slideItem);
+      });
+
+      wrap.appendChild(slidesList);
       break;
     }
     case 'divider': {
-      wrap.appendChild(el('p', { class: 'muted', style: 'font-size:12px' }, 'No editable properties.'));
+      wrap.appendChild(field('Line Style', select([
+        ['solid', 'Solid Line', p.style || 'solid'],
+        ['dashed', 'Dashed Line', p.style || 'solid'],
+        ['dotted', 'Dotted Line', p.style || 'solid'],
+        ['double', 'Double Line', p.style || 'solid']
+      ], v => { p.style = v; onChange(); })));
+
+      wrap.appendChild(field('Line Thickness (px)', select([
+        ['1', '1px (Hairline)', String(p.thickness || 1)],
+        ['2', '2px (Medium)', String(p.thickness || 1)],
+        ['3', '3px (Bold)', String(p.thickness || 1)],
+        ['4', '4px (Heavy)', String(p.thickness || 1)]
+      ], v => { p.thickness = Number(v); onChange(); })));
+
+      wrap.appendChild(field('Divider Width', select([
+        ['100%', '100% (Full)', p.width || '100%'],
+        ['75%', '75% (Wide)', p.width || '100%'],
+        ['50%', '50% (Centered)', p.width || '100%'],
+        ['25%', '25% (Short)', p.width || '100%']
+      ], v => { p.width = v; onChange(); })));
+
+      wrap.appendChild(field('Vertical Spacing (px)', input('number', String(p.margin != null ? p.margin : 16), v => {
+        p.margin = Math.max(4, Math.min(64, Number(v) || 16));
+        onPropInput();
+      })));
+
+      wrap.appendChild(colorField('Line Color', p.color || '', 'rgba(255,255,255,0.15)', v => {
+        p.color = v;
+        onPropInput();
+      }));
       break;
     }
     case 'spacer': {
       wrap.appendChild(field('Height (px)', input('number', String(p.height || 24), v => {
         const n = Math.max(8, Math.min(300, Number(v) || 24));
         p.height = n;
-        renderCanvas();
+        onPropInput();
       })));
+
+      const presetRow = el('div', { class: 'quick-presets-row' }, [
+        el('label', { style: 'font-size:11px;color:var(--text-tertiary);' }, 'Presets:'),
+        ...[12, 24, 48, 96].map(h => el('button', {
+          type: 'button',
+          class: `quick-preset-chip${p.height === h ? ' active' : ''}`,
+          onclick: () => { p.height = h; onChange(); }
+        }, `${h}px`))
+      ]);
+      wrap.appendChild(presetRow);
       break;
     }
     case 'table': {
@@ -1485,7 +3867,7 @@ function renderProps() {
         const headerInputs = p.headers.map((h, colIdx) => {
           return input('text', h, v => {
             p.headers[colIdx] = v;
-            renderCanvas();
+            onPropInput();
           });
         });
         matrixEditor.appendChild(el('div', { class: 'table-matrix-row', style: 'font-weight:bold;' }, [
@@ -1498,7 +3880,7 @@ function renderProps() {
         const rowInputs = p.headers.map((_, colIdx) => {
           return input('text', row[colIdx] || '', v => {
             row[colIdx] = v;
-            renderCanvas();
+            onPropInput();
           });
         });
 
@@ -1578,18 +3960,19 @@ function renderProps() {
 
       wrap.appendChild(field('Gap (px)', input('number', String(p.gap ?? 16), v => {
         p.gap = Math.max(0, Math.min(64, Number(v) || 0));
-        renderCanvas();
+        onPropInput();
       })));
 
       wrap.appendChild(field('Padding (px)', input('number', String(p.padding ?? 16), v => {
         p.padding = Math.max(0, Math.min(64, Number(v) || 0));
-        renderCanvas();
+        onPropInput();
       })));
 
-      wrap.appendChild(field('Background', select([
+      wrap.appendChild(field('Background Style', select([
         ['surface', 'Card Surface', p.bg || 'surface'],
         ['subtle', 'Subtle Tint', p.bg || 'surface'],
-        ['transparent', 'Transparent', p.bg || 'surface']
+        ['transparent', 'Transparent', p.bg || 'surface'],
+        ['dark', 'Deep Dark', p.bg || 'surface']
       ], v => { p.bg = v; onChange(); })));
 
       wrap.appendChild(checkbox('Show Container Border', !!p.border, v => {
@@ -1599,8 +3982,15 @@ function renderProps() {
 
       wrap.appendChild(field('Border Radius (px)', input('number', String(p.borderRadius ?? 8), v => {
         p.borderRadius = Math.max(0, Math.min(32, Number(v) || 0));
-        renderCanvas();
+        onPropInput();
       })));
+
+      wrap.appendChild(checkbox('Drop Shadow', !!p.shadow, v => {
+        p.shadow = v;
+        onChange();
+      }));
+
+      wrap.appendChild(navigationLinkField('Card Click Destination (Link Entire Container)', p, onPropInput, 'linkUrl'));
 
       wrap.appendChild(el('label', { style: 'font-weight:600;margin-top:14px;display:block;' }, 'Add Block Inside:'));
       const quickAdd = el('div', { class: 'container-quick-add' }, [
@@ -1608,7 +3998,9 @@ function renderProps() {
         el('button', { type: 'button', onclick: () => insertBlockAt('paragraph', block.id) }, '+ Text'),
         el('button', { type: 'button', onclick: () => insertBlockAt('button', block.id) }, '+ Button'),
         el('button', { type: 'button', onclick: () => insertBlockAt('image', block.id) }, '+ Image'),
+        el('button', { type: 'button', onclick: () => insertBlockAt('carousel', block.id) }, '+ Carousel'),
         el('button', { type: 'button', onclick: () => insertBlockAt('table', block.id) }, '+ Table'),
+        el('button', { type: 'button', onclick: () => insertBlockAt('divider', block.id) }, '+ Divider'),
         el('button', { type: 'button', onclick: () => insertBlockAt('spacer', block.id) }, '+ Spacer')
       ]);
       wrap.appendChild(quickAdd);
@@ -1664,7 +4056,92 @@ function renderProps() {
       break;
     }
   }
+
+  // Universal Custom CSS Style setting on every component
+  wrap.appendChild(customCssField(block, onPropInput));
+
   body.appendChild(wrap);
+}
+
+function customCssField(block, onPropChange) {
+  const p = block.props || {};
+  if (!p) block.props = {};
+
+  const fieldWrap = el('div', {
+    class: 'field custom-css-field-wrap',
+    style: 'margin-top:16px;padding-top:14px;border-top:1px solid var(--border-subtle);'
+  });
+
+  const titleRow = el('div', {
+    style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'
+  }, [
+    el('label', { style: 'font-weight:700;font-size:11.5px;color:var(--accent-primary);text-transform:uppercase;letter-spacing:0.5px;margin:0;display:flex;align-items:center;gap:5px;' }, [
+      createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>'),
+      el('span', {}, 'Custom CSS Style')
+    ]),
+    p.customCss ? el('button', {
+      type: 'button',
+      class: 'btn-icon-sm',
+      title: 'Clear Custom CSS',
+      onclick: () => {
+        p.customCss = '';
+        txt.value = '';
+        onPropChange();
+      }
+    }, '\u2715') : false
+  ]);
+
+  const txt = el('textarea', {
+    placeholder: 'e.g., box-shadow: 0 0 20px rgba(99,102,241,0.5); transform: rotate(-1deg); letter-spacing: 1px;',
+    style: 'font-family:var(--font-mono);font-size:11px;line-height:1.45;min-height:58px;resize:vertical;width:100%;box-sizing:border-box;background:rgba(0,0,0,0.35);color:#38bdf8;border:1px solid var(--border-medium);border-radius:var(--radius-md);padding:8px 10px;',
+    oninput: e => {
+      p.customCss = e.target.value;
+      onPropChange();
+    }
+  }, p.customCss || '');
+
+  const appendSnippet = (snippet) => {
+    p.customCss = (p.customCss ? p.customCss.trim().replace(/;?$/, '; ') : '') + snippet;
+    txt.value = p.customCss;
+    onPropChange();
+  };
+
+  const presetsRow = el('div', {
+    class: 'quick-presets-row',
+    style: 'margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;'
+  }, [
+    el('span', { style: 'font-size:10px;color:var(--text-tertiary);align-self:center;margin-right:2px;' }, 'Presets:'),
+    el('button', {
+      type: 'button',
+      class: 'quick-preset-chip',
+      onclick: () => appendSnippet('box-shadow: 0 0 25px rgba(99, 102, 241, 0.6);')
+    }, '\u2728 Glow'),
+    el('button', {
+      type: 'button',
+      class: 'quick-preset-chip',
+      onclick: () => appendSnippet('backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.18);')
+    }, '\ud83d\udc8e Glass'),
+    el('button', {
+      type: 'button',
+      class: 'quick-preset-chip',
+      onclick: () => appendSnippet('background: linear-gradient(135deg, #818cf8, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;')
+    }, '\ud83c\udf08 Gradient'),
+    el('button', {
+      type: 'button',
+      class: 'quick-preset-chip',
+      onclick: () => appendSnippet('transform: rotate(-1.5deg);')
+    }, '\ud83d\udcd0 Tilt'),
+    el('button', {
+      type: 'button',
+      class: 'quick-preset-chip',
+      onclick: () => appendSnippet('border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);')
+    }, '\u26a1 Neon')
+  ]);
+
+  fieldWrap.appendChild(titleRow);
+  fieldWrap.appendChild(txt);
+  fieldWrap.appendChild(presetsRow);
+  return fieldWrap;
 }
 
 function checkbox(label, checked, onToggle) {
@@ -1680,10 +4157,28 @@ function field(label, control) {
   ]);
 }
 
+function colorField(label, value, defaultVal, onChange) {
+  const colorInput = input('color', value || defaultVal || '#6366f1', v => onChange(v));
+  const textInput = input('text', value || '', v => onChange(v));
+  textInput.placeholder = 'Default';
+  textInput.style.maxWidth = '90px';
+  const clearBtn = el('button', {
+    type: 'button',
+    class: 'btn-icon-sm',
+    title: 'Reset to default',
+    onclick: () => {
+      onChange('');
+    }
+  }, '\u2715');
+
+  const row = el('div', { class: 'color-input-row' }, [colorInput, textInput, clearBtn]);
+  return field(label, row);
+}
+
 function input(type, value, onInput) {
   return el('input', {
     type,
-    value,
+    value: value != null ? value : '',
     oninput: e => onInput(e.target.value)
   });
 }
@@ -1691,7 +4186,7 @@ function input(type, value, onInput) {
 function textarea(value, onInput) {
   return el('textarea', {
     oninput: e => onInput(e.target.value)
-  }, value);
+  }, value != null ? value : '');
 }
 
 function select(options, onChange) {
@@ -1702,24 +4197,362 @@ function select(options, onChange) {
   return sel;
 }
 
+function navigationLinkField(label, propObj, onPropChange, urlKey = 'url', newTabKey = 'newTab') {
+  const currentUrl = propObj[urlKey] || '';
+  const isPage = currentUrl.startsWith('/p/');
+  const currentMode = !currentUrl ? 'none' : (isPage ? 'page' : 'custom');
+
+  const container = el('div', { class: 'field nav-link-field-wrap' }, [
+    el('label', { style: 'display:flex;align-items:center;justify-content:space-between;' }, [
+      el('span', {}, label || 'Click Navigation Action'),
+      currentUrl ? el('span', { class: 'link-type-tag' }, isPage ? 'Internal Page' : 'External Link') : false
+    ])
+  ]);
+
+  const modeSelect = select([
+    ['none', 'None (No click action)', currentMode === 'none' ? 'none' : ''],
+    ['page', '📄 Internal Document / Page', currentMode === 'page' ? 'page' : ''],
+    ['custom', '🔗 Custom URL / External Link', currentMode === 'custom' ? 'custom' : '']
+  ], mode => {
+    if (mode === 'none') {
+      propObj[urlKey] = '';
+    } else if (mode === 'page') {
+      const otherPages = state.cms.pages.filter(p => p.id !== state.cms.openPageId);
+      const target = otherPages[0] || state.cms.pages[0];
+      propObj[urlKey] = target ? `/p/${target.slug}` : '/p/';
+    } else if (mode === 'custom') {
+      propObj[urlKey] = 'https://';
+    }
+    onPropChange();
+    renderProps();
+  });
+
+  container.appendChild(modeSelect);
+
+  if (currentMode === 'page') {
+    const pageOptions = state.cms.pages.map(p => [
+      `/p/${p.slug}`,
+      `📄 ${p.title || 'Untitled'} (/p/${p.slug})`,
+      currentUrl === `/p/${p.slug}` ? `/p/${p.slug}` : ''
+    ]);
+    if (!pageOptions.some(opt => opt[0] === currentUrl) && currentUrl) {
+      pageOptions.unshift([currentUrl, `Current: ${currentUrl}`, currentUrl]);
+    }
+    if (!pageOptions.length) {
+      pageOptions.push(['/p/', 'No pages available yet', '/p/']);
+    }
+
+    const pageSelect = select(pageOptions, v => {
+      propObj[urlKey] = v;
+      onPropChange();
+    });
+    pageSelect.style.marginTop = '6px';
+    container.appendChild(pageSelect);
+  } else if (currentMode === 'custom') {
+    const customInput = input('text', currentUrl, v => {
+      propObj[urlKey] = v;
+      onPropChange();
+    });
+    customInput.placeholder = 'https://example.com or #section';
+    customInput.style.marginTop = '6px';
+    container.appendChild(customInput);
+  }
+
+  if (currentUrl) {
+    const newTabChk = checkbox('Open in New Tab', propObj[newTabKey] !== false, v => {
+      propObj[newTabKey] = v;
+      onPropChange();
+    });
+    newTabChk.style.marginTop = '6px';
+    container.appendChild(newTabChk);
+  }
+
+  return container;
+}
+
+// AI Website Generator State & Handlers
+state.cms.aiMode = 'prompt';
+state.cms.aiPreset = 'saas';
+
+const PRESET_PROMPTS = {
+  saas: 'A high-converting SaaS landing page for an AI cloud platform with a bold hero section, call-to-action buttons, 3 feature cards, customer quote carousel, and transparent pricing comparison table.',
+  portfolio: 'A modern design studio and product portfolio with an aesthetic hero header, project carousel showcase, client deliverables table, and a direct inquiry contact button.',
+  docs: 'A clean developer documentation portal with a getting started guide, protocol specification table, module overview cards, and an API reference explorer.',
+  custom: ''
+};
+
+function loadStoredAiSettings() {
+  const provider = localStorage.getItem('aladen_ai_provider') || 'opencode';
+  const apiKey = localStorage.getItem('aladen_ai_api_key') || '';
+  let baseUrl = localStorage.getItem('aladen_ai_base_url') || 'https://api.groq.com/openai/v1';
+  if (baseUrl.includes('api.opencode.ai/v1') || baseUrl.includes('opencode.ai/zen/v1')) {
+    baseUrl = 'https://api.groq.com/openai/v1';
+  }
+  let model = localStorage.getItem('aladen_ai_model') || 'qwen/qwen3.8-27b';
+  if (model === 'opencode-1' || model === 'minimax-01' || model === 'minimax-text-01' || model === 'big-pickle' || model === 'llama-3.3-70b-versatile' || model === 'llama-3.1-8b-instant') {
+    model = 'qwen/qwen3.8-27b';
+  }
+
+  const provSelect = document.getElementById('aiProviderSelect');
+  const keyInput = document.getElementById('aiApiKeyInput');
+  const baseInput = document.getElementById('aiBaseUrlInput');
+  const modelInput = document.getElementById('aiModelInput');
+
+  if (provSelect) provSelect.value = provider;
+  if (keyInput) keyInput.value = apiKey;
+  if (baseInput) baseInput.value = baseUrl;
+  if (modelInput) modelInput.value = model;
+
+  updateAiProviderUI(provider);
+}
+
+function saveStoredAiSettings() {
+  const provider = document.getElementById('aiProviderSelect')?.value || 'opencode';
+  const apiKey = document.getElementById('aiApiKeyInput')?.value.trim() || '';
+  const baseUrl = document.getElementById('aiBaseUrlInput')?.value.trim() || 'https://api.groq.com/openai/v1';
+  const model = document.getElementById('aiModelInput')?.value.trim() || 'qwen/qwen3.8-27b';
+
+  localStorage.setItem('aladen_ai_provider', provider);
+  localStorage.setItem('aladen_ai_api_key', apiKey);
+  localStorage.setItem('aladen_ai_base_url', baseUrl);
+  localStorage.setItem('aladen_ai_model', model);
+
+  const badge = document.getElementById('aiKeyStatusBadge');
+  if (badge) {
+    if (apiKey) {
+      badge.textContent = 'API Key Saved';
+      badge.style.display = 'inline-block';
+    } else {
+      badge.textContent = provider === 'smart-archetype' ? 'Built-in Engine' : 'No Key (Archetype Fallback)';
+    }
+  }
+}
+
+function updateAiProviderUI(provider) {
+  const keyGroup = document.getElementById('aiApiKeyGroup');
+  const baseGroup = document.getElementById('aiBaseUrlGroup');
+  const modelInput = document.getElementById('aiModelInput');
+
+  if (provider === 'smart-archetype') {
+    if (keyGroup) keyGroup.style.display = 'none';
+    if (baseGroup) baseGroup.style.display = 'none';
+  } else if (provider === 'gemini') {
+    if (keyGroup) keyGroup.style.display = 'block';
+    if (baseGroup) baseGroup.style.display = 'none';
+    if (modelInput && (!modelInput.value || modelInput.value === 'big-pickle')) modelInput.value = 'gemini-1.5-flash';
+  } else {
+    // OpenCode / OpenAI-Compatible
+    if (keyGroup) keyGroup.style.display = 'block';
+    if (baseGroup) baseGroup.style.display = 'block';
+    if (modelInput && (!modelInput.value || modelInput.value === 'gemini-1.5-flash')) modelInput.value = 'big-pickle';
+  }
+}
+
+function openAiGenerateModal() {
+  const modal = document.getElementById('aiGenerateModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+
+  loadStoredAiSettings();
+
+  // Populate board selector
+  const boardSelect = document.getElementById('aiBoardSelect');
+  if (boardSelect) {
+    boardSelect.innerHTML = '<option value="">Choose a Kanban board...</option>';
+    (state.boards || []).forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = `📋 ${b.name || b.title || 'Untitled Board'}`;
+      if (b.id === state.currentBoardId) opt.selected = true;
+      boardSelect.appendChild(opt);
+    });
+  }
+
+  // Set default prompt if empty
+  const promptInput = document.getElementById('aiPromptInput');
+  if (promptInput && !promptInput.value.trim()) {
+    promptInput.value = PRESET_PROMPTS[state.cms.aiPreset] || PRESET_PROMPTS.saas;
+  }
+
+  const overlay = document.getElementById('aiGeneratingOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+function closeAiGenerateModal() {
+  const modal = document.getElementById('aiGenerateModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function setAiMode(mode) {
+  state.cms.aiMode = mode;
+  document.getElementById('aiModePromptBtn')?.classList.toggle('active', mode === 'prompt');
+  document.getElementById('aiModeBoardBtn')?.classList.toggle('active', mode === 'board');
+  document.getElementById('aiPromptSection')?.classList.toggle('hidden', mode !== 'prompt');
+  document.getElementById('aiBoardSection')?.classList.toggle('hidden', mode !== 'board');
+}
+
+function selectAiPreset(preset) {
+  state.cms.aiPreset = preset;
+  document.querySelectorAll('.ai-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.preset === preset);
+  });
+  const promptInput = document.getElementById('aiPromptInput');
+  if (promptInput && PRESET_PROMPTS[preset]) {
+    promptInput.value = PRESET_PROMPTS[preset];
+  }
+}
+
+async function submitAiGenerate() {
+  const prompt = document.getElementById('aiPromptInput')?.value.trim() || '';
+  const theme = document.getElementById('aiThemeSelect')?.value || 'dark-card';
+  const provider = document.getElementById('aiProviderSelect')?.value || 'opencode';
+  const apiKey = document.getElementById('aiApiKeyInput')?.value.trim() || '';
+  const baseUrl = document.getElementById('aiBaseUrlInput')?.value.trim() || 'https://api.opencode.ai/v1';
+  const model = document.getElementById('aiModelInput')?.value.trim() || 'opencode-1';
+  const boardId = state.cms.aiMode === 'board' ? document.getElementById('aiBoardSelect')?.value : null;
+
+  saveStoredAiSettings();
+
+  if (state.cms.aiMode === 'prompt' && !prompt && state.cms.aiPreset === 'custom') {
+    showToast('Please describe what you want to build.', 'warning');
+    return;
+  }
+  if (state.cms.aiMode === 'board' && !boardId) {
+    showToast('Please select a Kanban board to convert.', 'warning');
+    return;
+  }
+
+  const overlay = document.getElementById('aiGeneratingOverlay');
+  const submitBtn = document.getElementById('submitAiGenerateBtn');
+  const loadingTitle = document.getElementById('aiLoadingTitle');
+  const loadingSub = document.getElementById('aiLoadingSub');
+
+  if (overlay) overlay.classList.remove('hidden');
+  if (submitBtn) submitBtn.disabled = true;
+
+  if (loadingTitle) {
+    loadingTitle.textContent = provider === 'opencode'
+      ? `Generating with OpenCode (${model})...`
+      : provider === 'gemini'
+        ? `Generating with Gemini (${model})...`
+        : 'Synthesizing Website Layout...';
+  }
+  if (loadingSub) {
+    loadingSub.textContent = 'Composing responsive visual components, structure, and theme...';
+  }
+
+  try {
+    const res = await fetch('/api/ai/generate-page', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: state.cms.aiMode === 'prompt' ? prompt : '',
+        preset: state.cms.aiPreset,
+        theme,
+        boardId: boardId ? Number(boardId) : null,
+        provider,
+        apiKey,
+        baseUrl,
+        model
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const newPage = data.page;
+
+    if (data.warning) {
+      showToast(`⚠️ ${data.warning} (Generated via Smart Archetype)`, 'warning');
+    } else if (data.source === 'opencode-ai') {
+      showToast(`✨ Generated "${newPage.title}" with OpenCode (${model})!`, 'success');
+    } else {
+      showToast(`✨ Generated "${newPage.title}" successfully!`, 'success');
+    }
+    closeAiGenerateModal();
+
+    await loadCmsPages();
+    openCmsPage(newPage.id);
+  } catch (err) {
+    console.error('AI Generation Error:', err);
+    showToast(`Generation failed: ${err.message}`, 'danger');
+  } finally {
+    if (overlay) overlay.classList.add('hidden');
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
 function setupCmsEvents() {
   document.getElementById('newPageBtn').onclick = newCmsPage;
   document.getElementById('cmsSaveBtn').onclick = saveCmsPage;
   document.getElementById('cmsDeleteBtn').onclick = deleteCmsPage;
 
+  // AI Website Generator Triggers
+  document.getElementById('cmsAiGenerateBtn')?.addEventListener('click', openAiGenerateModal);
+  document.getElementById('cmsPopupAiBtn')?.addEventListener('click', () => {
+    closePagesPopup();
+    openAiGenerateModal();
+  });
+  document.getElementById('closeAiModalBtn')?.addEventListener('click', closeAiGenerateModal);
+  document.getElementById('cancelAiModalBtn')?.addEventListener('click', closeAiGenerateModal);
+  document.getElementById('aiModalBackdrop')?.addEventListener('click', closeAiGenerateModal);
+  document.getElementById('aiModePromptBtn')?.addEventListener('click', () => setAiMode('prompt'));
+  document.getElementById('aiModeBoardBtn')?.addEventListener('click', () => setAiMode('board'));
+  document.getElementById('submitAiGenerateBtn')?.addEventListener('click', submitAiGenerate);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('aiGenerateModal');
+      if (modal && !modal.classList.contains('hidden')) {
+        closeAiGenerateModal();
+      }
+    }
+  });
+
+  document.getElementById('aiProviderSelect')?.addEventListener('change', e => {
+    updateAiProviderUI(e.target.value);
+    saveStoredAiSettings();
+  });
+  document.getElementById('aiApiKeyInput')?.addEventListener('input', saveStoredAiSettings);
+  document.getElementById('aiBaseUrlInput')?.addEventListener('input', saveStoredAiSettings);
+  document.getElementById('aiModelInput')?.addEventListener('input', saveStoredAiSettings);
+
+  document.getElementById('aiToggleKeyVisibility')?.addEventListener('click', () => {
+    const inp = document.getElementById('aiApiKeyInput');
+    if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+  });
+
+  document.querySelectorAll('.ai-chip').forEach(chip => {
+    chip.addEventListener('click', () => selectAiPreset(chip.dataset.preset));
+  });
+
   state.cms.indicator = el('div', { class: 'drop-indicator' });
 
   const canvas = document.getElementById('cmsCanvas');
-  canvas.addEventListener('dragover', onCanvasDragOver);
-  canvas.addEventListener('dragleave', onCanvasDragLeave);
-  canvas.addEventListener('drop', onCanvasDrop);
-  canvas.addEventListener('click', e => {
-    if (e.target === canvas || e.target.classList.contains('cms-empty-canvas')) {
+  const canvasWrap = document.querySelector('.cms-canvas-wrap');
+  const viewport = document.querySelector('.canvas-viewport');
+
+  const onDeselectCanvas = e => {
+    if (e.target === canvas || e.target === canvasWrap || e.target === viewport || e.target.classList.contains('cms-empty-canvas')) {
       state.cms.selectedBlockId = null;
       renderCanvas();
       renderProps();
     }
-  });
+  };
+
+  canvas.addEventListener('dragover', onCanvasDragOver);
+  canvas.addEventListener('dragleave', onCanvasDragLeave);
+  canvas.addEventListener('drop', onCanvasDrop);
+  canvas.addEventListener('click', onDeselectCanvas);
+  if (canvasWrap) {
+    canvasWrap.addEventListener('click', onDeselectCanvas);
+    canvasWrap.addEventListener('dragover', onCanvasDragOver);
+    canvasWrap.addEventListener('dragleave', onCanvasDragLeave);
+    canvasWrap.addEventListener('drop', onCanvasDrop);
+  }
 
   document.querySelectorAll('.palette-item').forEach(item => {
     item.addEventListener('dragstart', onPaletteDragStart);
@@ -1737,10 +4570,22 @@ function setupCmsEvents() {
     loadCmsPages();
   };
   document.getElementById('cmsTitle').oninput = e => {
-    if (state.cms.openPage) state.cms.openPage.title = e.target.value;
+    if (state.cms.openPage) {
+      state.cms.openPage.title = e.target.value;
+      updateCurrentPageTopbarLabel();
+      triggerAutoSave(350);
+    }
+  };
+  document.getElementById('cmsTagsInput').oninput = e => {
+    if (state.cms.openPage) {
+      triggerAutoSave(350);
+    }
   };
   document.getElementById('cmsStatus').onchange = e => {
-    if (state.cms.openPage) state.cms.openPage.status = e.target.value;
+    if (state.cms.openPage) {
+      state.cms.openPage.status = e.target.value;
+      triggerAutoSave(50);
+    }
     const link = document.getElementById('cmsPreviewLink');
     if (e.target.value === 'published' && state.cms.openPage && state.cms.openPage.slug) {
       link.href = `/p/${state.cms.openPage.slug}`;
@@ -1750,11 +4595,89 @@ function setupCmsEvents() {
     }
   };
 
+  const blocksTabBtn = document.getElementById('cmsTabBlocksBtn');
+  const treeTabBtn = document.getElementById('cmsTabTreeBtn');
+  if (blocksTabBtn) blocksTabBtn.onclick = () => switchSidebarTab('blocks');
+  if (treeTabBtn) treeTabBtn.onclick = () => switchSidebarTab('tree');
+
+  const subTabStd = document.getElementById('cmsSubTabStandard');
+  const subTabCustom = document.getElementById('cmsSubTabCustom');
+  if (subTabStd) subTabStd.onclick = () => switchBlocksSubTab('standard');
+  if (subTabCustom) subTabCustom.onclick = () => switchBlocksSubTab('custom');
+
+  // Viewport Device Switcher & Preview Controls
+  document.getElementById('cmsViewportDesktopBtn')?.addEventListener('click', () => setViewportMode('desktop'));
+  document.getElementById('cmsViewportTabletBtn')?.addEventListener('click', () => setViewportMode('tablet'));
+  document.getElementById('cmsViewportMobileBtn')?.addEventListener('click', () => setViewportMode('mobile'));
+  document.getElementById('cmsViewportRotateBtn')?.addEventListener('click', toggleViewportOrientation);
+  document.getElementById('cmsViewportFrameToggle')?.addEventListener('click', toggleDeviceFrame);
+  
+  document.getElementById('cmsEditModeBtn')?.addEventListener('click', () => togglePreviewMode(false));
+  document.getElementById('cmsPreviewModeBtn')?.addEventListener('click', () => togglePreviewMode(true));
+  document.getElementById('cmsExitPreviewBtn')?.addEventListener('click', () => togglePreviewMode(false));
+
+  initViewportResizers();
+
   document.addEventListener('keydown', e => {
     if (state.currentTab !== 'cms') return;
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('aiGenerateModal');
+      if (modal && !modal.classList.contains('hidden')) {
+        e.preventDefault();
+        closeAiGenerateModal();
+        return;
+      }
+      if (state.cms.isPreviewMode) {
+        e.preventDefault();
+        togglePreviewMode(false);
+        return;
+      }
+    }
+
+    if (!isInput) {
+      if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        togglePreviewMode();
+        return;
+      }
+      if (e.key === '1' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setViewportMode('desktop');
+        return;
+      }
+      if (e.key === '2' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setViewportMode('tablet');
+        return;
+      }
+      if (e.key === '3' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setViewportMode('mobile');
+        return;
+      }
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
       saveCmsPage();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+      const hasSelection = window.getSelection && window.getSelection().toString().length > 0;
+      if (!isInput && !hasSelection && state.cms.selectedBlockId) {
+        e.preventDefault();
+        copySelectedBlock(state.cms.selectedBlockId);
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+      if (!isInput && state.cms.clipboardBlock) {
+        e.preventDefault();
+        pasteCopiedBlock();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+      if (!isInput && state.cms.selectedBlockId) {
+        e.preventDefault();
+        duplicateBlock(state.cms.selectedBlockId);
+      }
     }
   });
 }

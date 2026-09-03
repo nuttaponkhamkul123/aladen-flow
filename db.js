@@ -88,12 +88,30 @@ CREATE TABLE IF NOT EXISTS page_tags (
   FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS reusable_blocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  category TEXT DEFAULT 'custom',
+  block_data TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_columns_board ON columns(board_id);
 CREATE INDEX IF NOT EXISTS idx_cards_column ON cards(column_id);
 CREATE INDEX IF NOT EXISTS idx_card_labels_card ON card_labels(card_id);
 CREATE INDEX IF NOT EXISTS idx_checklist_card ON checklist_items(card_id);
 CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag);
 `);
+
+try {
+  db.prepare("ALTER TABLE pages ADD COLUMN settings TEXT DEFAULT '{}'").run();
+} catch (_) {}
+try {
+  db.prepare("ALTER TABLE pages ADD COLUMN parent_id INTEGER DEFAULT NULL").run();
+} catch (_) {}
+try {
+  db.prepare("ALTER TABLE pages ADD COLUMN position INTEGER DEFAULT 0").run();
+} catch (_) {}
 
 function seedIfEmpty() {
   const boardCount = db.prepare('SELECT COUNT(*) AS c FROM boards').get().c;
@@ -173,7 +191,25 @@ function seedIfEmpty() {
           { id: 'b1', type: 'heading', props: { level: 1, text: 'Welcome to the Site Builder' } },
           { id: 'b2', type: 'paragraph', props: { text: 'Drag blocks from the palette to build your page. Click any block to edit it on the right.' } },
           { id: 'b3', type: 'heading', props: { level: 2, text: 'How it works' } },
-          { id: 'b4', type: 'paragraph', props: { text: 'Headings, paragraphs, buttons, images, dividers, and spacers. Mix and match.' } },
+          { id: 'b4', type: 'paragraph', props: { text: 'Headings, paragraphs, buttons, images, image carousels, tables, dividers, and spacers. Mix and match.' } },
+          {
+            id: 'b_carousel',
+            type: 'carousel',
+            props: {
+              slides: [
+                { url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1000&auto=format&fit=crop', caption: 'Dynamic Abstract Composition' },
+                { url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=1000&auto=format&fit=crop', caption: 'Cyberpunk Neon Horizon' },
+                { url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1000&auto=format&fit=crop', caption: 'Tropical Ocean Sunset' }
+              ],
+              aspectRatio: '16/9',
+              autoplay: true,
+              interval: 4,
+              showArrows: true,
+              showDots: true,
+              showCaptions: true,
+              borderRadius: 10
+            }
+          },
           { id: 'b5', type: 'button', props: { label: 'Learn more', url: 'https://example.com', color: '#6366f1' } },
           { id: 'b6', type: 'divider', props: {} },
           { id: 'b7', type: 'paragraph', props: { text: 'Happy building.' } }

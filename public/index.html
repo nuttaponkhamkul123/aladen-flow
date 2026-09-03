@@ -3,126 +3,528 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kanban</title>
+  <title>Aladenflow Studio | Modern Kanban & Visual Site Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body class="theme-dark">
   <header class="topbar">
-    <div class="brand">
-      <span class="logo">K</span>
-      <span class="title">Kanban</span>
+    <div class="topbar-left">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="5.5" height="18" rx="2" fill="currentColor" fill-opacity="0.2"/>
+            <rect x="10.5" y="3" width="5.5" height="12" rx="2" fill="currentColor" fill-opacity="0.4"/>
+            <rect x="18" y="3" width="5.5" height="15" rx="2" fill="currentColor" fill-opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="title">Aladenflow</span>
+          <span class="version-badge">STUDIO</span>
+        </div>
+      </div>
+      <!-- Main App Tabs -->
+      <nav class="tabs main-tabs-group">
+        <button class="tab active" data-tab="board">
+          <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/>
+          </svg>
+          <span>Boards</span>
+        </button>
+        <button class="tab" data-tab="cms">
+          <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M12 4v16"/><path d="M4 12h8"/>
+          </svg>
+          <span>Site Builder</span>
+        </button>
+      </nav>
+
+      <!-- Site Builder Sub-Tab Group (Pages Popup) -->
+      <div class="cms-sub-tabs-group hidden" data-tab-show="cms">
+        <button type="button" id="cmsPagesDropdownTrigger" class="tab cms-sub-tab" aria-expanded="false" title="Pages & Documents Explorer">
+          <svg class="tab-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span id="cmsCurrentPageLabel" class="cms-current-page-name">Pages</span>
+          <span id="cmsTopPagesCount" class="tab-badge">0</span>
+          <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.7;">
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
+        </button>
+
+        <!-- Pages Dropdown Popup -->
+        <div id="cmsPagesPopup" class="cms-pages-popup hidden">
+          <div class="cms-popup-header">
+            <div class="cms-popup-title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <span>Pages & Documents</span>
+            </div>
+            <button type="button" id="cmsClosePagesPopupBtn" class="cms-popup-close-btn" title="Close">✕</button>
+          </div>
+
+          <div class="cms-popup-top-action">
+            <button id="newPageBtn" class="btn primary full">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span>Blank Page</span>
+            </button>
+            <button id="cmsPopupAiBtn" class="btn btn-ai-sparkle full" style="margin-top:6px;">
+              <span>✨ AI Generate Page</span>
+            </button>
+          </div>
+
+          <div class="cms-popup-scroll">
+            <div class="cms-search-box">
+              <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+              </svg>
+              <input id="cmsSearchInput" type="text" placeholder="Filter pages..." />
+            </div>
+
+            <div class="cms-filter-row">
+              <label class="section-eyebrow">Status</label>
+              <div class="select-wrapper">
+                <select id="cmsStatusFilter">
+                  <option value="">All Statuses</option>
+                  <option value="draft">Drafts Only</option>
+                  <option value="published">Published Only</option>
+                </select>
+                <svg class="chevron-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+              </div>
+            </div>
+
+            <div class="cms-tags-wrap">
+              <label class="section-eyebrow">Tags</label>
+              <div id="cmsTags" class="cms-tags"></div>
+            </div>
+
+            <div class="cms-pages-list-wrap">
+              <div class="pages-header-row">
+                <label class="section-eyebrow">Documents</label>
+              </div>
+              <div id="cmsPagesList" class="cms-pages-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <nav class="tabs">
-      <button class="tab active" data-tab="board">Boards</button>
-      <button class="tab" data-tab="cms">CMS</button>
-    </nav>
+
     <div class="topbar-actions">
       <div class="board-switcher" data-tab-show="board">
-        <label>Board</label>
-        <select id="boardSelect"></select>
-        <button id="newBoardBtn" class="btn ghost" title="New board">+</button>
-        <button id="deleteBoardBtn" class="btn ghost danger" title="Delete board">x</button>
+        <div class="select-wrapper">
+          <svg class="select-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+          </svg>
+          <select id="boardSelect" aria-label="Select board"></select>
+          <svg class="chevron-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
+        </div>
+        <button id="newBoardBtn" class="btn-icon" title="Create new board">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+        <button id="deleteBoardBtn" class="btn-icon danger" title="Delete current board">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
       </div>
+
       <div class="search-wrap" data-tab-show="board">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+        </svg>
         <input id="searchInput" type="text" placeholder="Search cards..." />
+        <kbd class="shortcut-tag">⌘K</kbd>
         <div id="searchResults" class="search-results hidden"></div>
       </div>
-      <button id="activityBtn" class="btn" data-tab-show="board">Activity</button>
-      <button id="themeBtn" class="btn ghost" title="Toggle theme">Theme</button>
+
+      <button id="activityBtn" class="btn ghost btn-sm" data-tab-show="board">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span>Activity</span>
+      </button>
+
+      <button id="themeBtn" class="btn-icon" title="Toggle color theme">
+        <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+        </svg>
+        <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+        </svg>
+      </button>
     </div>
   </header>
 
+  <!-- Board Main View -->
   <main id="board" class="board" data-tab-panel="board"></main>
-  <button id="addColumnBtn" class="add-column-btn" data-tab-show="board">+ Add column</button>
+  <!-- Hidden placeholder button to keep JS references working if needed -->
+  <button id="addColumnBtn" class="hidden" data-tab-show="board"></button>
 
+  <!-- CMS Main View -->
   <main id="cms" class="cms hidden" data-tab-panel="cms">
     <aside class="cms-sidebar">
-      <button id="newPageBtn" class="btn full">+ New page</button>
-      <div class="cms-search">
-        <input id="cmsSearchInput" type="text" placeholder="Search pages..." />
+      <div class="cms-sidebar-tabs">
+        <button type="button" id="cmsTabBlocksBtn" class="cms-sidebar-tab active" data-sidebar-tab="blocks">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>
+          </svg>
+          <span>Blocks</span>
+        </button>
+        <button type="button" id="cmsTabTreeBtn" class="cms-sidebar-tab" data-sidebar-tab="tree">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>
+          </svg>
+          <span>Layers</span>
+          <span id="cmsTreeCountBadge" class="cms-tab-badge">0</span>
+        </button>
       </div>
-      <div class="cms-filter">
-        <label>Status</label>
-        <select id="cmsStatusFilter">
-          <option value="">All</option>
-          <option value="draft">Draft</option>
-          <option value="published">Published</option>
-        </select>
-      </div>
-      <div class="cms-tags-wrap">
-        <label>Tags</label>
-        <div id="cmsTags" class="cms-tags"></div>
-      </div>
-      <div class="cms-pages-list-wrap">
-        <label>Pages</label>
-        <div id="cmsPagesList" class="cms-pages-list"></div>
-      </div>
-    </aside>
-    <section class="cms-main">
-      <div id="cmsEmpty" class="cms-empty">
-        <p>Select a page or create a new one to start building.</p>
-      </div>
-      <div id="cmsEditorWrap" class="cms-editor-wrap hidden">
-        <div class="cms-page-bar">
-          <input id="cmsTitle" class="cms-title" placeholder="Page title" />
-          <input id="cmsSlug" class="cms-slug" placeholder="slug" />
-          <select id="cmsStatus" class="cms-status-select">
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-          <input id="cmsTagsInput" class="cms-tags-input" placeholder="tags (comma separated)" />
-          <div class="cms-page-actions">
-            <a id="cmsPreviewLink" class="btn ghost" target="_blank">Preview</a>
-            <button id="cmsSaveBtn" class="btn">Save</button>
-            <button id="cmsDeleteBtn" class="btn ghost danger">Delete</button>
-          </div>
+
+      <!-- Blocks Palette View -->
+      <div id="cmsPaletteView" class="cms-sidebar-view">
+        <div class="cms-palette-subtabs">
+          <button type="button" id="cmsSubTabStandard" class="cms-palette-subtab active">
+            <span>Pre-defined</span>
+          </button>
+          <button type="button" id="cmsSubTabCustom" class="cms-palette-subtab">
+            <span>Reusable</span>
+            <span id="cmsReusableCountBadge" class="cms-tab-badge">0</span>
+          </button>
         </div>
-        <div class="cms-workspace">
-          <aside class="cms-palette">
-            <h4>Blocks</h4>
+
+        <!-- Pre-defined Categorized Blocks -->
+        <div id="cmsStandardBlocksView" class="palette-scroll-wrap">
+          <!-- Category: Typography -->
+          <div class="palette-category">
+            <div class="category-title">Typography & Text</div>
             <div class="palette-list">
               <div class="palette-item" draggable="true" data-block-type="heading">
-                <span class="palette-icon">H</span>
-                <span class="palette-label">Heading</span>
+                <div class="palette-icon-wrap heading-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 12h12"/><path d="M6 4v16"/><path d="M18 4v16"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Heading</span>
+                  <span class="palette-sub">H1 - H3 titles</span>
+                </div>
               </div>
+
               <div class="palette-item" draggable="true" data-block-type="paragraph">
-                <span class="palette-icon">P</span>
-                <span class="palette-label">Paragraph</span>
-              </div>
-              <div class="palette-item" draggable="true" data-block-type="button">
-                <span class="palette-icon">B</span>
-                <span class="palette-label">Button</span>
-              </div>
-              <div class="palette-item" draggable="true" data-block-type="image">
-                <span class="palette-icon">I</span>
-                <span class="palette-label">Image</span>
-              </div>
-              <div class="palette-item" draggable="true" data-block-type="divider">
-                <span class="palette-icon">/</span>
-                <span class="palette-label">Divider</span>
-              </div>
-              <div class="palette-item" draggable="true" data-block-type="spacer">
-                <span class="palette-icon">.</span>
-                <span class="palette-label">Spacer</span>
-              </div>
-              <div class="palette-item" draggable="true" data-block-type="table">
-                <span class="palette-icon">⊞</span>
-                <span class="palette-label">Table</span>
-              </div>
-              <div class="palette-item" draggable="true" data-block-type="container">
-                <span class="palette-icon">☷</span>
-                <span class="palette-label">Container</span>
+                <div class="palette-icon-wrap text-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Paragraph</span>
+                  <span class="palette-sub">Body copy & text</span>
+                </div>
               </div>
             </div>
-            <p class="muted" style="font-size:11px;margin-top:12px">Drag blocks to the canvas</p>
-          </aside>
-          <div class="cms-canvas-wrap">
-            <div id="cmsCanvas" class="cms-canvas"></div>
           </div>
+
+          <!-- Category: Layout & Structure -->
+          <div class="palette-category">
+            <div class="category-title">Layout & Structure</div>
+            <div class="palette-list">
+              <div class="palette-item" draggable="true" data-block-type="container">
+                <div class="palette-icon-wrap container-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/><path d="M3 12h18"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Container</span>
+                  <span class="palette-sub">Grid & flex layouts</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="divider">
+                <div class="palette-icon-wrap divider-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Divider</span>
+                  <span class="palette-sub">Visual separator</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="spacer">
+                <div class="palette-icon-wrap spacer-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Spacer</span>
+                  <span class="palette-sub">Whitespace gap</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category: Media & Data -->
+          <div class="palette-category">
+            <div class="category-title">Media & Content</div>
+            <div class="palette-list">
+              <div class="palette-item" draggable="true" data-block-type="image">
+                <div class="palette-icon-wrap image-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Image</span>
+                  <span class="palette-sub">Asset & illustrations</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="carousel">
+                <div class="palette-icon-wrap carousel-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/><line x1="8" y1="4" x2="8" y2="20"/><line x1="16" y1="4" x2="16" y2="20"/><path d="m10 9 4 3-4 3"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Carousel</span>
+                  <span class="palette-sub">Slider & hero banners</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="table">
+                <div class="palette-icon-wrap table-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Table</span>
+                  <span class="palette-sub">Data & comparison</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category: Interactive -->
+          <div class="palette-category">
+            <div class="category-title">Interactive & Action</div>
+            <div class="palette-list">
+              <div class="palette-item" draggable="true" data-block-type="button">
+                <div class="palette-icon-wrap button-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="6" width="20" height="12" rx="4"/><circle cx="8" cy="12" r="1.5"/><line x1="12" y1="12" x2="16" y2="12"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Button</span>
+                  <span class="palette-sub">CTA & links</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- User-Defined Reusable Blocks View -->
+        <div id="cmsCustomBlocksView" class="palette-scroll-wrap hidden">
+          <div class="palette-header">
+            <label class="section-eyebrow">Saved Components</label>
+            <span class="palette-hint">Drag to reuse</span>
+          </div>
+          <div id="cmsCustomBlocksList" class="palette-list custom-blocks-list"></div>
+        </div>
+      </div>
+
+      <!-- 3. Hierarchy Tree View -->
+      <div id="cmsTreeView" class="cms-sidebar-view hidden">
+        <div class="palette-header">
+          <label class="section-eyebrow">Component Tree</label>
+          <span class="palette-hint">Select & reorder</span>
+        </div>
+        <div id="cmsTreeRoot" class="cms-tree-list"></div>
+      </div>
+    </aside>
+
+    <section class="cms-main">
+      <div id="cmsEmpty" class="cms-empty">
+        <div class="empty-state-card">
+          <div class="empty-icon-bubble">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+              <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          </div>
+          <h3>No Document Selected</h3>
+          <p>Choose an existing page from the sidebar or craft a new visual layout.</p>
+          <button onclick="document.getElementById('newPageBtn').click()" class="btn primary">
+            Create First Page
+          </button>
+        </div>
+      </div>
+
+      <div id="cmsEditorWrap" class="cms-editor-wrap hidden">
+        <div class="cms-page-bar">
+          <div class="cms-meta-inputs">
+            <div class="input-with-label">
+              <input id="cmsTitle" class="cms-title" placeholder="Untitled Document" />
+            </div>
+            <div class="slug-badge">
+              <span class="slug-prefix">/p/</span>
+              <input id="cmsSlug" class="cms-slug" placeholder="page-slug" />
+            </div>
+            <div class="status-pill-wrap">
+              <select id="cmsStatus" class="cms-status-select">
+                <option value="draft">● Draft</option>
+                <option value="published">● Published</option>
+              </select>
+            </div>
+            <div class="tags-input-wrap">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/>
+              </svg>
+              <input id="cmsTagsInput" class="cms-tags-input" placeholder="Tags (comma separated)" />
+            </div>
+          </div>
+
+          <!-- Viewport Device Switcher Toolbar -->
+          <div class="cms-viewport-toolbar">
+            <div class="viewport-segmented-control" role="group" aria-label="Device viewport size">
+              <button id="cmsViewportDesktopBtn" class="viewport-btn active" title="Desktop View (Press 1)" data-viewport="desktop">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                <span class="viewport-btn-text">Desktop</span>
+              </button>
+              <button id="cmsViewportTabletBtn" class="viewport-btn" title="Tablet View (Press 2)" data-viewport="tablet">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+                </svg>
+                <span class="viewport-btn-text">Tablet</span>
+              </button>
+              <button id="cmsViewportMobileBtn" class="viewport-btn" title="Mobile View (Press 3)" data-viewport="mobile">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+                </svg>
+                <span class="viewport-btn-text">Mobile</span>
+              </button>
+            </div>
+            <button id="cmsViewportRotateBtn" class="viewport-tool-btn hidden" title="Rotate Orientation (Portrait / Landscape)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+            </button>
+            <button id="cmsViewportFrameToggle" class="viewport-tool-btn active" title="Toggle Device Bezel/Frame">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/><path d="M15 3v18"/>
+              </svg>
+            </button>
+            <div id="cmsViewportBadge" class="viewport-dimension-badge" title="Current viewport width">
+              <span id="cmsViewportDimText">100%</span>
+            </div>
+          </div>
+
+          <div class="cms-page-actions">
+            <!-- Edit / Preview Mode Switch -->
+            <div class="cms-mode-switch" role="group" aria-label="Editor Mode">
+              <button id="cmsEditModeBtn" class="mode-switch-btn active" title="Editor Mode">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                </svg>
+                <span>Edit</span>
+              </button>
+              <button id="cmsPreviewModeBtn" class="mode-switch-btn" title="Interactive Preview (Press P)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+                <span>Preview</span>
+              </button>
+            </div>
+
+            <div id="cmsAutoSaveBadge" class="auto-save-badge saved">
+              <span class="save-status-dot"></span>
+              <span class="save-status-text">Saved</span>
+            </div>
+            <button id="cmsAiGenerateBtn" class="btn btn-sm btn-ai-sparkle" title="Generate Website or Components with AI">
+              <span>✨ AI Generate</span>
+            </button>
+            <a id="cmsPreviewLink" class="btn ghost btn-sm" target="_blank">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              <span>Live Page</span>
+            </a>
+            <button id="cmsSaveBtn" class="btn primary btn-sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              <span>Save</span>
+            </button>
+            <button id="cmsDeleteBtn" class="btn ghost danger btn-sm" title="Delete page">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="cms-workspace">
+
+          <!-- Canvas Frame -->
+          <div class="cms-canvas-wrap">
+            <div id="cmsPreviewBanner" class="cms-preview-banner hidden">
+              <div class="preview-banner-left">
+                <span class="preview-mode-pill">Interactive Preview</span>
+                <span id="cmsPreviewInfoText" class="preview-info-text">Desktop · 100%</span>
+              </div>
+              <div class="preview-banner-right">
+                <button id="cmsExitPreviewBtn" class="btn ghost btn-xs" title="Return to Edit (Esc)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                  <span>Exit Preview (Esc)</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="canvasViewportContainer" class="canvas-viewport-container">
+              <div class="viewport-resizer left" title="Drag to resize viewport"></div>
+              <div class="canvas-viewport">
+                <div id="cmsDeviceFrameTop" class="device-frame-top hidden">
+                  <div class="device-speaker-notch"></div>
+                </div>
+                <div id="cmsCanvas" class="cms-canvas"></div>
+                <div id="cmsDeviceFrameBottom" class="device-frame-bottom hidden">
+                  <div class="device-home-bar"></div>
+                </div>
+              </div>
+              <div class="viewport-resizer right" title="Drag to resize viewport"></div>
+            </div>
+          </div>
+
+          <!-- Properties Inspector -->
           <aside class="cms-props">
-            <h4>Properties</h4>
+            <div class="props-header">
+              <label class="section-eyebrow">Inspector</label>
+            </div>
             <div id="cmsPropsBody" class="cms-props-body">
-              <p class="muted">Select a block to edit its properties.</p>
+              <div class="no-selection-state">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/>
+                </svg>
+                <p>Click any canvas block to configure its layout, styles and properties.</p>
+              </div>
             </div>
           </aside>
         </div>
@@ -130,80 +532,293 @@
     </section>
   </main>
 
+  <!-- Card Details Modal -->
   <div id="cardModal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-panel">
       <div class="modal-header">
-        <input id="cardTitle" class="card-title-input" placeholder="Card title" />
-        <button class="btn ghost close-modal">x</button>
+        <div class="modal-title-wrap">
+          <div class="modal-card-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/>
+            </svg>
+          </div>
+          <input id="cardTitle" class="card-title-input" placeholder="Card Title..." />
+        </div>
+        <button class="btn-icon ghost close-modal" title="Close modal (Esc)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
+
       <div class="modal-body">
         <div class="modal-main">
-          <div class="field-row">
-            <span class="badge" id="cardPriorityBadge">priority</span>
-            <span class="muted" id="cardCreatedAt"></span>
+          <div class="card-badge-row">
+            <span class="badge" id="cardPriorityBadge">Priority</span>
+            <span class="meta-date" id="cardCreatedAt"></span>
           </div>
 
-          <section>
-            <h4>Description</h4>
-            <textarea id="cardDescription" placeholder="Add a more detailed description..."></textarea>
+          <section class="modal-section">
+            <div class="section-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+              </svg>
+              <h4>Description</h4>
+            </div>
+            <textarea id="cardDescription" placeholder="Add detailed notes, acceptance criteria, or context..."></textarea>
           </section>
 
-          <section>
-            <h4>Checklist</h4>
+          <section class="modal-section">
+            <div class="section-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+              <h4>Checklist</h4>
+            </div>
             <div id="cardChecklist" class="checklist"></div>
             <div class="checklist-add">
-              <input id="newChecklistInput" placeholder="Add an item" />
-              <button id="addChecklistBtn" class="btn">Add</button>
+              <input id="newChecklistInput" placeholder="Add a subtask item..." />
+              <button id="addChecklistBtn" class="btn primary btn-sm">Add</button>
             </div>
           </section>
 
-          <section>
-            <h4>Activity</h4>
+          <section class="modal-section">
+            <div class="section-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <h4>Activity History</h4>
+            </div>
             <div id="cardActivity" class="activity"></div>
           </section>
         </div>
 
         <aside class="modal-aside">
-          <h4>Details</h4>
+          <label class="section-eyebrow">Properties</label>
+          
           <div class="aside-row">
-            <label>Due date</label>
+            <label>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              Due Date
+            </label>
             <input id="cardDueDate" type="date" />
           </div>
+
           <div class="aside-row">
-            <label>Priority</label>
-            <select id="cardPriority">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
-          </div>
-          <div class="aside-row">
-            <label>Labels</label>
-            <div id="cardLabels" class="labels-list"></div>
-            <div class="label-add">
-              <input id="newLabelName" placeholder="New label" />
-              <input id="newLabelColor" type="color" value="#6366f1" />
-              <button id="addLabelBtn" class="btn">Add</button>
+            <label>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              Priority
+            </label>
+            <div class="select-wrapper">
+              <select id="cardPriority">
+                <option value="low">● Low Priority</option>
+                <option value="medium">● Medium Priority</option>
+                <option value="high">● High Priority</option>
+                <option value="urgent">● Urgent Priority</option>
+              </select>
+              <svg class="chevron-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
             </div>
           </div>
-          <div class="aside-row danger-zone">
-            <button id="archiveCardBtn" class="btn ghost">Archive</button>
-            <button id="deleteCardBtn" class="btn danger">Delete</button>
+
+          <div class="aside-row">
+            <label>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/>
+              </svg>
+              Labels
+            </label>
+            <div id="cardLabels" class="labels-list"></div>
+            <div class="label-add">
+              <input id="newLabelName" placeholder="New tag name..." />
+              <input id="newLabelColor" type="color" value="#6366f1" />
+              <button id="addLabelBtn" class="btn primary btn-sm">+</button>
+            </div>
+          </div>
+
+          <div class="danger-zone">
+            <button id="archiveCardBtn" class="btn ghost btn-sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
+              </svg>
+              Archive
+            </button>
+            <button id="deleteCardBtn" class="btn ghost danger btn-sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              Delete
+            </button>
           </div>
         </aside>
       </div>
     </div>
   </div>
 
+  <!-- Activity Slide-Over Drawer -->
   <div id="activityPanel" class="side-panel hidden">
     <div class="side-panel-header">
-      <h3>Recent activity</h3>
-      <button id="closeActivityBtn" class="btn ghost">x</button>
+      <div class="drawer-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <h3>Workspace Activity</h3>
+      </div>
+      <button id="closeActivityBtn" class="btn-icon ghost" title="Close drawer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
     </div>
     <div id="activityList" class="side-panel-body"></div>
   </div>
+
+  <!-- AI Website Generator Modal -->
+  <div id="aiGenerateModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="aiModalBackdrop"></div>
+    <div class="modal-panel ai-generator-modal">
+      <div class="modal-header ai-modal-header">
+        <div class="ai-modal-title-wrap">
+          <div class="ai-sparkle-badge">✨ AI Builder</div>
+          <div>
+            <h3 class="modal-title" style="margin:0;font-size:16px;font-weight:700;">Generate Website with AI</h3>
+            <p class="modal-subtitle" style="margin:2px 0 0 0;font-size:12px;color:var(--text-tertiary);">Synthesize complete landing pages, docs, portfolios, or Kanban roadmaps in seconds</p>
+          </div>
+        </div>
+        <button type="button" class="btn-icon ghost" id="closeAiModalBtn" title="Close modal (Esc)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body ai-modal-body" style="overflow-y:auto;max-height:calc(85vh - 130px);">
+        <!-- Mode Tabs -->
+        <div class="ai-mode-tabs">
+          <button type="button" id="aiModePromptBtn" class="ai-mode-tab active" data-ai-mode="prompt">
+            <span>✨ Prompt-to-Website</span>
+          </button>
+          <button type="button" id="aiModeBoardBtn" class="ai-mode-tab" data-ai-mode="board">
+            <span>📋 Kanban Board-to-Page</span>
+          </button>
+        </div>
+
+        <!-- Prompt Section -->
+        <div id="aiPromptSection" class="ai-section-content">
+          <div class="form-group">
+            <label for="aiPromptInput" class="ai-field-label">Describe what you want to build</label>
+            <textarea id="aiPromptInput" class="form-textarea ai-prompt-textarea" rows="3" placeholder="e.g., A modern SaaS landing page for an AI developer platform with a hero section, 3 feature cards, customer quote carousel, and pricing comparison table..."></textarea>
+          </div>
+
+          <div class="form-group" style="margin-top:12px;">
+            <label class="ai-field-label">Quick Archetype Presets</label>
+            <div class="ai-preset-chips">
+              <button type="button" class="ai-chip active" data-preset="saas">🚀 SaaS Landing Page</button>
+              <button type="button" class="ai-chip" data-preset="portfolio">🎨 Creative Portfolio</button>
+              <button type="button" class="ai-chip" data-preset="docs">📖 API & Developer Docs</button>
+              <button type="button" class="ai-chip" data-preset="custom">✨ Custom Prompt</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kanban Board Source Section -->
+        <div id="aiBoardSection" class="ai-section-content hidden">
+          <div class="form-group">
+            <label for="aiBoardSelect" class="ai-field-label">Select Kanban Board to Convert</label>
+            <div class="select-wrapper">
+              <select id="aiBoardSelect" class="form-select">
+                <option value="">Choose a Kanban board...</option>
+              </select>
+            </div>
+            <p class="form-help-text" style="margin-top:6px;font-size:12px;color:var(--text-tertiary);">Extracts your lists, cards, and milestones into live feature cards, status counters, and a progress matrix.</p>
+          </div>
+        </div>
+
+        <!-- AI Engine & Provider Configuration -->
+        <div class="ai-provider-config-box" style="margin-top:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:12px 14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <label class="ai-field-label" style="margin:0;font-weight:700;">⚡ AI Provider & API Key</label>
+            <span id="aiKeyStatusBadge" class="link-type-tag" style="background:rgba(34,197,94,0.15);color:#4ade80;border-color:rgba(34,197,94,0.3);">Saved Locally</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:10px;margin-bottom:10px;">
+            <div class="form-group" style="margin:0;">
+              <label for="aiProviderSelect" style="font-size:11.5px;color:var(--text-tertiary);margin-bottom:4px;display:block;">Provider Engine</label>
+              <div class="select-wrapper">
+                <select id="aiProviderSelect" class="form-select" style="font-size:12.5px;">
+                  <option value="opencode">⚡ Groq / OpenAI-Compatible</option>
+                  <option value="gemini">✨ Google Gemini API</option>
+                  <option value="smart-archetype">🧩 Built-in Smart Archetype (No API Key)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin:0;">
+              <label for="aiModelInput" style="font-size:11.5px;color:var(--text-tertiary);margin-bottom:4px;display:block;">Model Name</label>
+              <input type="text" id="aiModelInput" list="aiModelDatalist" class="form-input" placeholder="qwen/qwen3.8-27b" value="qwen/qwen3.8-27b" style="font-size:12.5px;" />
+              <datalist id="aiModelDatalist">
+                <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b (Groq Ultra Fast)</option>
+                <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Groq GPT 120B)</option>
+                <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
+                <option value="groq/compound">groq/compound</option>
+              </datalist>
+            </div>
+          </div>
+
+          <div class="form-group" id="aiApiKeyGroup" style="margin:0 0 10px 0;">
+            <label for="aiApiKeyInput" style="font-size:11.5px;color:var(--text-tertiary);margin-bottom:4px;display:block;">API Key</label>
+            <div style="display:flex;gap:6px;">
+              <input type="password" id="aiApiKeyInput" class="form-input" placeholder="Paste your OpenCode API Key here..." style="font-size:12.5px;" />
+              <button type="button" id="aiToggleKeyVisibility" class="btn ghost btn-sm" title="Toggle visibility">👁️</button>
+            </div>
+          </div>
+
+          <div class="form-group" id="aiBaseUrlGroup" style="margin:0;">
+            <label for="aiBaseUrlInput" style="font-size:11.5px;color:var(--text-tertiary);margin-bottom:4px;display:block;">API Base URL</label>
+            <input type="text" id="aiBaseUrlInput" class="form-input" placeholder="https://opencode.ai/zen/v1" value="https://opencode.ai/zen/v1" style="font-size:12px;font-family:var(--font-mono);" />
+          </div>
+        </div>
+
+        <!-- Design Style Selection -->
+        <div class="form-row" style="margin-top:12px;">
+          <div class="form-group" style="margin:0;">
+            <label for="aiThemeSelect" class="ai-field-label">Visual Theme / Color Palette</label>
+            <div class="select-wrapper">
+              <select id="aiThemeSelect" class="form-select">
+                <option value="dark-card">🌙 Dark Elegance (Default)</option>
+                <option value="pure-black">🖤 Pure OLED Black</option>
+                <option value="light">☀️ Clean Minimalist Light</option>
+                <option value="navy">🌌 Deep Cosmic Navy</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Generation Loading State Overlay -->
+        <div id="aiGeneratingOverlay" class="ai-generating-overlay hidden">
+          <div class="ai-loader-spinner"></div>
+          <h4 id="aiLoadingTitle">Synthesizing Website Layout...</h4>
+          <p id="aiLoadingSub" class="ai-loading-sub">Composing responsive containers, components, and visual styling...</p>
+        </div>
+      </div>
+
+      <div class="modal-footer ai-modal-footer">
+        <button type="button" class="btn ghost" id="cancelAiModalBtn">Cancel</button>
+        <button type="button" class="btn primary btn-ai-sparkle" id="submitAiGenerateBtn">
+          <span>✨ Generate Website Now</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
 
   <script src="/app.js"></script>
 </body>

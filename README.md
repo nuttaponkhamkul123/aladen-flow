@@ -17,7 +17,7 @@ A feature-rich Kanban board app with SQLite storage. Built with Node.js + Expres
   - Card archiving
   - Dark / light theme toggle
 - **CMS tab** (drag-and-drop website builder)
-  - Block-based editor: Heading, Paragraph, Button, Image, Divider, Spacer
+  - Block-based editor: Heading, Paragraph, Button, Image, Carousel (Image Slider), Container (Grid/Flex), Table, Divider, Spacer
   - Drag blocks from the palette onto the canvas
   - Drag blocks on the canvas to reorder; click to select
   - Right-side properties panel for the selected block (level, text, URL, color, height, etc.)
