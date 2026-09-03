@@ -1315,6 +1315,60 @@ function formatCustomCssForHtml(cssStr) {
   }).filter(Boolean).join(' ');
 }
 
+function parseRichTextHtml(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  let s = escHtml(raw);
+
+  // 1. Shorthand: [gradient](text)
+  s = s.replace(/\[gradient(?::([^\]]+))?\]\(([\s\S]*?)\)/gi, (match, colors, text) => {
+    let grad = 'linear-gradient(135deg, #818cf8, #ec4899, #f43f5e)';
+    if (colors) {
+      const parts = colors.split('-').map(c => c.trim()).filter(Boolean);
+      if (parts.length >= 2) grad = `linear-gradient(135deg, ${parts.join(', ')})`;
+    }
+    return `<span style="background:${grad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:bold;display:inline-block;">${text}</span>`;
+  });
+
+  // 2. Shorthand: [color:#hex](text)
+  s = s.replace(/\[color:([^\]]+)\]\(([\s\S]*?)\)/gi, (match, col, text) => {
+    return `<span style="color:${col};">${text}</span>`;
+  });
+
+  // 3. Shorthand: [glow:#hex](text) or [glow](text)
+  s = s.replace(/\[glow(?::([^\]]+))?\]\(([\s\S]*?)\)/gi, (match, col, text) => {
+    const color = col || '#818cf8';
+    return `<span style="color:${color};text-shadow:0 0 14px ${color};font-weight:600;">${text}</span>`;
+  });
+
+  // 4. Shorthand: [bg:#hex](text) or [highlight:#hex](text)
+  s = s.replace(/\[(?:bg|highlight):([^\]]+)\]\(([\s\S]*?)\)/gi, (match, col, text) => {
+    return `<mark style="background:${col};color:inherit;padding:2px 6px;border-radius:4px;display:inline-block;">${text}</mark>`;
+  });
+
+  // 5. Shorthand: [badge(?::#hex)?](text)
+  s = s.replace(/\[badge(?::([^\]]+))?\]\(([\s\S]*?)\)/gi, (match, col, text) => {
+    const baseColor = col || '#818cf8';
+    return `<span style="display:inline-block;padding:2px 10px;font-size:0.8em;border-radius:999px;background:rgba(99,102,241,0.15);color:${baseColor};border:1px solid ${baseColor}66;font-weight:600;vertical-align:middle;">${text}</span>`;
+  });
+
+  // 6. Markdown bold **text**
+  s = s.replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>');
+
+  // 7. Markdown italic *text*
+  s = s.replace(/(?<!\*)\*(?!\*)([\s\S]*?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+
+  // 8. Markdown underline __text__
+  s = s.replace(/__([\s\S]*?)__/g, '<u>$1</u>');
+
+  // 9. Markdown strikethrough ~~text~~
+  s = s.replace(/~~([\s\S]*?)~~/g, '<s>$1</s>');
+
+  // 10. Code snippet `text`
+  s = s.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.9em;font-family:monospace;">$1</code>');
+
+  return s;
+}
+
 function renderBlockHtml(b) {
   const p = b.props || {};
   const customCss = p.customCss ? escHtml(formatCustomCssForHtml(p.customCss)) : '';
@@ -1324,7 +1378,7 @@ function renderBlockHtml(b) {
       const align = p.align || 'left';
       const color = p.color ? `color:${escHtml(p.color)};` : '';
       const margin = p.margin != null ? `margin-bottom:${Number(p.margin)}px;` : 'margin-bottom:12px;';
-      let content = escHtml(p.text || '');
+      let content = parseRichTextHtml(p.text || '');
       if (p.linkUrl) {
         const target = p.newTab !== false && !p.linkUrl.startsWith('/p/') ? ' target="_blank" rel="noopener noreferrer"' : '';
         content = `<a href="${escHtml(p.linkUrl)}"${target} style="color:inherit;text-decoration:none;border-bottom:1px dashed currentColor;">${content}</a>`;
@@ -1338,7 +1392,7 @@ function renderBlockHtml(b) {
       const color = p.color ? `color:${escHtml(p.color)};` : '';
       const fontStyle = p.italic ? 'font-style:italic;' : '';
       const fontWeight = p.bold ? 'font-weight:600;' : '';
-      let content = escHtml(p.text || '');
+      let content = parseRichTextHtml(p.text || '');
       if (p.linkUrl) {
         const target = p.newTab !== false && !p.linkUrl.startsWith('/p/') ? ' target="_blank" rel="noopener noreferrer"' : '';
         content = `<a href="${escHtml(p.linkUrl)}"${target} style="color:inherit;text-decoration:underline;">${content}</a>`;

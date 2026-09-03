@@ -1820,6 +1820,60 @@ function applyCustomCssOverride(targetElement, customCssString) {
   });
 }
 
+function parseRichText(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  let s = raw;
+
+  // 1. Shorthand: [gradient](text) or [gradient:from-to](text)
+  s = s.replace(/\[gradient(?::([^\]]+))?\]\(([\s\S]*?)\)/gi, (match, colors, text) => {
+    let grad = 'linear-gradient(135deg, #818cf8, #ec4899, #f43f5e)';
+    if (colors) {
+      const parts = colors.split('-').map(c => c.trim()).filter(Boolean);
+      if (parts.length >= 2) grad = `linear-gradient(135deg, ${parts.join(', ')})`;
+    }
+    return `<span style="background:${grad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:bold;display:inline-block;">${text}</span>`;
+  });
+
+  // 2. Shorthand: [color:#hex](text) or [color:rgb(...)](text)
+  s = s.replace(/\[color:([^\]]+)\]\(([\s\S]*?)\)/gi, (match, col, text) => {
+    return `<span style="color:${col};">${text}</span>`;
+  });
+
+  // 3. Shorthand: [glow:#hex](text) or [glow](text)
+  s = s.replace(/\[glow(?::([^\]]+))?\]\(([\s\S]*?)\)/gi, (match, col, text) => {
+    const color = col || '#818cf8';
+    return `<span style="color:${color};text-shadow:0 0 14px ${color};font-weight:600;">${text}</span>`;
+  });
+
+  // 4. Shorthand: [bg:#hex](text) or [highlight:#hex](text)
+  s = s.replace(/\[(?:bg|highlight):([^\]]+)\]\(([\s\S]*?)\)/gi, (match, col, text) => {
+    return `<mark style="background:${col};color:inherit;padding:2px 6px;border-radius:4px;display:inline-block;">${text}</mark>`;
+  });
+
+  // 5. Shorthand: [badge(?::#hex)?](text)
+  s = s.replace(/\[badge(?::([^\]]+))?\]\(([\s\S]*?)\)/gi, (match, col, text) => {
+    const baseColor = col || '#818cf8';
+    return `<span style="display:inline-block;padding:2px 10px;font-size:0.8em;border-radius:999px;background:rgba(99,102,241,0.15);color:${baseColor};border:1px solid ${baseColor}66;font-weight:600;vertical-align:middle;">${text}</span>`;
+  });
+
+  // 6. Markdown bold **text**
+  s = s.replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>');
+
+  // 7. Markdown italic *text*
+  s = s.replace(/(?<!\*)\*(?!\*)([\s\S]*?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+
+  // 8. Markdown underline __text__
+  s = s.replace(/__([\s\S]*?)__/g, '<u>$1</u>');
+
+  // 9. Markdown strikethrough ~~text~~
+  s = s.replace(/~~([\s\S]*?)~~/g, '<s>$1</s>');
+
+  // 10. Code snippet `text`
+  s = s.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.9em;font-family:monospace;">$1</code>');
+
+  return s;
+}
+
 function renderBlockContent(block) {
   const p = block.props || {};
   switch (block.type) {
@@ -1832,7 +1886,8 @@ function renderBlockContent(block) {
       const headingEl = el('div', {
         class: `block block-heading lvl-${lvl}${hasLink ? ' has-nav-link' : ''}`,
         style: `text-align:${align};${colorStyle}${marginStyle}${hasLink ? 'cursor:pointer;' : ''}`
-      }, p.text || '');
+      });
+      headingEl.innerHTML = parseRichText(p.text || '');
       if (hasLink) {
         headingEl.addEventListener('click', e => {
           if (state.cms.isPreviewMode) {
@@ -1853,7 +1908,8 @@ function renderBlockContent(block) {
       const pEl = el('div', {
         class: cls,
         style: `text-align:${align};font-size:${fontSize};${colorStyle}${hasLink ? 'cursor:pointer;text-decoration:underline;' : ''}`
-      }, p.text || '');
+      });
+      pEl.innerHTML = parseRichText(p.text || '');
       if (hasLink) {
         pEl.addEventListener('click', e => {
           if (state.cms.isPreviewMode) {
@@ -3497,7 +3553,7 @@ function renderProps() {
         ['6', 'Heading 6 (H6)', String(p.level || 2)]
       ], v => { p.level = Number(v); onChange(); })));
 
-      wrap.appendChild(field('Text Content', textarea(p.text || '', v => { p.text = v; onPropInput(); })));
+      wrap.appendChild(richTextField('Text Content', p.text || '', v => { p.text = v; onPropInput(); }));
 
       wrap.appendChild(field('Alignment', select([
         ['left', 'Left Aligned', p.align || 'left'],
@@ -3519,7 +3575,7 @@ function renderProps() {
       break;
     }
     case 'paragraph': {
-      wrap.appendChild(field('Body Text', textarea(p.text || '', v => { p.text = v; onPropInput(); })));
+      wrap.appendChild(richTextField('Body Text', p.text || '', v => { p.text = v; onPropInput(); }));
 
       wrap.appendChild(field('Text Alignment', select([
         ['left', 'Left', p.align || 'left'],
@@ -4158,21 +4214,102 @@ function field(label, control) {
 }
 
 function colorField(label, value, defaultVal, onChange) {
-  const colorInput = input('color', value || defaultVal || '#6366f1', v => onChange(v));
-  const textInput = input('text', value || '', v => onChange(v));
-  textInput.placeholder = 'Default';
-  textInput.style.maxWidth = '90px';
-  const clearBtn = el('button', {
+  const container = el('div', { class: 'field color-picker-field' });
+  const labelEl = el('label', { style: 'display:flex;justify-content:space-between;align-items:center;' }, [
+    el('span', {}, label),
+    value ? el('span', { style: 'font-size:11px;font-family:var(--font-mono);color:var(--accent-primary);' }, value) : false
+  ]);
+  container.appendChild(labelEl);
+
+  const curVal = value || defaultVal || '#6366f1';
+  
+  // Custom Color Picker Swatch Box
+  const swatchBox = el('div', {
+    class: 'color-swatch-box',
+    title: 'Click to open color picker',
+    style: `background-color:${curVal};`
+  });
+  
+  const hiddenColorInput = el('input', {
+    type: 'color',
+    class: 'hidden-color-input',
+    value: curVal.startsWith('#') && curVal.length === 7 ? curVal : '#6366f1',
+    oninput: e => {
+      textInput.value = e.target.value.toUpperCase();
+      swatchBox.style.backgroundColor = e.target.value;
+      onChange(e.target.value);
+    }
+  });
+
+  swatchBox.onclick = () => hiddenColorInput.click();
+
+  // Hex Text Input
+  const textInput = input('text', value || '', v => {
+    let formatted = v.trim();
+    if (formatted && !formatted.startsWith('#') && /^[0-9a-fA-F]{3,8}$/.test(formatted)) {
+      formatted = '#' + formatted;
+    }
+    swatchBox.style.backgroundColor = formatted || defaultVal || '#6366f1';
+    if (formatted.startsWith('#') && formatted.length === 7) {
+      hiddenColorInput.value = formatted;
+    }
+    onChange(formatted);
+  });
+  textInput.placeholder = defaultVal ? `Default (${defaultVal})` : 'e.g. #6366F1';
+  textInput.className = 'form-input color-hex-input';
+
+  // Reset Button
+  const resetBtn = el('button', {
     type: 'button',
-    class: 'btn-icon-sm',
-    title: 'Reset to default',
+    class: 'btn ghost btn-sm color-reset-btn',
+    title: 'Reset to default color',
     onclick: () => {
+      textInput.value = '';
+      swatchBox.style.backgroundColor = defaultVal || '#6366f1';
+      hiddenColorInput.value = defaultVal && defaultVal.startsWith('#') ? defaultVal : '#6366f1';
       onChange('');
     }
-  }, '\u2715');
+  }, 'Reset');
 
-  const row = el('div', { class: 'color-input-row' }, [colorInput, textInput, clearBtn]);
-  return field(label, row);
+  const mainRow = el('div', { class: 'color-input-main-row' }, [
+    swatchBox,
+    hiddenColorInput,
+    textInput,
+    resetBtn
+  ]);
+  container.appendChild(mainRow);
+
+  // Quick Palette Swatches Row
+  const paletteRow = el('div', { class: 'color-quick-palette' }, [
+    ...[
+      { c: '#ffffff', name: 'White' },
+      { c: '#94a3b8', name: 'Slate' },
+      { c: '#6366f1', name: 'Indigo' },
+      { c: '#818cf8', name: 'Light Indigo' },
+      { c: '#38bdf8', name: 'Sky Cyan' },
+      { c: '#34d399', name: 'Emerald' },
+      { c: '#fbbf24', name: 'Amber' },
+      { c: '#f43f5e', name: 'Rose' },
+      { c: '#ec4899', name: 'Pink' },
+      { c: '#a855f7', name: 'Purple' },
+      { c: '#0f172a', name: 'Navy' },
+      { c: '#000000', name: 'Black' }
+    ].map(p => el('button', {
+      type: 'button',
+      class: 'color-palette-dot',
+      style: `background-color:${p.c};`,
+      title: `${p.name} (${p.c})`,
+      onclick: () => {
+        textInput.value = p.c.toUpperCase();
+        swatchBox.style.backgroundColor = p.c;
+        if (p.c.startsWith('#') && p.c.length === 7) hiddenColorInput.value = p.c;
+        onChange(p.c);
+      }
+    }))
+  ]);
+  container.appendChild(paletteRow);
+
+  return container;
 }
 
 function input(type, value, onInput) {
@@ -4187,6 +4324,166 @@ function textarea(value, onInput) {
   return el('textarea', {
     oninput: e => onInput(e.target.value)
   }, value != null ? value : '');
+}
+
+function richTextField(label, value, onInput) {
+  const container = el('div', { class: 'field rich-text-field-container' });
+  const labelEl = el('label', { style: 'display:flex;justify-content:space-between;align-items:center;' }, [
+    el('span', {}, label),
+    el('span', { style: 'font-size:10px;color:var(--text-tertiary);font-weight:normal;' }, '✨ Partial styling enabled')
+  ]);
+  container.appendChild(labelEl);
+
+  const ta = textarea(value || '', onInput);
+  ta.style.minHeight = '72px';
+
+  // Helper to wrap selected text in textarea
+  function wrapSelection(prefix, suffix, defaultText = 'highlighted text') {
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const val = ta.value;
+    const selected = val.substring(start, end) || defaultText;
+    const replacement = `${prefix}${selected}${suffix}`;
+    const newVal = val.substring(0, start) + replacement + val.substring(end);
+    ta.value = newVal;
+    onInput(newVal);
+    ta.focus();
+    ta.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+  }
+
+  // Formatting Toolbar
+  const toolbar = el('div', { class: 'rich-text-toolbar' });
+
+  // Row 1: Formatting buttons
+  const toolsRow = el('div', { class: 'rich-tools-row' });
+
+  // 1. Bold Button
+  const boldBtn = el('button', {
+    type: 'button',
+    class: 'rich-text-btn',
+    title: 'Bold selection (**text**)',
+    onclick: () => wrapSelection('**', '**', 'bold text')
+  }, [el('strong', {}, 'B')]);
+
+  // 2. Italic Button
+  const italicBtn = el('button', {
+    type: 'button',
+    class: 'rich-text-btn',
+    title: 'Italic selection (*text*)',
+    onclick: () => wrapSelection('*', '*', 'italic text')
+  }, [el('em', {}, 'I')]);
+
+  // 3. Underline Button
+  const uBtn = el('button', {
+    type: 'button',
+    class: 'rich-text-btn',
+    title: 'Underline selection (__text__)',
+    onclick: () => wrapSelection('__', '__', 'underline')
+  }, [el('u', {}, 'U')]);
+
+  // 4. Code Button
+  const codeBtn = el('button', {
+    type: 'button',
+    class: 'rich-text-btn',
+    title: 'Inline code snippet (`code`)',
+    onclick: () => wrapSelection('`', '`', 'code')
+  }, '</>');
+
+  // 5. Gradient Button
+  const gradBtn = el('button', {
+    type: 'button',
+    class: 'rich-text-btn',
+    title: 'Rainbow gradient text ([gradient](text))',
+    style: 'background:linear-gradient(135deg,rgba(129,140,248,0.25),rgba(236,72,153,0.25));border:1px solid rgba(129,140,248,0.4);color:#c7d2fe;',
+    onclick: () => wrapSelection('[gradient](', ')', 'Gradient Phrase')
+  }, '🌈 Gradient');
+
+  // 6. Glow Button
+  const glowBtn = el('button', {
+    type: 'button',
+    class: 'rich-text-btn',
+    title: 'Glowing neon text ([glow:#818cf8](text))',
+    style: 'color:#818cf8;',
+    onclick: () => wrapSelection('[glow:#818cf8](', ')', 'Glowing Text')
+  }, '✨ Glow');
+
+  // 7. Highlight / Background Mark Button
+  const hlBtn = el('button', {
+    type: 'button',
+    class: 'rich-text-btn',
+    title: 'Highlighted background ([bg:rgba(245,158,11,0.25)](text))',
+    style: 'color:#fbbf24;',
+    onclick: () => wrapSelection('[bg:rgba(245,158,11,0.25)](', ')', 'highlighted text')
+  }, '🖍️ Mark');
+
+  // 8. Badge Pill Button
+  const badgeBtn = el('button', {
+    type: 'button',
+    class: 'rich-text-btn',
+    title: 'Badge pill badge ([badge:#38bdf8](text))',
+    style: 'color:#38bdf8;',
+    onclick: () => wrapSelection('[badge:#38bdf8](', ')', 'Badge')
+  }, '🏷️ Pill');
+
+  toolsRow.appendChild(boldBtn);
+  toolsRow.appendChild(italicBtn);
+  toolsRow.appendChild(uBtn);
+  toolsRow.appendChild(codeBtn);
+  toolsRow.appendChild(el('div', { class: 'rich-btn-divider' }));
+  toolsRow.appendChild(gradBtn);
+  toolsRow.appendChild(glowBtn);
+  toolsRow.appendChild(hlBtn);
+  toolsRow.appendChild(badgeBtn);
+
+  // Row 2: Color Swatches Row
+  const colorsRow = el('div', { class: 'rich-colors-row' });
+  colorsRow.appendChild(el('span', { class: 'rich-colors-label' }, '🎨 Color:'));
+
+  const swatches = [
+    { color: '#ffffff', name: 'White' },
+    { color: '#818cf8', name: 'Indigo' },
+    { color: '#ec4899', name: 'Pink' },
+    { color: '#34d399', name: 'Emerald' },
+    { color: '#38bdf8', name: 'Cyan' },
+    { color: '#fbbf24', name: 'Amber' },
+    { color: '#f43f5e', name: 'Rose' },
+    { color: '#a855f7', name: 'Purple' }
+  ];
+
+  swatches.forEach(s => {
+    const dot = el('button', {
+      type: 'button',
+      class: 'rich-swatch-dot',
+      style: `background-color:${s.color};`,
+      title: `Color: ${s.name} ([color:${s.color}](text))`,
+      onclick: () => wrapSelection(`[color:${s.color}](`, ')', `${s.name} text`)
+    });
+    colorsRow.appendChild(dot);
+  });
+
+  // Custom Color Input in toolbar
+  const customColorInput = el('input', {
+    type: 'color',
+    value: '#6366f1',
+    style: 'width:20px;height:20px;border:none;background:transparent;cursor:pointer;padding:0;vertical-align:middle;',
+    title: 'Custom color for selected text',
+    onchange: e => {
+      wrapSelection(`[color:${e.target.value}](`, ')', 'colored text');
+    }
+  });
+  colorsRow.appendChild(customColorInput);
+
+  toolbar.appendChild(toolsRow);
+  toolbar.appendChild(colorsRow);
+
+  const hint = el('div', { class: 'rich-text-helper-hint' }, [
+    '💡 Tip: Select any text and click a style above to format only that specific part.'
+  ]);
+
+  container.appendChild(toolbar);
+  container.appendChild(ta);
+  container.appendChild(hint);
+  return container;
 }
 
 function select(options, onChange) {
