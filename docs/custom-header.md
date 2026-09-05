@@ -5,6 +5,14 @@ Feature
 Custom header is the feature that user can drag any components to the header and save it as a custom header. 
 basically like container but carousel
 
+custom header does have 3 big sections
+- header
+- content
+- footer but this one should on the bottom like the actual footer
+
+
+*** customer header should have only one per page ***
+
 User can add subsection into custom header
 User can edit and set properties for each component in the header such as: 
 - Logo

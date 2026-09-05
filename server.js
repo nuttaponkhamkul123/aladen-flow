@@ -1194,7 +1194,7 @@ Return ONLY valid JSON (no markdown formatting, no code block backticks) matchin
   ]
 }
 IMPORTANT STYLING DIRECTIVE:
-Every block supports an optional "customCss" string in "props". When needed to elevate the design (e.g. gradient hero titles, glassmorphism containers, glowing CTA buttons, subtle card borders, or badge styling), USE "customCss" to give the page a modern, visually stunning look.
+Every block supports an optional "customCss" string in "props". When needed to elevate the design (e.g. gradient hero titles, glassmorphism containers, glowing CTA buttons, subtle card borders, or badge styling), USE "customCss" to give the page a modern, visually stunning look. Every block ALSO supports background + parallax props: "bgType": "none"|"color"|"gradient"|"image", "bgColor": "#hex", "bgGradient": "linear-gradient(135deg, #0f172a, #4f46e5)", "bgImage": "https://images.unsplash.com/...", "bgSize": "cover"|"contain"|"auto", "bgPosition": "center"|"top"|"bottom"|"left"|"right", "bgRepeat": "no-repeat"|"repeat"|"repeat-x"|"repeat-y", "parallax": true (fixes the background while scrolling). Use these for section backgrounds and parallax hero effects.
 Examples:
 - Gradient Hero Title: "background: linear-gradient(135deg, #818cf8, #ec4899, #f43f5e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; letter-spacing: -0.5px;"
 - Glassmorphism Cards: "backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);"
@@ -1406,10 +1406,11 @@ Return ONLY valid JSON (no markdown formatting, no code block backticks) matchin
     // 24. form: { "id": "frm_1", "type": "form", "props": { "title": "Contact Us", "description": "...", "buttonLabel": "Send Message" } }
     // 25. audio: { "id": "aud_1", "type": "audio", "props": { "title": "Episode 01", "artist": "Host Name", "duration": "04:15", "cover": "https://..." } }
     // 26. header: { "id": "hdr_1", "type": "header", "props": { "brandName": "Brand Name", "brandIcon": "✦", "layout": "spread"|"centered"|"floating", "styleVariant": "glass"|"solid"|"transparent"|"bordered", "sticky": false, "showCta": true, "ctaLabel": "Get Started", "ctaUrl": "#", "ctaVariant": "filled"|"outline"|"glow", "links": [{ "label": "Features", "url": "#features" }] } }
+    // 27. footer: { "id": "ftr_1", "type": "footer", "props": { "brandName": "Brand Name", "brandIcon": "✦", "tagline": "...", "styleVariant": "dark"|"light"|"transparent", "columns": [{ "title": "Product", "links": [{ "label": "Features", "url": "#features" }] }], "showNewsletter": true, "newsletterTitle": "Stay in the loop", "newsletterText": "...", "showSocial": true, "social": [{ "platform": "twitter", "url": "https://twitter.com/..." }], "copyright": "© 2026 Brand. All rights reserved.", "bottomLinks": [{ "label": "Privacy Policy", "url": "#" }] } }
   ]
 }
 IMPORTANT STYLING DIRECTIVE:
-Every block supports an optional "customCss" string in "props". When needed to elevate the design (e.g. gradient hero titles, glassmorphism containers, glowing CTA buttons, subtle card borders, or badge styling), USE "customCss" to give the page a modern, visually stunning look.
+Every block supports an optional "customCss" string in "props". When needed to elevate the design (e.g. gradient hero titles, glassmorphism containers, glowing CTA buttons, subtle card borders, or badge styling), USE "customCss" to give the page a modern, visually stunning look. Every block ALSO supports background + parallax props: "bgType": "none"|"color"|"gradient"|"image", "bgColor": "#hex", "bgGradient": "linear-gradient(135deg, #0f172a, #4f46e5)", "bgImage": "https://images.unsplash.com/...", "bgSize": "cover"|"contain"|"auto", "bgPosition": "center"|"top"|"bottom"|"left"|"right", "bgRepeat": "no-repeat"|"repeat"|"repeat-x"|"repeat-y", "parallax": true (fixes the background while scrolling). Use these for section backgrounds and parallax hero effects.
 Examples:
 - Gradient Hero Title: "background: linear-gradient(135deg, #818cf8, #ec4899, #f43f5e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; letter-spacing: -0.5px;"
 - Glassmorphism Cards: "backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);"
@@ -1493,10 +1494,11 @@ Return ONLY valid JSON (no markdown formatting, no code block backticks) matchin
     // 24. form: { "id": "frm_1", "type": "form", "props": { "title": "Contact Us", "description": "...", "buttonLabel": "Send Message" } }
     // 25. audio: { "id": "aud_1", "type": "audio", "props": { "title": "Episode 01", "artist": "Host Name", "duration": "04:15", "cover": "https://..." } }
     // 26. header: { "id": "hdr_1", "type": "header", "props": { "brandName": "Brand Name", "brandIcon": "✦", "layout": "spread"|"centered"|"floating", "styleVariant": "glass"|"solid"|"transparent"|"bordered", "sticky": false, "showCta": true, "ctaLabel": "Get Started", "ctaUrl": "#", "ctaVariant": "filled"|"outline"|"glow", "links": [{ "label": "Features", "url": "#features" }] } }
+    // 27. footer: { "id": "ftr_1", "type": "footer", "props": { "brandName": "Brand Name", "brandIcon": "✦", "tagline": "...", "styleVariant": "dark"|"light"|"transparent", "columns": [{ "title": "Product", "links": [{ "label": "Features", "url": "#features" }] }], "showNewsletter": true, "newsletterTitle": "Stay in the loop", "newsletterText": "...", "showSocial": true, "social": [{ "platform": "twitter", "url": "https://twitter.com/..." }], "copyright": "© 2026 Brand. All rights reserved.", "bottomLinks": [{ "label": "Privacy Policy", "url": "#" }] } }
   ]
 }
 IMPORTANT STYLING DIRECTIVE:
-Every block supports an optional "customCss" string in "props". When needed to elevate the design (e.g. gradient hero titles, glassmorphism containers, glowing CTA buttons, subtle card borders, or badge styling), USE "customCss" to give the page a modern, visually stunning look.
+Every block supports an optional "customCss" string in "props". When needed to elevate the design (e.g. gradient hero titles, glassmorphism containers, glowing CTA buttons, subtle card borders, or badge styling), USE "customCss" to give the page a modern, visually stunning look. Every block ALSO supports background + parallax props: "bgType": "none"|"color"|"gradient"|"image", "bgColor": "#hex", "bgGradient": "linear-gradient(135deg, #0f172a, #4f46e5)", "bgImage": "https://images.unsplash.com/...", "bgSize": "cover"|"contain"|"auto", "bgPosition": "center"|"top"|"bottom"|"left"|"right", "bgRepeat": "no-repeat"|"repeat"|"repeat-x"|"repeat-y", "parallax": true (fixes the background while scrolling). Use these for section backgrounds and parallax hero effects.
 Make the website rich, professional, engaging, with multiple sections (Hero, Features Grid, Testimonials/Quotes, Pricing or Stats Table, CTA buttons).
 
 CRITICAL SYNTAX & COMPLETION RULES:
@@ -1725,7 +1727,44 @@ function parseRichTextHtml(raw) {
   return s;
 }
 
+// Universal "Background & Parallax" CSS applied to every component's outer element.
+function makeBlockBgCss(p) {
+  const type = p.bgType || 'none';
+  let css = '';
+  if (type === 'color' && p.bgColor) {
+    css += `background:${p.bgColor};`;
+  } else if (type === 'gradient' && p.bgGradient) {
+    css += `background:${p.bgGradient};`;
+  } else if (type === 'image' && p.bgImage) {
+    css += `background-image:url("${p.bgImage}");background-size:${p.bgSize || 'cover'};background-position:${p.bgPosition || 'center'};background-repeat:${p.bgRepeat || 'no-repeat'};`;
+  }
+  if (p.parallax && type !== 'none') css += 'background-attachment:fixed;';
+  return css;
+}
+
+// Appends a CSS string into the first tag's style attribute of a rendered block HTML string.
+function injectBgStyleIntoFirstTag(html, css) {
+  if (!css || typeof html !== 'string' || !html) return html;
+  const gt = html.indexOf('>');
+  if (gt === -1) return html;
+  const firstTag = html.slice(0, gt + 1);
+  const safeCss = escHtml(css);
+  const styleAttrMatch = firstTag.match(/style="([^"]*)"/);
+  if (styleAttrMatch) {
+    const replaced = firstTag.replace(/style="([^"]*)"/, (m, inner) => `style="${inner}${safeCss}"`);
+    return replaced + html.slice(gt + 1);
+  }
+  const selfClosing = firstTag.endsWith('/>');
+  const openTag = selfClosing ? firstTag.slice(0, gt - 1) : firstTag.slice(0, gt);
+  return `${openTag} style="${safeCss}"${selfClosing ? '/>' : '>'}` + html.slice(gt + 1);
+}
+
 function renderBlockHtml(b) {
+  const bgCss = makeBlockBgCss(b.props || {});
+  return injectBgStyleIntoFirstTag(renderBlockInnerHtml(b), bgCss);
+}
+
+function renderBlockInnerHtml(b) {
   const p = b.props || {};
   const customCss = p.customCss ? escHtml(formatCustomCssForHtml(p.customCss)) : '';
   switch (b.type) {
@@ -2394,9 +2433,76 @@ function renderBlockHtml(b) {
         ${carouselHtml}
       </header>`;
     }
+    case 'footer': {
+      const variant = p.styleVariant || 'dark';
+      const brandIcon = p.brandIcon ? `<span class="cms-footer-brand-icon">${escHtml(p.brandIcon)}</span>` : '';
+      const brandHtml = `<div class="cms-footer-brand">
+          <div class="cms-footer-brand-name">${brandIcon}<span class="cms-footer-brand-title">${escHtml(p.brandName || 'Brand')}</span></div>
+          ${p.tagline ? `<div class="cms-footer-tagline">${escHtml(p.tagline)}</div>` : ''}
+        </div>`;
+
+      let colsHtml = '';
+      if (p.showColumns !== false && Array.isArray(p.columns)) {
+        colsHtml = `<div class="cms-footer-cols" style="grid-template-columns:repeat(${Math.min(p.columns.length, 4)}, minmax(0, 1fr));">${p.columns.map(col => `
+            <div class="cms-footer-col">
+              <div class="cms-footer-col-title">${escHtml(col.title || '')}</div>
+              <ul class="cms-footer-col-links">${(col.links || []).map(l => `<li><a class="cms-footer-link" href="${escHtml(l.url || '#')}">${escHtml(l.label || '')}</a></li>`).join('')}</ul>
+            </div>`).join('')}</div>`;
+      }
+
+      let newsletterHtml = '';
+      if (p.showNewsletter !== false) {
+        newsletterHtml = `<div class="cms-footer-newsletter">
+            <div class="cms-footer-newsletter-info">
+              ${p.newsletterTitle ? `<div class="cms-footer-newsletter-title">${escHtml(p.newsletterTitle)}</div>` : ''}
+              ${p.newsletterText ? `<div class="cms-footer-newsletter-text">${escHtml(p.newsletterText)}</div>` : ''}
+            </div>
+            <form class="cms-footer-newsletter-form" onsubmit="return false;">
+              <input class="cms-footer-newsletter-input" type="email" placeholder="${escHtml(p.newsletterPlaceholder || 'Your email address')}" />
+              <button class="cms-footer-newsletter-btn" type="button">${escHtml(p.newsletterButton || 'Subscribe')}</button>
+            </form>
+          </div>`;
+      }
+
+      let socialHtml = '';
+      if (p.showSocial !== false && Array.isArray(p.social)) {
+        const icons = p.social.filter(s => s && s.platform && s.platform !== 'none');
+        if (icons.length) {
+          socialHtml = `<div class="cms-footer-social">${icons.map(s => `<a class="cms-footer-social-link" href="${escHtml(s.url || '#')}" title="${escHtml(s.platform)}" target="_blank" rel="noopener noreferrer">${footerSocialSvgHtml(s.platform)}</a>`).join('')}</div>`;
+        }
+      }
+
+      let bottomLinksHtml = '';
+      if (Array.isArray(p.bottomLinks) && p.bottomLinks.length) {
+        bottomLinksHtml = `<div class="cms-footer-bottom-links">${p.bottomLinks.map(l => `<a class="cms-footer-link" href="${escHtml(l.url || '#')}">${escHtml(l.label || '')}</a>`).join('')}</div>`;
+      }
+
+      return `<footer class="cms-footer-block variant-${variant}" style="${customCss}">
+        <div class="cms-footer-top">${brandHtml}${colsHtml}</div>
+        ${newsletterHtml}
+        <div class="cms-footer-bottom">
+          ${socialHtml}
+          <div class="cms-footer-copyright">${escHtml(p.copyright || '© 2026. All rights reserved.')}</div>
+          ${bottomLinksHtml}
+        </div>
+      </footer>`;
+    }
     default:
       return '';
   }
+}
+
+function footerSocialSvgHtml(platform) {
+  const icons = {
+    twitter: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+    github: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12a11.5 11.5 0 0 0 7.86 10.9c.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.66.41.35.77 1.05.77 2.12v3.15c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z"/></svg>',
+    linkedin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.22.79 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>',
+    facebook: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.7 4.53-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.89v2.26h3.32l-.53 3.49h-2.79V24C19.61 23.09 24 18.1 24 12.07z"/></svg>',
+    instagram: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect width="20" height="20" x="2" y="2" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>',
+    youtube: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.5 3.55 12 3.55 12 3.55s-7.5 0-9.38.5A3.02 3.02 0 0 0 .5 6.19 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.81 3.02 3.02 0 0 0 2.12 2.14c1.88.5 9.38.5 9.38.5s7.5 0 9.38-.5a3.02 3.02 0 0 0 2.12-2.14A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.81zM9.55 15.57V8.43L15.82 12z"/></svg>'
+  };
+  const fallback = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>';
+  return icons[platform] || fallback;
 }
 
 function renderPublishedPage(page, blocks, tags) {
@@ -2448,7 +2554,22 @@ function renderPublishedPage(page, blocks, tags) {
     alignMargin = `${marginY} ${marginX}`;
   }
 
-  const body = blocks.map(renderBlockHtml).join('\n');
+  const blockList = Array.isArray(blocks) ? blocks : [];
+  const headerBlocks = [];
+  const footerBlocks = [];
+  const contentBlocks = [];
+  for (const b of blockList) {
+    if (b.type === 'header' && headerBlocks.length === 0) headerBlocks.push(b);
+    else if (b.type === 'footer' && footerBlocks.length === 0) footerBlocks.push(b);
+    else contentBlocks.push(b);
+  }
+  const headerHtml = headerBlocks.map(renderBlockHtml).join('\n');
+  const contentHtml = contentBlocks.map(renderBlockHtml).join('\n');
+  const footerHtml = footerBlocks.map(renderBlockHtml).join('\n');
+  const tagsHtml = tags.length ? `<div class="tags">${tags.map(t => `<span>${escHtml(t)}</span>`).join('')}</div>` : '';
+  const body = `${headerHtml}
+  <main class="cms-page-main">${contentHtml}${tagsHtml}</main>
+  ${footerHtml}`;
   const draftBanner = page.status !== 'published' ? `
   <div style="background:#f59e0b;color:#1e1b4b;padding:8px 16px;text-align:center;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
     <span>⚡ <strong>Draft Preview Mode</strong> &mdash; This page is currently unpublished (${escHtml(page.status || 'draft')})</span>
@@ -2466,14 +2587,15 @@ function renderPublishedPage(page, blocks, tags) {
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css" />
   <style>
-    html, body {
+    html {
       height: auto !important;
       min-height: 100vh !important;
       overflow-x: hidden !important;
       overflow-y: auto !important;
     }
-    body { font-family: ${fontFamily}; background: ${pageBg}; color: ${textColor}; margin: 0; min-height: 100vh; }
-    .wrap { max-width: ${maxWidth}; min-width: ${minWidth}; margin: ${alignMargin}; padding: ${paddingY} ${paddingX}; border-radius: ${borderRadius}; background: ${cardBg}; min-height: 100vh; box-sizing: border-box; box-shadow: 0 0 0 1px ${borderColor}; }
+    body { font-family: ${fontFamily}; background: ${pageBg}; color: ${textColor}; margin: 0; min-height: 100vh; overflow: visible; display: block; }
+    .wrap { max-width: ${maxWidth}; min-width: ${minWidth}; margin: ${alignMargin}; padding: ${paddingY} ${paddingX}; border-radius: ${borderRadius}; background: ${cardBg}; min-height: 100vh; box-sizing: border-box; box-shadow: 0 0 0 1px ${borderColor}; display: flex; flex-direction: column; }
+    .cms-page-main { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; }
     .tags { margin-top: 32px; padding-top: 16px; border-top: 1px solid ${borderColor}; font-size: 12px; color: #64748b; }
     .tags span { display: inline-block; background: rgba(100,116,139,0.15); padding: 2px 8px; border-radius: 999px; margin-right: 4px; }
     .cms-table th { background: rgba(100,116,139,0.12); color: inherit; font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 2px solid ${borderColor}; }
@@ -2973,13 +3095,189 @@ function renderPublishedPage(page, blocks, tags) {
       width: 24px;
       box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
     }
+
+    /* Custom Footer / Site Bottom */
+    .cms-footer-block {
+      width: 100%;
+      box-sizing: border-box;
+      margin: 24px 0 0;
+      border-radius: 14px;
+      padding: 28px 24px 18px;
+      font-size: 14px;
+      line-height: 1.6;
+      transition: all 0.25s ease;
+    }
+    .cms-footer-block.variant-dark {
+      background: #0b1220;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    }
+    .cms-footer-block.variant-light {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+    }
+    .cms-footer-block.variant-transparent {
+      background: transparent;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      color: rgba(255, 255, 255, 0.75);
+    }
+    .cms-footer-top {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    .cms-footer-brand {
+      min-width: 220px;
+      flex: 1;
+    }
+    .cms-footer-brand-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 17px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .cms-footer-block.variant-light .cms-footer-brand-name { color: #0f172a; }
+    .cms-footer-block.variant-transparent .cms-footer-brand-name { color: #ffffff; }
+    .cms-footer-brand-icon { font-size: 18px; line-height: 1; }
+    .cms-footer-tagline {
+      margin-top: 8px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.55);
+      max-width: 300px;
+    }
+    .cms-footer-block.variant-light .cms-footer-tagline { color: #64748b; }
+    .cms-footer-block.variant-transparent .cms-footer-tagline { color: rgba(255, 255, 255, 0.55); }
+    .cms-footer-cols {
+      display: grid;
+      gap: 28px;
+      flex: 2;
+    }
+    .cms-footer-col { min-width: 120px; }
+    .cms-footer-col-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: rgba(255, 255, 255, 0.55);
+      margin-bottom: 10px;
+    }
+    .cms-footer-block.variant-light .cms-footer-col-title { color: #64748b; }
+    .cms-footer-col-links {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .cms-footer-col-links li { margin: 0; }
+    .cms-footer-link {
+      color: rgba(255, 255, 255, 0.7);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.15s ease;
+    }
+    .cms-footer-link:hover { color: #6366f1; text-decoration: underline; }
+    .cms-footer-block.variant-light .cms-footer-link { color: #475569; }
+    .cms-footer-newsletter {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 22px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .cms-footer-block.variant-light .cms-footer-newsletter {
+      background: #ffffff;
+      border-color: #e2e8f0;
+    }
+    .cms-footer-newsletter-info { min-width: 220px; flex: 1; }
+    .cms-footer-newsletter-title { font-weight: 700; font-size: 15px; color: #ffffff; }
+    .cms-footer-block.variant-light .cms-footer-newsletter-title { color: #0f172a; }
+    .cms-footer-newsletter-text { font-size: 12.5px; color: rgba(255, 255, 255, 0.5); }
+    .cms-footer-block.variant-light .cms-footer-newsletter-text { color: #64748b; }
+    .cms-footer-newsletter-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .cms-footer-newsletter-input {
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: #ffffff;
+      font-size: 13px;
+      min-width: 200px;
+      outline: none;
+    }
+    .cms-footer-block.variant-light .cms-footer-newsletter-input {
+      border-color: #e2e8f0;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .cms-footer-newsletter-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+    .cms-footer-newsletter-btn {
+      padding: 9px 16px;
+      border-radius: 8px;
+      border: none;
+      background: #6366f1;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .cms-footer-newsletter-btn:hover { background: #4f46e5; }
+    .cms-footer-bottom {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 12.5px;
+    }
+    .cms-footer-block.variant-light .cms-footer-bottom { border-top-color: #e2e8f0; }
+    .cms-footer-copyright { color: rgba(255, 255, 255, 0.5); flex: 1; }
+    .cms-footer-block.variant-light .cms-footer-copyright { color: #64748b; }
+    .cms-footer-bottom-links { display: flex; gap: 14px; }
+    .cms-footer-social { display: flex; gap: 8px; }
+    .cms-footer-social-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.7);
+      transition: all 0.15s ease;
+    }
+    .cms-footer-social-link:hover {
+      background: #6366f1;
+      border-color: #6366f1;
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+    .cms-footer-block.variant-light .cms-footer-social-link {
+      background: #f1f5f9;
+      border-color: #e2e8f0;
+      color: #475569;
+    }
   </style>
 </head>
 <body>
   ${draftBanner}
   <div class="wrap">
     ${body}
-    ${tags.length ? `<div class="tags">${tags.map(t => `<span>${escHtml(t)}</span>`).join('')}</div>` : ''}
   </div>
   <script>
     function setCarouselSlide(id, idx) {

@@ -1034,6 +1034,59 @@ const BLOCK_DEFAULTS = {
       }
     ]
   },
+  footer: {
+    brandName: 'Aladen Studio',
+    brandIcon: '✦',
+    tagline: 'Build and publish beautiful marketing websites visually — no code required.',
+    logoHeight: 26,
+    styleVariant: 'dark',
+    showColumns: true,
+    columns: [
+      {
+        title: 'Product',
+        links: [
+          { label: 'Features', url: '#features' },
+          { label: 'Pricing', url: '#pricing' },
+          { label: 'Showcase', url: '#showcase' },
+          { label: 'Changelog', url: '#' }
+        ]
+      },
+      {
+        title: 'Company',
+        links: [
+          { label: 'About', url: '#' },
+          { label: 'Blog', url: '#' },
+          { label: 'Careers', url: '#' },
+          { label: 'Contact', url: '#' }
+        ]
+      },
+      {
+        title: 'Resources',
+        links: [
+          { label: 'Documentation', url: '#' },
+          { label: 'Templates', url: '#' },
+          { label: 'Community', url: '#' },
+          { label: 'Support', url: '#' }
+        ]
+      }
+    ],
+    showNewsletter: true,
+    newsletterTitle: 'Stay in the loop',
+    newsletterText: 'Get product updates and design inspiration straight to your inbox.',
+    newsletterPlaceholder: 'Your email address',
+    newsletterButton: 'Subscribe',
+    showSocial: true,
+    social: [
+      { platform: 'twitter', url: '#' },
+      { platform: 'github', url: '#' },
+      { platform: 'linkedin', url: '#' }
+    ],
+    copyright: '© 2026 Aladen Studio. All rights reserved.',
+    bottomLinks: [
+      { label: 'Privacy Policy', url: '#' },
+      { label: 'Terms of Service', url: '#' }
+    ]
+  },
   heading: {
     level: 2,
     text: 'New heading',
@@ -1243,6 +1296,7 @@ const BLOCK_DEFAULTS = {
 
 const BLOCK_LABELS = {
   header: 'Custom Header (Navbar)',
+  footer: 'Footer (Site Bottom)',
   heading: 'Heading',
   paragraph: 'Paragraph',
   button: 'Button',
@@ -2176,6 +2230,25 @@ function applyCustomCssOverride(targetElement, customCssString) {
       try { targetElement.style[prop] = val; } catch (__) {}
     }
   });
+}
+
+// Universal "Background & Parallax" appearance applied to every component.
+function applyBlockAppearance(targetElement, props) {
+  if (!targetElement || !props) return;
+  const type = props.bgType || 'none';
+  if (type === 'color' && props.bgColor) {
+    targetElement.style.background = props.bgColor;
+  } else if (type === 'gradient' && props.bgGradient) {
+    targetElement.style.background = props.bgGradient;
+  } else if (type === 'image' && props.bgImage) {
+    targetElement.style.backgroundImage = `url("${props.bgImage}")`;
+    targetElement.style.backgroundSize = props.bgSize || 'cover';
+    targetElement.style.backgroundPosition = props.bgPosition || 'center';
+    targetElement.style.backgroundRepeat = props.bgRepeat || 'no-repeat';
+  }
+  if (props.parallax && type !== 'none') {
+    targetElement.style.backgroundAttachment = 'fixed';
+  }
 }
 
 function parseRichText(raw) {
@@ -3584,9 +3657,107 @@ function renderBlockContent(block) {
       applyCustomCssOverride(headerEl, p.customCss);
       return headerEl;
     }
+    case 'footer': {
+      const p = Object.assign({}, BLOCK_DEFAULTS.footer, block.props || {});
+      const variant = p.styleVariant || 'dark';
+      const children = [];
+
+      const topRow = el('div', { class: 'cms-footer-top' });
+
+      const brand = el('div', { class: 'cms-footer-brand' });
+      brand.appendChild(el('div', { class: 'cms-footer-brand-name' }, [
+        el('span', { class: 'cms-footer-brand-icon' }, p.brandIcon || '✦'),
+        el('span', { class: 'cms-footer-brand-title' }, p.brandName || '')
+      ]));
+      if (p.tagline) brand.appendChild(el('div', { class: 'cms-footer-tagline' }, p.tagline));
+      topRow.appendChild(brand);
+
+      if (p.showColumns && Array.isArray(p.columns)) {
+        const cols = el('div', { class: 'cms-footer-cols', dataset: { cols: Math.min(p.columns.length, 4) } });
+        p.columns.forEach(col => {
+          const colEl = el('div', { class: 'cms-footer-col' });
+          colEl.appendChild(el('div', { class: 'cms-footer-col-title' }, col.title || ''));
+          const ul = el('ul', { class: 'cms-footer-col-links' });
+          (col.links || []).forEach(link => {
+            ul.appendChild(el('li', {}, [el('a', { class: 'cms-footer-link', href: link.url || '#' }, link.label || '')]));
+          });
+          colEl.appendChild(ul);
+          cols.appendChild(colEl);
+        });
+        topRow.appendChild(cols);
+      }
+
+      children.push(topRow);
+
+      if (p.showNewsletter) {
+        const nl = el('div', { class: 'cms-footer-newsletter' });
+        const nlInfo = el('div', { class: 'cms-footer-newsletter-info' });
+        if (p.newsletterTitle) nlInfo.appendChild(el('div', { class: 'cms-footer-newsletter-title' }, p.newsletterTitle));
+        if (p.newsletterText) nlInfo.appendChild(el('div', { class: 'cms-footer-newsletter-text' }, p.newsletterText));
+        nl.appendChild(nlInfo);
+        const form = el('div', { class: 'cms-footer-newsletter-form' });
+        form.appendChild(el('input', {
+          type: 'email',
+          class: 'cms-footer-newsletter-input',
+          placeholder: p.newsletterPlaceholder || 'Your email address'
+        }));
+        form.appendChild(el('button', { type: 'button', class: 'cms-footer-newsletter-btn' }, p.newsletterButton || 'Subscribe'));
+        nl.appendChild(form);
+        children.push(nl);
+      }
+
+      const bottomBar = el('div', { class: 'cms-footer-bottom' });
+
+      if (p.showSocial && Array.isArray(p.social)) {
+        const social = el('div', { class: 'cms-footer-social' });
+        p.social.forEach(s => {
+          if (!s || !s.platform || s.platform === 'none') return;
+          social.appendChild(el('a', {
+            class: 'cms-footer-social-link',
+            href: s.url || '#',
+            title: s.platform,
+            target: '_blank',
+            rel: 'noopener'
+          }, [createSvg(footerSocialIcon(s.platform))]));
+        });
+        bottomBar.appendChild(social);
+      }
+
+      bottomBar.appendChild(el('div', { class: 'cms-footer-copyright' }, p.copyright || '© 2026. All rights reserved.'));
+
+      if (Array.isArray(p.bottomLinks) && p.bottomLinks.length) {
+        const bl = el('div', { class: 'cms-footer-bottom-links' });
+        p.bottomLinks.forEach(link => {
+          bl.appendChild(el('a', { class: 'cms-footer-link', href: link.url || '#' }, link.label || ''));
+        });
+        bottomBar.appendChild(bl);
+      }
+
+      children.push(bottomBar);
+
+      const footerEl = el('footer', {
+        class: `cms-footer-block variant-${variant}`
+      }, children);
+
+      applyCustomCssOverride(footerEl, p.customCss);
+      return footerEl;
+    }
     default:
       return el('div', { class: 'block' }, 'Unknown block');
   }
+}
+
+function footerSocialIcon(platform) {
+  const fallback = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>';
+  const icons = {
+    twitter: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+    github: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12a11.5 11.5 0 0 0 7.86 10.9c.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.66.41.35.77 1.05.77 2.12v3.15c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z"/></svg>',
+    linkedin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.22.79 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>',
+    facebook: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.7 4.53-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.89v2.26h3.32l-.53 3.49h-2.79V24C19.61 23.09 24 18.1 24 12.07z"/></svg>',
+    instagram: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect width="20" height="20" x="2" y="2" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>',
+    youtube: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.5 3.55 12 3.55 12 3.55s-7.5 0-9.38.5A3.02 3.02 0 0 0 .5 6.19 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.81 3.02 3.02 0 0 0 2.12 2.14c1.88.5 9.38.5 9.38.5s7.5 0 9.38-.5a3.02 3.02 0 0 0 2.12-2.14A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.81zM9.55 15.57V8.43L15.82 12z"/></svg>'
+  };
+  return icons[platform] || fallback;
 }
 
 function renderBlockWrap(block, parentContainerId = null) {
@@ -3652,6 +3823,7 @@ function renderBlockWrap(block, parentContainerId = null) {
     }
 
     applyCustomCssOverride(containerEl, p.customCss);
+    applyBlockAppearance(containerEl, p);
 
     if (!children.length) {
       const dropzone = el('div', { class: 'container-dropzone empty' }, [
@@ -3673,6 +3845,7 @@ function renderBlockWrap(block, parentContainerId = null) {
   } else {
     const rendered = renderBlockContent(block);
     applyCustomCssOverride(rendered, block.props?.customCss);
+    applyBlockAppearance(rendered, block.props);
     wrap.appendChild(rendered);
   }
 
@@ -4001,6 +4174,8 @@ function getBlockIconSvg(type) {
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>');
     case 'header':
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M2 10h20"/><circle cx="6" cy="7" r="1"/><path d="M14 7h4"/></svg>');
+    case 'footer':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M5 15h14"/></svg>');
     default:
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>');
   }
@@ -4092,6 +4267,7 @@ function scrollToBlock(id) {
       else if (block.type === 'carousel') snippet = `${(block.props.slides || []).length} slides`;
       else if (block.type === 'container') snippet = block.props.mode === 'grid' ? `${block.props.columns || 2} cols` : (block.props.direction || 'row');
       else if (block.type === 'header') snippet = `${(block.props.children || []).length} slides • ${block.props.brandName || 'Brand'}`;
+      else if (block.type === 'footer') snippet = block.props.brandName || 'Brand';
     }
 
     const nodeWrap = el('div', { class: `tree-node ${isSelected ? 'selected' : ''}` });
@@ -4263,6 +4439,56 @@ function scrollToBlock(id) {
   });
 }
 
+function pageHasBlockType(type) {
+  const blocks = getBlocks();
+  const search = (arr) => arr.some(b => b.type === type || (Array.isArray(b.props?.children) && search(b.props.children)));
+  return search(blocks);
+}
+
+function chromeBlockLabel(type) {
+  return type === 'header' ? 'Custom Header' : 'Footer';
+}
+
+function assertCanAddChrome(type, targetContainerId) {
+  if (type !== 'header' && type !== 'footer') return true;
+  if (targetContainerId) {
+    showToast(`${chromeBlockLabel(type)} can only be placed at the page root (top or bottom of the canvas).`, 'warning');
+    return false;
+  }
+  if (pageHasBlockType(type)) {
+    showToast(`Only one ${chromeBlockLabel(type)} is allowed per page.`, 'warning');
+    return false;
+  }
+  return true;
+}
+
+function orderPageBlocks(blocks) {
+  const headers = [];
+  const footers = [];
+  const content = [];
+  for (const b of blocks) {
+    if (b.type === 'header' && headers.length === 0) headers.push(b);
+    else if (b.type === 'footer' && footers.length === 0) footers.push(b);
+    else content.push(b);
+  }
+  return [...headers, ...content, ...footers];
+}
+
+function canvasZoneDivider(zone) {
+  const labels = { header: 'Header', content: 'Content', footer: 'Footer' };
+  const icons = {
+    header: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="M2 10h20"/><circle cx="6" cy="7" r="1"/><path d="M14 7h4"/>',
+    content: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/><path d="M3 12h18"/>',
+    footer: '<path d="M3 10h18"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M5 15h14"/>'
+  };
+  return el('div', { class: `canvas-zone-divider zone-${zone}`, dataset: { canvasZone: zone } }, [
+    el('span', { class: 'canvas-zone-chip' }, [
+      createSvg(`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${icons[zone] || icons.content}</svg>`),
+      el('span', {}, labels[zone] || zone)
+    ])
+  ]);
+}
+
 function renderCanvas() {
   applyCanvasSettings();
   const canvas = document.getElementById('cmsCanvas');
@@ -4271,7 +4497,18 @@ function renderCanvas() {
   if (!blocks.length) {
     canvas.appendChild(el('div', { class: 'cms-empty-canvas' }, 'Drag a block from the palette to get started.'));
   } else {
-    blocks.forEach(block => {
+    const ordered = orderPageBlocks(blocks);
+    const hasChrome = ordered.some(b => b.type === 'header' || b.type === 'footer');
+    let lastZone = null;
+    ordered.forEach(block => {
+      const zone = block.type === 'header' ? 'header' : (block.type === 'footer' ? 'footer' : 'content');
+      if (zone !== lastZone) {
+        lastZone = zone;
+        if (zone !== 'content' || hasChrome) {
+          canvas.appendChild(canvasZoneDivider(zone));
+          if (zone === 'footer') canvas.appendChild(el('div', { class: 'canvas-zone-grow' }));
+        }
+      }
       canvas.appendChild(renderBlockWrap(block));
     });
   }
@@ -4332,6 +4569,10 @@ function pasteCopiedBlock() {
     return;
   }
   const cloned = cloneBlockWithNewIds(state.cms.clipboardBlock);
+  if (cloned.type === 'header' || cloned.type === 'footer') {
+    showToast(`Only one ${chromeBlockLabel(cloned.type)} is allowed per page. Paste is not possible.`, 'warning');
+    return;
+  }
 
   if (state.cms.selectedBlockId) {
     const loc = findBlockLocation(state.cms.selectedBlockId);
@@ -4363,6 +4604,10 @@ function duplicateBlock(id) {
   if (!loc) return;
   const { parentArray, index } = loc;
   const original = parentArray[index];
+  if (original.type === 'header' || original.type === 'footer') {
+    showToast(`Only one ${chromeBlockLabel(original.type)} is allowed per page. Duplicate is not possible.`, 'warning');
+    return;
+  }
   const cloned = cloneBlockWithNewIds(original);
   parentArray.splice(index + 1, 0, cloned);
   state.cms.selectedBlockId = cloned.id;
@@ -4373,6 +4618,7 @@ function duplicateBlock(id) {
 }
 
 function insertBlockAt(type, targetContainerId, idx) {
+  if (!assertCanAddChrome(type, targetContainerId)) return;
   const block = makeBlock(type);
   if (targetContainerId) {
     const container = findBlock(targetContainerId);
@@ -4394,6 +4640,11 @@ function insertBlockAt(type, targetContainerId, idx) {
 
 function moveBlockTo(blockId, targetContainerId, idx) {
   if (targetContainerId && isDescendant(blockId, targetContainerId)) {
+    return;
+  }
+  const movingBlock = findBlock(blockId);
+  if (movingBlock && (movingBlock.type === 'header' || movingBlock.type === 'footer') && targetContainerId) {
+    showToast(`${chromeBlockLabel(movingBlock.type)} can only be placed at the page root (top or bottom of the canvas).`, 'warning');
     return;
   }
   const loc = findBlockLocation(blockId);
@@ -4430,6 +4681,7 @@ function insertReusableBlockAt(reusableId, targetContainerId, idx) {
   const r = (state.cms.reusableBlocks || []).find(x => x.id === Number(reusableId));
   if (!r || !r.block_data) return;
   const cloned = cloneBlockWithNewIds(r.block_data);
+  if (!assertCanAddChrome(cloned.type, targetContainerId)) return;
   if (targetContainerId) {
     const container = findBlock(targetContainerId);
     if (container) {
@@ -4696,7 +4948,7 @@ function onContainerDragOver(e, containerBlock) {
   containerEl.classList.add('drag-over');
 
   const p = containerBlock.props || {};
-  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || containerBlock.type === 'header';
+  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || (containerBlock.type === 'header' && p.carouselLayout !== 'vertical');
   const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isGridOrWrap);
   showContainerDropIndicator(containerEl, idx, isGridOrWrap);
 }
@@ -4721,7 +4973,7 @@ function onContainerDrop(e, containerBlock) {
   }
 
   const p = containerBlock.props || {};
-  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || containerBlock.type === 'header';
+  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || (containerBlock.type === 'header' && p.carouselLayout !== 'vertical');
   const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isGridOrWrap);
 
   if (state.cms.drag.kind === 'palette') {
@@ -6434,6 +6686,134 @@ function renderProps() {
       }
       break;
     }
+    case 'footer': {
+      // Brand & Identity
+      section('brand', 'Brand & Identity', sectionIcon('<path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v6h-6"/><path d="M9 15l3-3 3 3-3 3-3-3z"/>'));
+      wrap.appendChild(field('Brand Name', input('text', p.brandName || '', v => { p.brandName = v; onPropInput(); })));
+      wrap.appendChild(field('Brand Icon (emoji / symbol)', input('text', p.brandIcon || '', v => { p.brandIcon = v; onPropInput(); })));
+      wrap.appendChild(field('Tagline', textarea(p.tagline || '', v => { p.tagline = v; onPropInput(); })));
+
+      // Style
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
+      wrap.appendChild(field('Color Variant', select([
+        ['dark', 'Dark (default)', p.styleVariant || 'dark'],
+        ['light', 'Light (pale background)', p.styleVariant || 'dark'],
+        ['transparent', 'Transparent / Minimal', p.styleVariant || 'dark']
+      ], v => { p.styleVariant = v; onChange(); })));
+
+      // Link Columns
+      section('columns', 'Link Columns', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
+      wrap.appendChild(el('label', { class: 'props-checkbox' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: p.showColumns !== false,
+          onchange: e => { p.showColumns = e.target.checked; onChange(); }
+        }),
+        'Show link columns'
+      ]));
+      if (p.showColumns !== false) {
+        wrap.appendChild(footerColumnsEditor(p, onChange, onPropInput));
+      }
+
+      // Newsletter Bar
+      section('newsletter', 'Newsletter Bar', sectionIcon('<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/>'));
+      wrap.appendChild(el('label', { class: 'props-checkbox' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: p.showNewsletter !== false,
+          onchange: e => { p.showNewsletter = e.target.checked; onChange(); }
+        }),
+        'Show newsletter signup bar'
+      ]));
+      if (p.showNewsletter !== false) {
+        wrap.appendChild(field('Heading', input('text', p.newsletterTitle || '', v => { p.newsletterTitle = v; onPropInput(); })));
+        wrap.appendChild(field('Description', textarea(p.newsletterText || '', v => { p.newsletterText = v; onPropInput(); })));
+        wrap.appendChild(field('Input Placeholder', input('text', p.newsletterPlaceholder || '', v => { p.newsletterPlaceholder = v; onPropInput(); })));
+        wrap.appendChild(field('Button Label', input('text', p.newsletterButton || '', v => { p.newsletterButton = v; onPropInput(); })));
+      }
+
+      // Social Icons
+      section('social', 'Social Icons', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
+      wrap.appendChild(el('label', { class: 'props-checkbox' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: p.showSocial !== false,
+          onchange: e => { p.showSocial = e.target.checked; onChange(); }
+        }),
+        'Show social icons'
+      ]));
+      if (p.showSocial !== false) {
+        wrap.appendChild(footerSocialEditor(p, onChange, onPropInput));
+      }
+
+      // Bottom Bar
+      section('bottom', 'Bottom Bar', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
+      wrap.appendChild(field('Copyright Text', input('text', p.copyright || '', v => { p.copyright = v; onPropInput(); })));
+      wrap.appendChild(footerBottomLinksEditor(p, onChange, onPropInput));
+      break;
+    }
+  }
+
+  // Universal "Background & Parallax" setting on every component
+  section('bg', 'Background & Parallax', sectionIcon('<path d="M3 3h18v18H3z"/><path d="M3 12h18"/><path d="M12 3v18"/>'), { startCollapsed: true });
+  const bgType = p.bgType || 'none';
+  wrap.appendChild(field('Background Type', select([
+    ['none', 'None (Transparent)', bgType],
+    ['color', 'Solid Color', bgType],
+    ['gradient', 'Gradient', bgType],
+    ['image', 'Image', bgType]
+  ], v => { p.bgType = v; onChange(); })));
+
+  if (bgType === 'color') {
+    wrap.appendChild(colorField('Background Color', p.bgColor || '', '#0f172a', v => { p.bgColor = v; onChange(160); }));
+  } else if (bgType === 'gradient') {
+    wrap.appendChild(field('Gradient CSS', input('text', p.bgGradient || '', v => { p.bgGradient = v; onPropInput(200); })));
+    const gradPresets = [
+      ['linear-gradient(135deg, #0f172a, #312e81)', 'Navy \u2192 Indigo'],
+      ['linear-gradient(135deg, #1e1b4b, #4c1d95, #be185d)', 'Deep Purple'],
+      ['linear-gradient(135deg, #0ea5e9, #6366f1)', 'Sky \u2192 Indigo'],
+      ['linear-gradient(135deg, #0f766e, #134e4a)', 'Teal'],
+      ['linear-gradient(135deg, #1f2937, #0b0f17)', 'Slate Dark']
+    ];
+    const gradPresetsRow = el('div', { style: 'display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;' }, gradPresets.map(([css, label]) => el('button', {
+      type: 'button',
+      class: 'btn secondary btn-sm',
+      style: `background:${css};color:#fff;border:none;font-size:10.5px;padding:5px 9px;border-radius:6px;cursor:pointer;`,
+      title: css,
+      onclick: () => { p.bgGradient = css; onChange(); }
+    }, label)));
+    wrap.appendChild(gradPresetsRow);
+  } else if (bgType === 'image') {
+    wrap.appendChild(field('Image URL', input('text', p.bgImage || '', v => { p.bgImage = v; onPropInput(250); })));
+    wrap.appendChild(field('Background Size', select([
+      ['cover', 'Cover (fill)', p.bgSize || 'cover'],
+      ['contain', 'Contain (fit inside)', p.bgSize || 'cover'],
+      ['auto', 'Auto (original size)', p.bgSize || 'cover']
+    ], v => { p.bgSize = v; onChange(); })));
+    wrap.appendChild(field('Position', select([
+      ['center', 'Center', p.bgPosition || 'center'],
+      ['top', 'Top', p.bgPosition || 'center'],
+      ['bottom', 'Bottom', p.bgPosition || 'center'],
+      ['left', 'Left', p.bgPosition || 'center'],
+      ['right', 'Right', p.bgPosition || 'center']
+    ], v => { p.bgPosition = v; onChange(); })));
+    wrap.appendChild(field('Repeat', select([
+      ['no-repeat', 'No Repeat', p.bgRepeat || 'no-repeat'],
+      ['repeat', 'Repeat (both)', p.bgRepeat || 'no-repeat'],
+      ['repeat-x', 'Repeat Horizontally', p.bgRepeat || 'no-repeat'],
+      ['repeat-y', 'Repeat Vertically', p.bgRepeat || 'no-repeat']
+    ], v => { p.bgRepeat = v; onChange(); })));
+  }
+
+  if (bgType !== 'none') {
+    wrap.appendChild(el('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-top:10px;' }, [
+      el('input', {
+        type: 'checkbox',
+        checked: !!p.parallax,
+        onchange: e => { p.parallax = e.target.checked; onChange(); }
+      }),
+      el('span', {}, 'Parallax Scrolling (background stays fixed while content scrolls)')
+    ]));
   }
 
   // Universal Custom CSS Style setting on every component
@@ -6441,6 +6821,178 @@ function renderProps() {
   wrap.appendChild(customCssField(block, onPropInput));
 
   body.appendChild(wrapRoot);
+}
+
+function footerColumnsEditor(p, onChange, onPropInput) {
+  if (!Array.isArray(p.columns)) {
+    p.columns = JSON.parse(JSON.stringify(BLOCK_DEFAULTS.footer.columns));
+  }
+  const root = el('div', { style: 'margin-top:10px;' });
+
+  const header = el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;' }, [
+    el('span', { style: 'font-size:12px;font-weight:700;color:var(--text-secondary);' }, `Link Columns (${p.columns.length})`),
+    el('button', {
+      type: 'button',
+      class: 'btn primary btn-sm',
+      style: 'padding:3px 8px;font-size:11px;',
+      onclick: () => {
+        p.columns.push({ title: 'New Column', links: [{ label: 'Link label', url: '#' }] });
+        onChange();
+      }
+    }, '+ Add Column')
+  ]);
+  root.appendChild(header);
+
+  p.columns.forEach((col, idx) => {
+    const box = el('div', { class: 'slide-edit-item', style: 'padding:10px;margin-bottom:10px;' }, [
+      el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;' }, [
+        el('span', { style: 'font-weight:700;font-size:12px;color:var(--text-secondary);' }, `#${idx + 1} Column`),
+        el('button', {
+          type: 'button',
+          class: 'btn-icon-sm',
+          title: 'Delete Column',
+          onclick: () => { p.columns.splice(idx, 1); onChange(); }
+        }, '\u2715')
+      ]),
+      field('Column Title', input('text', col.title || '', v => { col.title = v; onPropInput(); })),
+      ...footerLinksEditor(col, onChange, onPropInput)
+    ]);
+    root.appendChild(box);
+  });
+
+  return root;
+}
+
+function footerLinksEditor(col, onChange, onPropInput) {
+  if (!Array.isArray(col.links)) col.links = [];
+  const box = el('div', { style: 'margin-top:8px;' });
+
+  const header = el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;' }, [
+    el('span', { style: 'font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;' }, `Links (${col.links.length})`),
+    el('button', {
+      type: 'button',
+      class: 'btn secondary btn-sm',
+      style: 'padding:2px 6px;font-size:10.5px;',
+      onclick: () => { col.links.push({ label: 'New link', url: '#' }); onChange(); }
+    }, '+ Add Link')
+  ]);
+  box.appendChild(header);
+
+  col.links.forEach((link, li) => {
+    const row = el('div', { style: 'display:flex;gap:6px;align-items:center;margin-bottom:6px;' }, [
+      el('div', { style: 'flex:1;' }, [
+        el('label', { style: 'font-size:10px;color:var(--text-tertiary);' }, 'Label'),
+        input('text', link.label || '', v => { link.label = v; onPropInput(); })
+      ]),
+      el('div', { style: 'flex:1;' }, [
+        el('label', { style: 'font-size:10px;color:var(--text-tertiary);' }, 'URL'),
+        input('text', link.url || '', v => { link.url = v; onPropInput(); })
+      ]),
+      el('button', {
+        type: 'button',
+        class: 'btn-icon-sm',
+        title: 'Remove link',
+        onclick: () => { col.links.splice(li, 1); onChange(); }
+      }, '\u2715')
+    ]);
+    box.appendChild(row);
+  });
+
+  return [box];
+}
+
+function footerSocialEditor(p, onChange, onPropInput) {
+  if (!Array.isArray(p.social)) p.social = [];
+  const platforms = [
+    ['twitter', 'X / Twitter'],
+    ['github', 'GitHub'],
+    ['linkedin', 'LinkedIn'],
+    ['facebook', 'Facebook'],
+    ['instagram', 'Instagram'],
+    ['youtube', 'YouTube']
+  ];
+  const root = el('div', { style: 'margin-top:10px;' });
+
+  const header = el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;' }, [
+    el('span', { style: 'font-size:12px;font-weight:700;color:var(--text-secondary);' }, `Social Icons (${p.social.length})`),
+    el('button', {
+      type: 'button',
+      class: 'btn primary btn-sm',
+      style: 'padding:3px 8px;font-size:11px;',
+      onclick: () => {
+        const existing = new Set(p.social.map(s => s && s.platform));
+        const next = platforms.find(pr => !existing.has(pr[0]));
+        if (!next) {
+          showToast('All social platforms already added.', 'info');
+          return;
+        }
+        p.social.push({ platform: next[0], url: '#' });
+        onChange();
+      }
+    }, '+ Add Social')
+  ]);
+  root.appendChild(header);
+
+  p.social.forEach((s, idx) => {
+    if (!s) return;
+    const row = el('div', { style: 'display:flex;gap:6px;align-items:center;margin-bottom:6px;' }, [
+      el('div', { style: 'flex:1;' }, [
+        el('label', { style: 'font-size:10px;color:var(--text-tertiary);' }, 'Platform'),
+        select(platforms.map(pr => [pr[0], pr[1], s.platform || 'twitter']), v => { s.platform = v; onChange(); })
+      ]),
+      el('div', { style: 'flex:1;' }, [
+        el('label', { style: 'font-size:10px;color:var(--text-tertiary);' }, 'URL'),
+        input('text', s.url || '#', v => { s.url = v; onPropInput(); })
+      ]),
+      el('button', {
+        type: 'button',
+        class: 'btn-icon-sm',
+        title: 'Remove social icon',
+        onclick: () => { p.social.splice(idx, 1); onChange(); }
+      }, '\u2715')
+    ]);
+    root.appendChild(row);
+  });
+
+  return root;
+}
+
+function footerBottomLinksEditor(p, onChange, onPropInput) {
+  if (!Array.isArray(p.bottomLinks)) p.bottomLinks = [];
+  const box = el('div', { style: 'margin-top:8px;' });
+
+  const header = el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;' }, [
+    el('span', { style: 'font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;' }, `Legal / Bottom Links (${p.bottomLinks.length})`),
+    el('button', {
+      type: 'button',
+      class: 'btn secondary btn-sm',
+      style: 'padding:2px 6px;font-size:10.5px;',
+      onclick: () => { p.bottomLinks.push({ label: 'Link', url: '#' }); onChange(); }
+    }, '+ Add Link')
+  ]);
+  box.appendChild(header);
+
+  p.bottomLinks.forEach((link, li) => {
+    const row = el('div', { style: 'display:flex;gap:6px;align-items:center;margin-bottom:6px;' }, [
+      el('div', { style: 'flex:1;' }, [
+        el('label', { style: 'font-size:10px;color:var(--text-tertiary);' }, 'Label'),
+        input('text', link.label || '', v => { link.label = v; onPropInput(); })
+      ]),
+      el('div', { style: 'flex:1;' }, [
+        el('label', { style: 'font-size:10px;color:var(--text-tertiary);' }, 'URL'),
+        input('text', link.url || '', v => { link.url = v; onPropInput(); })
+      ]),
+      el('button', {
+        type: 'button',
+        class: 'btn-icon-sm',
+        title: 'Remove link',
+        onclick: () => { p.bottomLinks.splice(li, 1); onChange(); }
+      }, '\u2715')
+    ]);
+    box.appendChild(row);
+  });
+
+  return box;
 }
 
 function customCssField(block, onPropChange) {
