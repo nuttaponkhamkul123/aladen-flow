@@ -188,10 +188,24 @@ function renderCard(card) {
   const doneChecklist = (card.checklist || []).filter(i => i.checked).length;
   if (totalChecklist > 0) {
     const pct = Math.round((doneChecklist / totalChecklist) * 100);
-    meta.appendChild(el('div', { class: 'checklist-progress', title: `${doneChecklist}/${totalChecklist} done` }, [
-      el('div', { class: 'bar' }, el('div', { style: `width:${pct}%` })),
-      el('span', {}, `${doneChecklist}/${totalChecklist}`)
-    ]));
+    const circ = 44;
+    const offset = Math.round(circ - (pct / 100) * circ);
+    const strokeColor = pct === 100 ? '#10b981' : '#6366f1';
+
+    const ringSvg = createSvg(`<svg class="card-progress-ring-svg" width="18" height="18" viewBox="0 0 20 20">
+      <circle class="card-progress-ring-bg" cx="10" cy="10" r="7" />
+      <circle class="card-progress-ring-fill" cx="10" cy="10" r="7" stroke="${strokeColor}" stroke-dasharray="${circ}" stroke-dashoffset="${offset}" />
+    </svg>`);
+
+    const ringWrap = el('div', {
+      class: 'card-progress-ring-wrap',
+      title: `Checklist: ${doneChecklist}/${totalChecklist} completed (${pct}%)`
+    }, [
+      ringSvg,
+      el('span', { class: 'card-progress-ring-text' }, `${doneChecklist}/${totalChecklist}`)
+    ]);
+
+    meta.appendChild(ringWrap);
   }
 
   meta.appendChild(el('span', { class: `badge priority-${card.priority}` }, [
@@ -204,15 +218,21 @@ function renderCard(card) {
     meta.appendChild(el('span', { class: `due ${due.cls}` }, [calSvg, due.label]));
   }
 
+  const cardElements = [];
+  if (card.cover) {
+    const isImg = card.cover.startsWith('http') || card.cover.startsWith('data:image');
+    const coverStyle = isImg ? `background-image:url("${card.cover}");` : `background:${card.cover};`;
+    cardElements.push(el('div', { class: 'card-cover-banner', style: coverStyle }));
+  }
+  cardElements.push(labels);
+  cardElements.push(el('div', { class: 'card-title-text' }, card.title));
+  cardElements.push(meta);
+
   const cardNode = el('div', {
     class: 'card',
     dataset: { id: card.id, columnId: card.column_id },
     draggable: 'true'
-  }, [
-    labels,
-    el('div', { class: 'card-title-text' }, card.title),
-    meta
-  ]);
+  }, cardElements);
 
   cardNode.addEventListener('click', e => {
     if (cardNode.classList.contains('dragging')) return;
@@ -427,8 +447,7 @@ function setBoardEvents() {
   document.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      searchInput.focus();
-      searchInput.select();
+      openCommandPalette();
     }
   });
 
@@ -441,6 +460,19 @@ function setBoardEvents() {
     document.body.classList.toggle('theme-light');
     document.body.classList.toggle('theme-dark');
   };
+
+  // Kanban Canvas Ambient Theme Picker
+  const boardThemeSelect = document.getElementById('boardThemeSelect');
+  if (boardThemeSelect) {
+    const savedTheme = localStorage.getItem('aladen_board_theme') || 'default';
+    boardThemeSelect.value = savedTheme;
+    applyBoardTheme(savedTheme);
+    boardThemeSelect.onchange = () => {
+      const val = boardThemeSelect.value;
+      localStorage.setItem('aladen_board_theme', val);
+      applyBoardTheme(val);
+    };
+  }
 
   document.querySelectorAll('.close-modal, .modal-backdrop').forEach(n => {
     n.onclick = closeCardModal;
@@ -457,6 +489,46 @@ function setBoardEvents() {
   document.getElementById('cardDescription').onblur = saveCardFields;
   document.getElementById('cardDueDate').onchange = saveCardFields;
   document.getElementById('cardPriority').onchange = saveCardFields;
+
+  const cardCoverInput = document.getElementById('cardCoverInput');
+  if (cardCoverInput) {
+    cardCoverInput.onchange = async () => {
+      if (!state.openCardId) return;
+      const card = findCard(state.openCardId);
+      if (!card) return;
+      const coverVal = cardCoverInput.value.trim();
+      card.cover = coverVal;
+      await api.patch(`/api/cards/${state.openCardId}`, { cover: coverVal });
+      renderBoard();
+      showToast('Card cover updated');
+    };
+  }
+  document.querySelectorAll('.cover-preset-dot:not(#cardClearCoverBtn)').forEach(btn => {
+    btn.onclick = async () => {
+      if (!state.openCardId) return;
+      const card = findCard(state.openCardId);
+      if (!card) return;
+      const coverVal = btn.dataset.cover || '';
+      card.cover = coverVal;
+      if (cardCoverInput) cardCoverInput.value = coverVal;
+      await api.patch(`/api/cards/${state.openCardId}`, { cover: coverVal });
+      renderBoard();
+      showToast('Card cover gradient applied');
+    };
+  });
+  const cardClearCoverBtn = document.getElementById('cardClearCoverBtn');
+  if (cardClearCoverBtn) {
+    cardClearCoverBtn.onclick = async () => {
+      if (!state.openCardId) return;
+      const card = findCard(state.openCardId);
+      if (!card) return;
+      card.cover = '';
+      if (cardCoverInput) cardCoverInput.value = '';
+      await api.patch(`/api/cards/${state.openCardId}`, { cover: '' });
+      renderBoard();
+      showToast('Card cover removed');
+    };
+  }
 
   document.getElementById('addChecklistBtn').onclick = addChecklistItem;
   document.getElementById('newChecklistInput').onkeydown = e => {
@@ -483,6 +555,15 @@ function setBoardEvents() {
     showToast('Card deleted', 'danger');
     await loadBoard();
   };
+}
+
+function applyBoardTheme(theme) {
+  const board = document.getElementById('board');
+  if (!board) return;
+  board.classList.remove('board-theme-aurora', 'board-theme-nebula', 'board-theme-cyberpunk', 'board-theme-blueprint');
+  if (theme && theme !== 'default') {
+    board.classList.add(`board-theme-${theme}`);
+  }
 }
 
 let saveCardTimer;
@@ -518,6 +599,8 @@ async function openCard(cardId) {
   document.getElementById('cardDescription').value = card.description || '';
   document.getElementById('cardDueDate').value = card.due_date || '';
   document.getElementById('cardPriority').value = card.priority;
+  const coverInput = document.getElementById('cardCoverInput');
+  if (coverInput) coverInput.value = card.cover || '';
   document.getElementById('cardModal').classList.remove('hidden');
   renderChecklist(card);
   renderCardLabels(card);
@@ -966,6 +1049,122 @@ const BLOCK_DEFAULTS = {
     borderRadius: 8,
     shadow: false,
     children: []
+  },
+  callout: {
+    type: 'info',
+    icon: '💡',
+    title: 'Did you know?',
+    text: 'You can combine Kanban project tracking with full visual site publishing on one canvas.',
+    color: ''
+  },
+  accordion: {
+    items: [
+      { title: 'What is this platform?', content: 'A complete workspace combining visual site building and Kanban task management.' },
+      { title: 'How do I publish my site?', content: 'Click the Publish button in the top bar to get an instant live public link.' },
+      { title: 'Can I export or customize code?', content: 'Yes! Full custom CSS styles, responsive viewports, and clean semantic exports are built-in.' }
+    ]
+  },
+  tabs: {
+    tabs: [
+      { title: 'Overview', content: 'Explore our core capabilities and workflows designed for modern creators and agile teams.' },
+      { title: 'Features', content: 'Real-time drag-and-drop, responsive layout previews, AI-assisted generation, and Kanban boards.' },
+      { title: 'Roadmap', content: 'Upcoming integrations include cloud syncing, webhook notifications, and multi-user collaboration.' }
+    ]
+  },
+  pricing: {
+    plan: 'Pro Plan',
+    price: '$29',
+    period: '/month',
+    description: 'Everything you need to launch and scale your online presence.',
+    features: [
+      'Unlimited visual pages & blocks',
+      'Integrated Kanban task tracking',
+      'Local Ollama & Cloud AI generation',
+      'Custom styling & responsive previews'
+    ],
+    ctaLabel: 'Get Started Today',
+    ctaUrl: '#',
+    isPopular: true,
+    badge: 'Most Popular'
+  },
+  stat: {
+    label: 'Monthly Active Users',
+    value: '128.4K',
+    subtext: 'vs previous month',
+    trend: '+24.8%',
+    trendDirection: 'up'
+  },
+  testimonial: {
+    quote: 'This platform completely transformed our development process. The visual builder combined with Kanban is unmatched!',
+    author: 'Sarah Jenkins',
+    role: 'Head of Product at TechFlow',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop',
+    rating: 5
+  },
+  video: {
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    caption: '',
+    autoplay: false
+  },
+  code: {
+    code: '// Modern JavaScript sample\nasync function launchProject() {\n  console.log("Ready for takeoff!");\n}',
+    language: 'javascript'
+  },
+  bento: {
+    items: [
+      { title: 'Ultra Fast Engine', subtitle: 'Native node:sqlite queries with sub-millisecond roundtrips.', icon: '⚡', tag: 'Core', metric: '0.4ms', span: 2, tall: false, image: '' },
+      { title: 'Global CDN', subtitle: 'Edge deployed content delivered with zero latency globally.', icon: '🌐', tag: 'Network', metric: '99.99%', span: 1, tall: false, image: '' },
+      { title: 'Deep Analytics', subtitle: 'Real-time telemetry and user interaction telemetry.', icon: '📊', tag: 'Insights', metric: '10M+', span: 1, tall: false, image: '' },
+      { title: 'Design System', subtitle: 'Curated color palettes and sleek glassmorphic surfaces.', icon: '🎨', tag: 'Aesthetics', metric: '60fps', span: 2, tall: false, image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop' }
+    ]
+  },
+  comparison: {
+    beforeImage: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&auto=format&fit=crop',
+    afterImage: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&auto=format&fit=crop',
+    beforeLabel: 'Before Design',
+    afterLabel: 'After Design'
+  },
+  'tilt-card': {
+    badge: 'Featured Experience',
+    title: 'Dynamic 3D Tilt Card',
+    subtitle: 'Hover or drag across this card to experience natural spatial perspective, dynamic parallax depth, and specular glare reflection.',
+    ctaLabel: 'Explore Interactive',
+    ctaUrl: '#'
+  },
+  marquee: {
+    speed: 'normal',
+    items: [
+      { text: 'TypeScript', icon: '⚡' },
+      { text: 'TailwindCSS', icon: '🎨' },
+      { text: 'Node.js', icon: '🟢' },
+      { text: 'SQLite', icon: '🗄️' },
+      { text: 'GraphQL', icon: '◈' },
+      { text: 'Next.js', icon: '▲' }
+    ]
+  },
+  countdown: {
+    title: 'Product Launch Countdown',
+    subtitle: 'Our next major generation release is just around the corner.',
+    targetDate: '2026-12-31T23:59:59'
+  },
+  timeline: {
+    items: [
+      { title: 'Project Genesis', date: 'Q1 2026', description: 'Initial architecture design, core Kanban workspace, and local database engine.', status: 'completed' },
+      { title: 'Visual CMS & AI Generation', date: 'Q2 2026', description: 'Drag-and-drop block site builder integrated with local Ollama LLM intelligence.', status: 'completed' },
+      { title: 'Creative Component Suite', date: 'Q3 2026', description: 'Launch of 3D tilt cards, bento grids, comparison sliders, and ambient themes.', status: 'current' },
+      { title: 'Cloud Sync & Team Spaces', date: 'Q4 2026', description: 'Real-time multi-agent sync, team spaces, and decentralized publishing.', status: 'upcoming' }
+    ]
+  },
+  form: {
+    title: 'Connect With Our Team',
+    description: 'Have questions, ideas, or feedback? Send us a message and we will respond within 24 hours.',
+    buttonLabel: 'Send Message'
+  },
+  audio: {
+    title: 'Midnight Synth Wave - Ambient Session 04',
+    artist: 'Aladen Studio Radio',
+    duration: '03:45',
+    cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150&auto=format&fit=crop'
   }
 };
 
@@ -978,7 +1177,23 @@ const BLOCK_LABELS = {
   divider: 'Divider',
   spacer: 'Spacer',
   table: 'Table',
-  container: 'Container (Grid / Flex)'
+  container: 'Container (Grid / Flex)',
+  callout: 'Callout Box',
+  accordion: 'Accordion (FAQ)',
+  tabs: 'Tabs (Panels)',
+  pricing: 'Pricing Card',
+  stat: 'Stats & Metric',
+  testimonial: 'Testimonial Card',
+  video: 'Video Embed',
+  code: 'Code Block',
+  bento: 'Bento Grid',
+  comparison: 'Before / After Slider',
+  'tilt-card': '3D Tilt Card',
+  marquee: 'Infinite Marquee',
+  countdown: 'Countdown Timer',
+  timeline: 'Roadmap Timeline',
+  form: 'Contact Form',
+  audio: 'Audio Player'
 };
 
 function newBlockId() {
@@ -2160,6 +2375,631 @@ function renderBlockContent(block) {
 
       return el('div', { class: 'block block-table-wrap' }, [tableEl]);
     }
+    case 'callout': {
+      const type = p.type || 'info';
+      const icon = p.icon || (type === 'tip' ? '💡' : type === 'warning' ? '⚠️' : type === 'danger' ? '🚨' : 'ℹ️');
+      const customColor = p.color ? `color:${p.color};border-color:${p.color};` : '';
+      const calloutEl = el('div', {
+        class: `block block-callout callout-${type}`,
+        style: customColor
+      }, [
+        el('div', { class: 'callout-icon-wrap' }, icon),
+        el('div', { class: 'callout-body' }, [
+          p.title ? el('div', { class: 'callout-title' }, p.title) : false,
+          el('div', { class: 'callout-text' })
+        ])
+      ]);
+      calloutEl.querySelector('.callout-text').innerHTML = parseRichText(p.text || '');
+      applyCustomCssOverride(calloutEl, p.customCss);
+      return calloutEl;
+    }
+    case 'accordion': {
+      const items = Array.isArray(p.items) ? p.items : [];
+      if (!state.cms.accordionOpen) state.cms.accordionOpen = {};
+      const openSet = state.cms.accordionOpen[block.id] || new Set([0]);
+      state.cms.accordionOpen[block.id] = openSet;
+
+      const accordionEl = el('div', { class: 'block block-accordion' });
+      items.forEach((item, idx) => {
+        const isOpen = openSet.has(idx);
+        const itemEl = el('div', { class: `cms-accordion-item${isOpen ? ' is-open' : ''}` });
+
+        const trigger = el('button', {
+          type: 'button',
+          class: 'cms-accordion-trigger',
+          onclick: (e) => {
+            e.stopPropagation();
+            if (openSet.has(idx)) {
+              openSet.delete(idx);
+            } else {
+              openSet.add(idx);
+            }
+            itemEl.classList.toggle('is-open', openSet.has(idx));
+          }
+        }, [
+          el('span', {}, item.title || `Section ${idx + 1}`),
+          el('span', { class: 'cms-accordion-chevron' }, [
+            createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>')
+          ])
+        ]);
+
+        const panel = el('div', { class: 'cms-accordion-panel' });
+        panel.innerHTML = parseRichText(item.content || '');
+
+        itemEl.appendChild(trigger);
+        itemEl.appendChild(panel);
+        accordionEl.appendChild(itemEl);
+      });
+
+      applyCustomCssOverride(accordionEl, p.customCss);
+      return accordionEl;
+    }
+    case 'tabs': {
+      const tabs = Array.isArray(p.tabs) ? p.tabs : [];
+      if (!state.cms.tabIdx) state.cms.tabIdx = {};
+      let activeIdx = state.cms.tabIdx[block.id] != null ? state.cms.tabIdx[block.id] : 0;
+      if (activeIdx >= tabs.length) activeIdx = 0;
+      state.cms.tabIdx[block.id] = activeIdx;
+
+      const tabsWrap = el('div', { class: 'block block-tabs' });
+      const navEl = el('div', { class: 'cms-tabs-nav' });
+      const contentEl = el('div', { class: 'cms-tabs-content' });
+
+      tabs.forEach((tab, idx) => {
+        const isActive = idx === activeIdx;
+        const btn = el('button', {
+          type: 'button',
+          class: `cms-tab-btn${isActive ? ' active' : ''}`,
+          onclick: (e) => {
+            e.stopPropagation();
+            state.cms.tabIdx[block.id] = idx;
+            renderCanvas();
+          }
+        }, tab.title || `Tab ${idx + 1}`);
+        navEl.appendChild(btn);
+
+        const pane = el('div', { class: `cms-tab-pane${isActive ? ' active' : ''}` });
+        pane.innerHTML = parseRichText(tab.content || '');
+        contentEl.appendChild(pane);
+      });
+
+      tabsWrap.appendChild(navEl);
+      tabsWrap.appendChild(contentEl);
+      applyCustomCssOverride(tabsWrap, p.customCss);
+      return tabsWrap;
+    }
+    case 'pricing': {
+      const isPopular = !!p.isPopular;
+      const cardEl = el('div', {
+        class: `block block-pricing${isPopular ? ' is-popular' : ''}`
+      });
+
+      if (isPopular && p.badge) {
+        cardEl.appendChild(el('div', { class: 'pricing-badge' }, p.badge));
+      }
+
+      const header = el('div', { class: 'pricing-header' }, [
+        el('h3', { class: 'pricing-plan' }, p.plan || 'Plan Name'),
+        el('div', { class: 'pricing-price-wrap' }, [
+          el('span', { class: 'pricing-price' }, p.price || '$0'),
+          p.period ? el('span', { class: 'pricing-period' }, p.period) : false
+        ]),
+        p.description ? el('p', { class: 'pricing-desc' }, p.description) : false
+      ]);
+      cardEl.appendChild(header);
+
+      const features = Array.isArray(p.features) ? p.features : [];
+      if (features.length > 0) {
+        const featList = el('ul', { class: 'pricing-features' });
+        features.forEach(f => {
+          featList.appendChild(el('li', { class: 'pricing-feat-item' }, [
+            el('span', { class: 'pricing-feat-icon' }, '✓'),
+            el('span', {}, f)
+          ]));
+        });
+        cardEl.appendChild(featList);
+      }
+
+      if (p.ctaLabel) {
+        const cta = el('button', {
+          type: 'button',
+          class: 'pricing-cta',
+          onclick: (e) => {
+            if (state.cms.isPreviewMode && p.ctaUrl) {
+              handleComponentNavigation(p.ctaUrl, true, e);
+            }
+          }
+        }, p.ctaLabel);
+        cardEl.appendChild(cta);
+      }
+
+      applyCustomCssOverride(cardEl, p.customCss);
+      return cardEl;
+    }
+    case 'stat': {
+      const trendDir = p.trendDirection || (p.trend && p.trend.startsWith('-') ? 'down' : 'up');
+      const trendIcon = trendDir === 'down' ? '↓' : '↑';
+      const statEl = el('div', { class: 'block block-stat' }, [
+        el('div', { class: 'stat-header-row' }, [
+          el('span', { class: 'stat-label' }, p.label || 'Metric'),
+          p.trend ? el('span', { class: `stat-trend trend-${trendDir}` }, `${trendIcon} ${p.trend}`) : false
+        ]),
+        el('div', { class: 'stat-value' }, p.value || '0'),
+        p.subtext ? el('div', { class: 'stat-desc' }, p.subtext) : false
+      ]);
+      applyCustomCssOverride(statEl, p.customCss);
+      return statEl;
+    }
+    case 'testimonial': {
+      const rating = Math.max(1, Math.min(5, Number(p.rating) || 5));
+      const starsStr = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+
+      const cardEl = el('div', { class: 'block block-testimonial' }, [
+        el('div', { class: 'testimonial-stars' }, starsStr),
+        el('p', { class: 'testimonial-quote' }, `"${p.quote || 'No review quote provided.'}"`),
+        el('div', { class: 'testimonial-author-row' }, [
+          p.avatar ? el('img', {
+            src: p.avatar,
+            alt: p.author || 'Avatar',
+            class: 'testimonial-avatar',
+            onerror: e => { e.target.style.display = 'none'; }
+          }) : false,
+          el('div', { class: 'testimonial-info' }, [
+            el('span', { class: 'testimonial-name' }, p.author || 'Anonymous User'),
+            p.role ? el('span', { class: 'testimonial-role' }, p.role) : false
+          ])
+        ])
+      ]);
+      applyCustomCssOverride(cardEl, p.customCss);
+      return cardEl;
+    }
+    case 'video': {
+      let rawUrl = (p.url || '').trim();
+      let embedUrl = rawUrl;
+      if (rawUrl.includes('youtube.com/watch?v=')) {
+        const id = rawUrl.split('watch?v=')[1]?.split('&')[0];
+        if (id) embedUrl = `https://www.youtube.com/embed/${id}`;
+      } else if (rawUrl.includes('youtu.be/')) {
+        const id = rawUrl.split('youtu.be/')[1]?.split('?')[0];
+        if (id) embedUrl = `https://www.youtube.com/embed/${id}`;
+      } else if (rawUrl.includes('vimeo.com/')) {
+        const id = rawUrl.split('vimeo.com/')[1]?.split('?')[0];
+        if (id) embedUrl = `https://player.vimeo.com/video/${id}`;
+      }
+
+      const videoWrap = el('div', { class: 'block block-video' }, [
+        el('div', { class: 'video-responsive-wrap' }, [
+          embedUrl ? el('iframe', {
+            src: embedUrl,
+            frameborder: '0',
+            allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
+            allowfullscreen: ''
+          }) : el('div', { style: 'color:var(--text-tertiary);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:13px;' }, 'Enter a YouTube or Vimeo URL in settings')
+        ])
+      ]);
+      if (p.caption) {
+        videoWrap.appendChild(el('div', { style: 'font-size:12px;color:var(--text-tertiary);text-align:center;margin-top:6px;' }, p.caption));
+      }
+      applyCustomCssOverride(videoWrap, p.customCss);
+      return videoWrap;
+    }
+    case 'code': {
+      const lang = (p.language || 'javascript').toLowerCase();
+      const codeSnippet = p.code || '// Enter your code snippet here';
+
+      const copyBtn = el('button', {
+        type: 'button',
+        class: 'copy-code-btn',
+        onclick: (e) => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(codeSnippet).then(() => {
+            copyBtn.textContent = '✓ Copied!';
+            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+          }).catch(() => {
+            showToast('Failed to copy', 'danger');
+          });
+        }
+      }, 'Copy');
+
+      const codeBlock = el('div', { class: 'block block-code' }, [
+        el('div', { class: 'code-block-header' }, [
+          el('div', { class: 'code-window-dots' }, [
+            el('span', { class: 'code-dot dot-red' }),
+            el('span', { class: 'code-dot dot-yellow' }),
+            el('span', { class: 'code-dot dot-green' })
+          ]),
+          el('span', { class: 'code-lang-label' }, lang),
+          copyBtn
+        ]),
+        el('pre', { class: 'code-pre' }, [
+          el('code', {}, codeSnippet)
+        ])
+      ]);
+      applyCustomCssOverride(codeBlock, p.customCss);
+      return codeBlock;
+    }
+    case 'bento': {
+      const items = Array.isArray(p.items) ? p.items : [];
+      const cards = items.map(item => {
+        const spanStyle = item.span === 2 ? 'grid-column: span 2;' : '';
+        const tallStyle = item.tall ? 'grid-row: span 2;' : '';
+        const bg = item.bg || 'rgba(255,255,255,0.03)';
+        const cardEl = el('div', {
+          class: 'cms-bento-card',
+          style: `background:${bg};border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:24px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 10px 30px rgba(0,0,0,0.25);position:relative;overflow:hidden;${spanStyle}${tallStyle}`
+        });
+
+        const topContent = el('div', {});
+        const headerRow = el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;' });
+        if (item.icon) {
+          headerRow.appendChild(el('div', { style: 'font-size:24px;margin-bottom:12px;' }, item.icon));
+        }
+        if (item.tag) {
+          headerRow.appendChild(el('span', { style: 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#818cf8;background:rgba(99,102,241,0.15);padding:3px 8px;border-radius:999px;border:1px solid rgba(99,102,241,0.3);' }, item.tag));
+        }
+        topContent.appendChild(headerRow);
+
+        topContent.appendChild(el('h4', { style: 'font-size:18px;font-weight:700;color:#fff;margin:0 0 6px 0;' }, item.title || 'Feature Tile'));
+        const subEl = el('p', { style: 'font-size:13.5px;color:#94a3b8;line-height:1.5;margin:0;' });
+        subEl.innerHTML = parseRichText(item.subtitle || '');
+        topContent.appendChild(subEl);
+
+        if (item.metric) {
+          topContent.appendChild(el('div', { style: 'font-size:32px;font-weight:800;color:#fff;margin:8px 0;letter-spacing:-0.02em;' }, item.metric));
+        }
+        cardEl.appendChild(topContent);
+
+        if (item.image) {
+          cardEl.appendChild(el('div', { style: `width:100%;height:140px;border-radius:10px;background-image:url('${item.image}');background-size:cover;background-position:center;margin-top:14px;` }));
+        }
+        return cardEl;
+      });
+
+      const gridEl = el('div', {
+        class: 'block cms-bento-grid',
+        style: 'display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin:24px 0;'
+      }, cards);
+      applyCustomCssOverride(gridEl, p.customCss);
+      return gridEl;
+    }
+    case 'comparison': {
+      const beforeImg = p.beforeImage || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&auto=format&fit=crop';
+      const afterImg = p.afterImage || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&auto=format&fit=crop';
+      const beforeLabel = p.beforeLabel || 'Before';
+      const afterLabel = p.afterLabel || 'After';
+
+      const afterImgEl = el('img', { src: afterImg, alt: afterLabel, style: 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;' });
+      const afterBadge = el('div', { style: 'position:absolute;top:12px;right:16px;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.15);z-index:2;' }, afterLabel);
+
+      const beforeFullImg = el('img', { src: beforeImg, alt: beforeLabel, class: 'cms-before-full-img', style: 'position:absolute;top:0;left:0;height:100%;max-width:none;width:100%;object-fit:cover;' });
+      const beforeBadge = el('div', { style: 'position:absolute;top:12px;left:16px;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.15);' }, beforeLabel);
+
+      const overlay = el('div', { class: 'cms-comparison-overlay', style: 'position:absolute;top:0;left:0;bottom:0;width:50%;overflow:hidden;z-index:3;' }, [
+        beforeFullImg,
+        beforeBadge
+      ]);
+
+      const handleGrip = el('div', { style: 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#6366f1;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.5);font-size:14px;font-weight:bold;' }, '⇄');
+      const handle = el('div', { class: 'cms-comparison-handle', style: 'position:absolute;top:0;bottom:0;left:50%;width:3px;background:#ffffff;box-shadow:0 0 12px rgba(99,102,241,0.8);z-index:5;cursor:ew-resize;transform:translateX(-50%);' }, [handleGrip]);
+
+      const container = el('div', {
+        class: 'block cms-comparison-container',
+        style: 'position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;user-select:none;margin:24px 0;box-shadow:0 16px 40px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);'
+      }, [afterImgEl, afterBadge, overlay, handle]);
+
+      // Interactive slider movement in preview & canvas
+      let isDown = false;
+      const setPos = (clientX) => {
+        const rect = container.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        let pct = ((clientX - rect.left) / rect.width) * 100;
+        pct = Math.max(0, Math.min(100, pct));
+        overlay.style.width = pct + '%';
+        handle.style.left = pct + '%';
+        beforeFullImg.style.width = rect.width + 'px';
+      };
+
+      container.addEventListener('mousedown', e => { isDown = true; setPos(e.clientX); });
+      window.addEventListener('mouseup', () => { isDown = false; });
+      window.addEventListener('mousemove', e => { if (isDown) setPos(e.clientX); });
+      container.addEventListener('touchstart', e => { isDown = true; setPos(e.touches[0].clientX); }, { passive: true });
+      window.addEventListener('touchend', () => { isDown = false; });
+      window.addEventListener('touchmove', e => { if (isDown) setPos(e.touches[0].clientX); }, { passive: true });
+
+      applyCustomCssOverride(container, p.customCss);
+      return container;
+    }
+    case 'tilt-card': {
+      const title = p.title || 'Interactive 3D Card';
+      const badge = p.badge;
+      const cta = p.ctaLabel;
+
+      const card = el('div', {
+        class: 'cms-tilt-card',
+        style: 'position:relative;background:linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:36px 30px;box-shadow:0 20px 50px rgba(0,0,0,0.5);transform-style:preserve-3d;transition:transform 0.1s ease-out;overflow:hidden;'
+      });
+
+      const glare = el('div', {
+        class: 'cms-tilt-glare',
+        style: 'position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15), transparent 70%);opacity:0;pointer-events:none;transition:opacity 0.2s;'
+      });
+      card.appendChild(glare);
+
+      const inner = el('div', { style: 'transform:translateZ(30px);' });
+      if (badge) {
+        inner.appendChild(el('div', { style: 'margin-bottom:12px;' }, [
+          el('span', { style: 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#38bdf8;background:rgba(56,189,248,0.15);padding:3px 9px;border-radius:999px;border:1px solid rgba(56,189,248,0.3);' }, badge)
+        ]));
+      }
+
+      inner.appendChild(el('h3', { style: 'font-size:22px;font-weight:800;color:#fff;margin:0 0 8px 0;letter-spacing:-0.01em;' }, title));
+      const sub = el('p', { style: 'font-size:14.5px;color:#94a3b8;line-height:1.6;margin:0;' });
+      sub.innerHTML = parseRichText(p.subtitle || '');
+      inner.appendChild(sub);
+
+      if (cta) {
+        inner.appendChild(el('a', {
+          href: p.ctaUrl || '#',
+          style: 'display:inline-flex;align-items:center;gap:6px;background:#6366f1;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;margin-top:16px;box-shadow:0 4px 14px rgba(99,102,241,0.4);'
+        }, `${cta} →`));
+      }
+      card.appendChild(inner);
+
+      const wrap = el('div', {
+        class: 'block cms-tilt-wrap',
+        style: 'perspective:1000px;margin:24px 0;'
+      }, [card]);
+
+      wrap.addEventListener('mousemove', e => {
+        const rect = wrap.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const rotX = ((y - cy) / cy) * -12;
+        const rotY = ((x - cx) / cx) * 12;
+        card.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg) scale3d(1.02, 1.02, 1.02)`;
+        glare.style.opacity = '1';
+        glare.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(255,255,255,0.22), transparent 60%)`;
+      });
+      wrap.addEventListener('mouseleave', () => {
+        card.style.transform = 'rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+        glare.style.opacity = '0';
+      });
+
+      applyCustomCssOverride(wrap, p.customCss);
+      return wrap;
+    }
+    case 'marquee': {
+      let items = (Array.isArray(p.items) && p.items.length > 0) ? p.items : [
+        { text: 'TypeScript', icon: '⚡' },
+        { text: 'TailwindCSS', icon: '🎨' },
+        { text: 'Node.js', icon: '🟢' },
+        { text: 'SQLite', icon: '🗄️' },
+        { text: 'GraphQL', icon: '◈' },
+        { text: 'Next.js', icon: '▲' }
+      ];
+      items = items.map(it => typeof it === 'string' ? { text: it, icon: '✦' } : it);
+      const speed = p.speed === 'fast' ? '14s' : p.speed === 'slow' ? '32s' : '22s';
+
+      const createPills = () => items.map(it => {
+        const pill = el('div', {
+          style: 'display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;color:#f1f5f9;font-size:13.5px;font-weight:600;white-space:nowrap;margin-right:14px;flex-shrink:0;user-select:none;'
+        });
+        if (it.icon) pill.appendChild(el('span', { style: 'font-size:16px;' }, it.icon));
+        else pill.appendChild(el('span', {}, '✦'));
+        pill.appendChild(el('span', {}, it.text || 'Item'));
+        return pill;
+      });
+
+      // Repeat items across two identical halves so translateX(-50%) loops infinitely without gaps
+      const half1 = el('div', { style: 'display:flex;flex-shrink:0;align-items:center;' }, [
+        el('div', { style: 'display:flex;flex-shrink:0;' }, createPills()),
+        el('div', { style: 'display:flex;flex-shrink:0;' }, createPills())
+      ]);
+      const half2 = el('div', { style: 'display:flex;flex-shrink:0;align-items:center;' }, [
+        el('div', { style: 'display:flex;flex-shrink:0;' }, createPills()),
+        el('div', { style: 'display:flex;flex-shrink:0;' }, createPills())
+      ]);
+
+      const track = el('div', {
+        class: 'cms-marquee-track',
+        style: `display:flex;width:max-content;flex-shrink:0;will-change:transform;animation:marqueeScroll ${speed} linear infinite;`
+      }, [half1, half2]);
+
+      const marqueeWrap = el('div', {
+        class: 'block cms-marquee-wrap',
+        style: 'position:relative;width:100%;overflow:hidden;padding:14px 0;margin:24px 0;mask-image:linear-gradient(to right, transparent, black 10%, black 90%, transparent);-webkit-mask-image:linear-gradient(to right, transparent, black 10%, black 90%, transparent);'
+      }, [track]);
+
+      applyCustomCssOverride(marqueeWrap, p.customCss);
+      return marqueeWrap;
+    }
+    case 'countdown': {
+      const targetDate = p.targetDate || '2026-12-31T23:59:59';
+      const daysVal = el('div', { class: 'cd-val cd-days', style: 'font-size:32px;font-weight:800;color:#6366f1;line-height:1;' }, '00');
+      const hoursVal = el('div', { class: 'cd-val cd-hours', style: 'font-size:32px;font-weight:800;color:#6366f1;line-height:1;' }, '00');
+      const minsVal = el('div', { class: 'cd-val cd-minutes', style: 'font-size:32px;font-weight:800;color:#6366f1;line-height:1;' }, '00');
+      const secsVal = el('div', { class: 'cd-val cd-seconds', style: 'font-size:32px;font-weight:800;color:#6366f1;line-height:1;' }, '00');
+
+      const makeBox = (valEl, label) => el('div', { style: 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;text-align:center;' }, [
+        valEl,
+        el('div', { style: 'font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;' }, label)
+      ]);
+      const makeSep = () => el('div', { style: 'font-size:24px;font-weight:bold;color:#6366f1;opacity:0.6;' }, ':');
+
+      const boxesRow = el('div', { style: 'display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;' }, [
+        makeBox(daysVal, 'Days'),
+        makeSep(),
+        makeBox(hoursVal, 'Hours'),
+        makeSep(),
+        makeBox(minsVal, 'Mins'),
+        makeSep(),
+        makeBox(secsVal, 'Secs')
+      ]);
+
+      const container = el('div', {
+        class: 'block cms-countdown-container',
+        style: 'text-align:center;padding:32px 24px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:20px;margin:24px 0;box-shadow:0 14px 40px rgba(0,0,0,0.3);'
+      }, [
+        el('h3', { style: 'font-size:20px;font-weight:800;color:#fff;margin:0 0 6px 0;' }, p.title || 'Next Milestone Launch'),
+        el('p', { style: 'font-size:13px;color:#94a3b8;margin:0 0 20px 0;' }, p.subtitle || 'Counting down every second to release'),
+        boxesRow
+      ]);
+
+      const updateTicker = () => {
+        const target = new Date(targetDate).getTime();
+        const diff = Math.max(0, target - Date.now());
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const m = Math.floor((diff / (1000 * 60)) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+        daysVal.textContent = String(d).padStart(2, '0');
+        hoursVal.textContent = String(h).padStart(2, '0');
+        minsVal.textContent = String(m).padStart(2, '0');
+        secsVal.textContent = String(s).padStart(2, '0');
+      };
+      updateTicker();
+      const timer = setInterval(updateTicker, 1000);
+      container._cdTimer = timer;
+
+      applyCustomCssOverride(container, p.customCss);
+      return container;
+    }
+    case 'timeline': {
+      const items = Array.isArray(p.items) ? p.items : [];
+      const spine = el('div', { style: 'position:absolute;top:10px;bottom:10px;left:7px;width:2px;background:rgba(255,255,255,0.1);z-index:1;' });
+      const nodes = items.map(item => {
+        const status = item.status || 'upcoming';
+        const statusColor = status === 'completed' ? '#10b981' : status === 'current' ? '#6366f1' : '#94a3b8';
+        const statusLabel = status === 'completed' ? 'Completed' : status === 'current' ? 'In Progress' : 'Planned';
+
+        const node = el('div', { style: 'position:relative;padding-left:36px;margin-bottom:28px;' }, [
+          el('div', { style: `position:absolute;left:0;top:4px;width:16px;height:16px;border-radius:50%;background:#0d1117;border:3px solid ${statusColor};box-shadow:0 0 10px ${statusColor}66;z-index:2;` })
+        ]);
+
+        if (item.date) {
+          node.appendChild(el('div', { style: `font-size:12px;font-weight:700;color:${statusColor};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;` }, item.date));
+        }
+
+        const titleRow = el('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:6px;' }, [
+          el('h4', { style: 'font-size:16px;font-weight:700;color:#fff;margin:0;' }, item.title || 'Milestone'),
+          el('span', { style: `font-size:10.5px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}44;` }, statusLabel)
+        ]);
+        node.appendChild(titleRow);
+
+        const desc = el('p', { style: 'font-size:13.5px;color:#94a3b8;line-height:1.5;margin:0;' });
+        desc.innerHTML = parseRichText(item.description || '');
+        node.appendChild(desc);
+
+        return node;
+      });
+
+      const timelineWrap = el('div', {
+        class: 'block cms-timeline-wrap',
+        style: 'position:relative;padding:10px 0;margin:24px 0;'
+      }, [spine, ...nodes]);
+
+      applyCustomCssOverride(timelineWrap, p.customCss);
+      return timelineWrap;
+    }
+    case 'form': {
+      const formCard = el('div', {
+        class: 'block cms-form-card',
+        style: 'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:32px 28px;margin:24px 0;box-shadow:0 16px 40px rgba(0,0,0,0.35);'
+      }, [
+        el('h3', { style: 'font-size:20px;font-weight:800;color:#fff;margin:0 0 6px 0;' }, p.title || 'Get in Touch'),
+        el('p', { style: 'font-size:13.5px;color:#94a3b8;margin:0 0 20px 0;line-height:1.5;' }, p.description || 'We would love to hear from you. Leave your details below.')
+      ]);
+
+      const form = el('form', {
+        class: 'cms-contact-form',
+        style: 'display:flex;flex-direction:column;gap:14px;',
+        onsubmit: e => {
+          e.preventDefault();
+          successAlert.style.display = 'block';
+          form.reset();
+        }
+      });
+
+      const nameGroup = el('div', {}, [
+        el('label', { style: 'display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;' }, 'Your Name'),
+        el('input', { type: 'text', required: true, placeholder: 'Alex Mercer', style: 'width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;' })
+      ]);
+
+      const emailGroup = el('div', {}, [
+        el('label', { style: 'display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;' }, 'Email Address'),
+        el('input', { type: 'email', required: true, placeholder: 'alex@example.com', style: 'width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;' })
+      ]);
+
+      const msgGroup = el('div', {}, [
+        el('label', { style: 'display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;' }, 'Message'),
+        el('textarea', { rows: '3', required: true, placeholder: 'How can we help you?', style: 'width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;resize:vertical;' })
+      ]);
+
+      const submitBtn = el('button', {
+        type: 'submit',
+        style: 'background:#6366f1;color:#fff;border:none;border-radius:8px;padding:12px 18px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(99,102,241,0.4);transition:background 0.15s;'
+      }, p.buttonLabel || 'Send Message');
+
+      const successAlert = el('div', {
+        class: 'form-success-alert',
+        style: 'display:none;padding:10px 14px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#34d399;font-size:13px;border-radius:8px;text-align:center;'
+      }, '✓ Thank you! Your message has been received.');
+
+      form.appendChild(nameGroup);
+      form.appendChild(emailGroup);
+      form.appendChild(msgGroup);
+      form.appendChild(submitBtn);
+      form.appendChild(successAlert);
+
+      formCard.appendChild(form);
+      applyCustomCssOverride(formCard, p.customCss);
+      return formCard;
+    }
+    case 'audio': {
+      const cover = p.cover
+        ? el('img', { src: p.cover, style: 'width:52px;height:52px;border-radius:10px;object-fit:cover;' })
+        : el('div', { style: 'width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;' }, '🎵');
+
+      const info = el('div', { style: 'flex:1;overflow:hidden;' }, [
+        el('h4', { style: 'font-size:14.5px;font-weight:700;color:#fff;margin:0 0 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' }, p.title || 'Track Title'),
+        el('div', { style: 'font-size:12px;color:#94a3b8;' }, [
+          document.createTextNode(`${p.artist || 'Podcast Host / Artist'} • `),
+          el('span', { style: 'color:#6366f1;' }, p.duration || '04:15')
+        ])
+      ]);
+
+      const waveformBars = [40, 70, 100, 50, 80, 30, 90, 60].map((h, i) => {
+        return el('span', { style: `width:3px;height:${h}%;background:#6366f1;border-radius:2px;` });
+      });
+      const waveform = el('div', { class: 'cms-waveform-bar', style: 'display:flex;align-items:flex-end;gap:3px;height:18px;margin-top:8px;' }, waveformBars);
+      info.appendChild(waveform);
+
+      let isPlaying = false;
+      const playBtn = el('button', {
+        type: 'button',
+        class: 'cms-audio-play-btn',
+        style: 'width:42px;height:42px;border-radius:50%;background:#6366f1;border:none;color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(99,102,241,0.4);flex-shrink:0;',
+        onclick: (e) => {
+          e.stopPropagation();
+          isPlaying = !isPlaying;
+          playBtn.textContent = isPlaying ? '❚❚' : '▶';
+          playBtn.style.background = isPlaying ? '#ec4899' : '#6366f1';
+          waveformBars.forEach((bar, idx) => {
+            bar.style.animation = isPlaying ? `wave 0.6s ease-in-out infinite alternate ${idx * 0.1}s` : 'none';
+          });
+        }
+      }, '▶');
+
+      const audioCard = el('div', {
+        class: 'block cms-audio-card',
+        style: 'display:flex;align-items:center;gap:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:16px 20px;margin:20px 0;box-shadow:0 10px 30px rgba(0,0,0,0.25);'
+      }, [cover, info, playBtn]);
+
+      applyCustomCssOverride(audioCard, p.customCss);
+      return audioCard;
+    }
     default:
       return el('div', { class: 'block' }, 'Unknown block');
   }
@@ -2357,6 +3197,10 @@ function updateViewportUI() {
   if (workspace) {
     workspace.classList.toggle('is-preview-mode', isPreview);
   }
+  const cmsMain = document.getElementById('cms');
+  if (cmsMain) {
+    cmsMain.classList.toggle('is-preview-mode', isPreview);
+  }
 
   const banner = document.getElementById('cmsPreviewBanner');
   if (banner) {
@@ -2529,6 +3373,38 @@ function getBlockIconSvg(type) {
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/></svg>');
     case 'spacer':
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>');
+    case 'callout':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="M2 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="M12 22v-4"/><path d="m19.07 19.07-2.83-2.83"/><path d="M22 12h-4"/><path d="m19.07 4.93-2.83 2.83"/></svg>');
+    case 'accordion':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="m15 16-3-3-3 3"/></svg>');
+    case 'tabs':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/></svg>');
+    case 'pricing':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>');
+    case 'stat':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>');
+    case 'testimonial':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/></svg>');
+    case 'video':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>');
+    case 'code':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>');
+    case 'bento':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>');
+    case 'comparison':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="2"/></svg>');
+    case 'tilt-card':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="3"/><path d="m3 9 18-3"/><path d="m9 21 3-18"/></svg>');
+    case 'marquee':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><path d="M12 12h.01"/><path d="M17 12h.01"/><path d="M7 12h.01"/></svg>');
+    case 'countdown':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>');
+    case 'timeline':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="19" r="3"/><line x1="12" y1="8" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="16"/></svg>');
+    case 'form':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>');
+    case 'audio':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>');
     default:
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>');
   }
@@ -4111,6 +4987,431 @@ function renderProps() {
       }
       break;
     }
+    case 'callout': {
+      wrap.appendChild(field('Callout Style', select([
+        ['info', 'Information (Blue)', p.type || 'info'],
+        ['tip', 'Tip / Success (Green)', p.type || 'info'],
+        ['warning', 'Warning (Amber)', p.type || 'info'],
+        ['danger', 'Danger / Alert (Red)', p.type || 'info']
+      ], v => { p.type = v; onChange(); })));
+
+      wrap.appendChild(field('Icon (Emoji or Symbol)', input('text', p.icon || '💡', v => {
+        p.icon = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Title (Optional)', input('text', p.title || '', v => {
+        p.title = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(richTextField('Body Text', p.text || '', v => {
+        p.text = v;
+        onPropInput();
+      }));
+
+      wrap.appendChild(colorField('Custom Border Color', p.color || '', '', v => {
+        p.color = v;
+        onPropInput();
+      }));
+      break;
+    }
+    case 'accordion': {
+      if (!Array.isArray(p.items)) p.items = [];
+
+      const itemsHeader = el('div', {
+        style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;'
+      }, [
+        el('label', { style: 'font-weight:600;margin:0;' }, `Accordion Items (${p.items.length})`),
+        el('button', {
+          type: 'button',
+          class: 'btn primary btn-sm',
+          style: 'padding:3px 8px;font-size:11px;',
+          onclick: () => {
+            p.items.push({
+              title: `Question ${p.items.length + 1}`,
+              content: 'Add your detailed answer or description here.'
+            });
+            onChange();
+          }
+        }, '+ Add Item')
+      ]);
+      wrap.appendChild(itemsHeader);
+
+      const itemsList = el('div', { class: 'slides-list' });
+      p.items.forEach((item, idx) => {
+        const itemBox = el('div', { class: 'slide-edit-item', style: 'padding:10px;margin-bottom:10px;' }, [
+          el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;' }, [
+            el('span', { style: 'font-weight:700;font-size:12px;color:var(--text-secondary);' }, `#${idx + 1} Item`),
+            el('button', {
+              type: 'button',
+              class: 'btn-icon-sm',
+              title: 'Delete Item',
+              onclick: () => {
+                p.items.splice(idx, 1);
+                onChange();
+              }
+            }, '\u2715')
+          ]),
+          field('Section Title', input('text', item.title || '', v => {
+            item.title = v;
+            onPropInput();
+          })),
+          richTextField('Content', item.content || '', v => {
+            item.content = v;
+            onPropInput();
+          })
+        ]);
+        itemsList.appendChild(itemBox);
+      });
+      wrap.appendChild(itemsList);
+      break;
+    }
+    case 'tabs': {
+      if (!Array.isArray(p.tabs)) p.tabs = [];
+
+      const tabsHeader = el('div', {
+        style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;'
+      }, [
+        el('label', { style: 'font-weight:600;margin:0;' }, `Tabs (${p.tabs.length})`),
+        el('button', {
+          type: 'button',
+          class: 'btn primary btn-sm',
+          style: 'padding:3px 8px;font-size:11px;',
+          onclick: () => {
+            p.tabs.push({
+              title: `Tab ${p.tabs.length + 1}`,
+              content: 'Tab panel content here.'
+            });
+            onChange();
+          }
+        }, '+ Add Tab')
+      ]);
+      wrap.appendChild(tabsHeader);
+
+      const tabsList = el('div', { class: 'slides-list' });
+      p.tabs.forEach((tab, idx) => {
+        const tabBox = el('div', { class: 'slide-edit-item', style: 'padding:10px;margin-bottom:10px;' }, [
+          el('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;' }, [
+            el('span', { style: 'font-weight:700;font-size:12px;color:var(--text-secondary);' }, `#${idx + 1} Tab`),
+            el('button', {
+              type: 'button',
+              class: 'btn-icon-sm',
+              title: 'Delete Tab',
+              onclick: () => {
+                p.tabs.splice(idx, 1);
+                onChange();
+              }
+            }, '\u2715')
+          ]),
+          field('Tab Label', input('text', tab.title || '', v => {
+            tab.title = v;
+            onPropInput();
+          })),
+          richTextField('Panel Content', tab.content || '', v => {
+            tab.content = v;
+            onPropInput();
+          })
+        ]);
+        tabsList.appendChild(tabBox);
+      });
+      wrap.appendChild(tabsList);
+      break;
+    }
+    case 'pricing': {
+      wrap.appendChild(field('Plan Name', input('text', p.plan || '', v => {
+        p.plan = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Price', input('text', p.price || '', v => {
+        p.price = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Billing Period', input('text', p.period || '', v => {
+        p.period = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Plan Description', input('text', p.description || '', v => {
+        p.description = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(checkbox('Highlight as Most Popular', !!p.isPopular, v => {
+        p.isPopular = v;
+        onChange();
+      }));
+
+      if (p.isPopular) {
+        wrap.appendChild(field('Badge Text', input('text', p.badge || 'Most Popular', v => {
+          p.badge = v;
+          onPropInput();
+        })));
+      }
+
+      if (!Array.isArray(p.features)) p.features = [];
+      const featText = p.features.join('\n');
+      const featArea = el('textarea', {
+        class: 'input',
+        style: 'height:90px;font-size:12px;line-height:1.4;',
+        placeholder: 'One feature per line...'
+      }, featText);
+      featArea.oninput = () => {
+        p.features = featArea.value.split('\n').map(s => s.trim()).filter(Boolean);
+        onPropInput();
+      };
+      wrap.appendChild(field('Plan Features (1 per line)', featArea));
+
+      wrap.appendChild(field('CTA Button Text', input('text', p.ctaLabel || 'Get Started', v => {
+        p.ctaLabel = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(navigationLinkField('CTA Click Destination', p, onPropInput, 'ctaUrl'));
+      break;
+    }
+    case 'stat': {
+      wrap.appendChild(field('Metric Value', input('text', p.value || '', v => {
+        p.value = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Metric Label', input('text', p.label || '', v => {
+        p.label = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Subtext / Context', input('text', p.subtext || '', v => {
+        p.subtext = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Trend Pill Text', input('text', p.trend || '', v => {
+        p.trend = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Trend Direction', select([
+        ['up', 'Up / Growth (Green)', p.trendDirection || 'up'],
+        ['down', 'Down / Decline (Red)', p.trendDirection || 'up']
+      ], v => { p.trendDirection = v; onChange(); })));
+      break;
+    }
+    case 'testimonial': {
+      wrap.appendChild(richTextField('Quote', p.quote || '', v => {
+        p.quote = v;
+        onPropInput();
+      }));
+
+      wrap.appendChild(field('Author Name', input('text', p.author || '', v => {
+        p.author = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Author Role / Company', input('text', p.role || '', v => {
+        p.role = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Avatar Image URL', input('text', p.avatar || '', v => {
+        p.avatar = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Rating Stars', select([
+        ['5', '★★★★★ (5 Stars)', String(p.rating || 5)],
+        ['4', '★★★★☆ (4 Stars)', String(p.rating || 5)],
+        ['3', '★★★☆☆ (3 Stars)', String(p.rating || 5)],
+        ['2', '★★☆☆☆ (2 Stars)', String(p.rating || 5)],
+        ['1', '★☆☆☆☆ (1 Star)', String(p.rating || 5)]
+      ], v => { p.rating = Number(v); onChange(); })));
+      break;
+    }
+    case 'video': {
+      wrap.appendChild(field('Video URL (YouTube or Vimeo)', input('text', p.url || '', v => {
+        p.url = v;
+        onPropInput();
+      })));
+
+      wrap.appendChild(field('Video Caption (Optional)', input('text', p.caption || '', v => {
+        p.caption = v;
+        onPropInput();
+      })));
+      break;
+    }
+    case 'code': {
+      wrap.appendChild(field('Language Label', input('text', p.language || 'javascript', v => {
+        p.language = v;
+        onPropInput();
+      })));
+
+      const codeArea = el('textarea', {
+        class: 'input',
+        style: 'height:140px;font-family:var(--font-mono, monospace);font-size:12px;line-height:1.4;',
+        placeholder: '// Type or paste your code snippet here...'
+      }, p.code || '');
+      codeArea.oninput = () => {
+        p.code = codeArea.value;
+        onPropInput();
+      };
+      wrap.appendChild(field('Code Snippet', codeArea));
+      break;
+    }
+    case 'bento': {
+      if (!Array.isArray(p.items)) p.items = [];
+      const addBtn = el('button', {
+        type: 'button',
+        class: 'btn secondary btn-sm',
+        style: 'margin-bottom:12px;',
+        onclick: () => {
+          p.items.push({ title: 'New Tile', subtitle: 'Tile description...', icon: '✦', tag: 'New', metric: '', span: 1, tall: false, image: '' });
+          onChange();
+        }
+      }, '+ Add Bento Card');
+      wrap.appendChild(addBtn);
+
+      p.items.forEach((item, idx) => {
+        const itemBox = el('div', { class: 'accordion-item-box', style: 'padding:12px;border:1px solid var(--border-subtle);border-radius:8px;margin-bottom:12px;background:rgba(255,255,255,0.02);' }, [
+          el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;' }, [
+            el('span', { style: 'font-weight:600;font-size:12px;' }, `Card #${idx + 1}`),
+            el('button', {
+              type: 'button',
+              class: 'btn ghost btn-sm danger',
+              style: 'padding:2px 6px;font-size:11px;',
+              onclick: () => { p.items.splice(idx, 1); onChange(); }
+            }, 'Remove')
+          ]),
+          field('Title', input('text', item.title || '', v => { item.title = v; onPropInput(); })),
+          field('Subtitle', input('text', item.subtitle || '', v => { item.subtitle = v; onPropInput(); })),
+          field('Icon (Emoji or Text)', input('text', item.icon || '', v => { item.icon = v; onPropInput(); })),
+          field('Metric Highlight (e.g. 99.9%)', input('text', item.metric || '', v => { item.metric = v; onPropInput(); })),
+          field('Tag Pill', input('text', item.tag || '', v => { item.tag = v; onPropInput(); })),
+          field('Image URL (Optional)', input('text', item.image || '', v => { item.image = v; onPropInput(); })),
+          field('Column Width Span', select([
+            ['1', 'Single Column (1 Col)', String(item.span || 1)],
+            ['2', 'Wide Span (2 Cols)', String(item.span || 1)]
+          ], v => { item.span = Number(v); onChange(); }))
+        ]);
+        wrap.appendChild(itemBox);
+      });
+      break;
+    }
+    case 'comparison': {
+      wrap.appendChild(field('Before Image URL', input('text', p.beforeImage || '', v => { p.beforeImage = v; onPropInput(); })));
+      wrap.appendChild(field('Before Label', input('text', p.beforeLabel || 'Before', v => { p.beforeLabel = v; onPropInput(); })));
+      wrap.appendChild(field('After Image URL', input('text', p.afterImage || '', v => { p.afterImage = v; onPropInput(); })));
+      wrap.appendChild(field('After Label', input('text', p.afterLabel || 'After', v => { p.afterLabel = v; onPropInput(); })));
+      break;
+    }
+    case 'tilt-card': {
+      wrap.appendChild(field('Badge Text', input('text', p.badge || '', v => { p.badge = v; onPropInput(); })));
+      wrap.appendChild(field('Card Title', input('text', p.title || '', v => { p.title = v; onPropInput(); })));
+      const subArea = el('textarea', { class: 'input', style: 'height:80px;' }, p.subtitle || '');
+      subArea.oninput = () => { p.subtitle = subArea.value; onPropInput(); };
+      wrap.appendChild(field('Card Description', subArea));
+      wrap.appendChild(field('CTA Button Text (Optional)', input('text', p.ctaLabel || '', v => { p.ctaLabel = v; onPropInput(); })));
+      wrap.appendChild(field('CTA Link URL', input('text', p.ctaUrl || '', v => { p.ctaUrl = v; onPropInput(); })));
+      break;
+    }
+    case 'marquee': {
+      wrap.appendChild(field('Scroll Speed', select([
+        ['slow', 'Gentle & Slow (30s)', p.speed || 'normal'],
+        ['normal', 'Standard Pace (20s)', p.speed || 'normal'],
+        ['fast', 'Dynamic & Fast (12s)', p.speed || 'normal']
+      ], v => { p.speed = v; onChange(); })));
+
+      if (!Array.isArray(p.items)) p.items = [];
+      const addBtn = el('button', {
+        type: 'button',
+        class: 'btn secondary btn-sm',
+        style: 'margin-bottom:12px;',
+        onclick: () => {
+          p.items.push({ text: 'New Item', icon: '✦' });
+          onChange();
+        }
+      }, '+ Add Marquee Pill');
+      wrap.appendChild(addBtn);
+
+      p.items.forEach((item, idx) => {
+        const iconInp = input('text', item.icon || '', v => { item.icon = v; onPropInput(); });
+        iconInp.style.width = '46px';
+        iconInp.style.textAlign = 'center';
+
+        const row = el('div', { style: 'display:flex;gap:6px;align-items:center;margin-bottom:8px;' }, [
+          iconInp,
+          input('text', item.text || '', v => { item.text = v; onPropInput(); }),
+          el('button', {
+            type: 'button',
+            class: 'btn ghost btn-sm danger',
+            style: 'padding:4px 8px;',
+            onclick: () => { p.items.splice(idx, 1); onChange(); }
+          }, '✕')
+        ]);
+        wrap.appendChild(row);
+      });
+      break;
+    }
+    case 'countdown': {
+      wrap.appendChild(field('Headline', input('text', p.title || '', v => { p.title = v; onPropInput(); })));
+      wrap.appendChild(field('Subtitle', input('text', p.subtitle || '', v => { p.subtitle = v; onPropInput(); })));
+      wrap.appendChild(field('Target Date & Time (ISO 8601)', input('text', p.targetDate || '2026-12-31T23:59:59', v => {
+        p.targetDate = v;
+        onPropInput();
+      })));
+      break;
+    }
+    case 'timeline': {
+      if (!Array.isArray(p.items)) p.items = [];
+      const addBtn = el('button', {
+        type: 'button',
+        class: 'btn secondary btn-sm',
+        style: 'margin-bottom:12px;',
+        onclick: () => {
+          p.items.push({ title: 'New Milestone', date: 'Upcoming', description: 'Milestone goals and outcomes...', status: 'upcoming' });
+          onChange();
+        }
+      }, '+ Add Milestone');
+      wrap.appendChild(addBtn);
+
+      p.items.forEach((item, idx) => {
+        const itemBox = el('div', { class: 'accordion-item-box', style: 'padding:12px;border:1px solid var(--border-subtle);border-radius:8px;margin-bottom:12px;background:rgba(255,255,255,0.02);' }, [
+          el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;' }, [
+            el('span', { style: 'font-weight:600;font-size:12px;' }, `Milestone #${idx + 1}`),
+            el('button', {
+              type: 'button',
+              class: 'btn ghost btn-sm danger',
+              style: 'padding:2px 6px;font-size:11px;',
+              onclick: () => { p.items.splice(idx, 1); onChange(); }
+            }, 'Remove')
+          ]),
+          field('Title', input('text', item.title || '', v => { item.title = v; onPropInput(); })),
+          field('Date / Period', input('text', item.date || '', v => { item.date = v; onPropInput(); })),
+          field('Description', input('text', item.description || '', v => { item.description = v; onPropInput(); })),
+          field('Status Stage', select([
+            ['completed', 'Completed', item.status || 'upcoming'],
+            ['current', 'In Progress (Active)', item.status || 'upcoming'],
+            ['upcoming', 'Planned / Upcoming', item.status || 'upcoming']
+          ], v => { item.status = v; onChange(); }))
+        ]);
+        wrap.appendChild(itemBox);
+      });
+      break;
+    }
+    case 'form': {
+      wrap.appendChild(field('Form Title', input('text', p.title || '', v => { p.title = v; onPropInput(); })));
+      wrap.appendChild(field('Description Subtitle', input('text', p.description || '', v => { p.description = v; onPropInput(); })));
+      wrap.appendChild(field('Button Label', input('text', p.buttonLabel || 'Send Message', v => { p.buttonLabel = v; onPropInput(); })));
+      break;
+    }
+    case 'audio': {
+      wrap.appendChild(field('Track Title', input('text', p.title || '', v => { p.title = v; onPropInput(); })));
+      wrap.appendChild(field('Artist / Host', input('text', p.artist || '', v => { p.artist = v; onPropInput(); })));
+      wrap.appendChild(field('Duration Label (e.g. 03:45)', input('text', p.duration || '03:45', v => { p.duration = v; onPropInput(); })));
+      wrap.appendChild(field('Cover Artwork Image URL', input('text', p.cover || '', v => { p.cover = v; onPropInput(); })));
+      break;
+    }
   }
 
   // Universal Custom CSS Style setting on every component
@@ -4582,11 +5883,15 @@ function loadStoredAiSettings() {
   const provider = localStorage.getItem('aladen_ai_provider') || 'opencode';
   const apiKey = localStorage.getItem('aladen_ai_api_key') || '';
   let baseUrl = localStorage.getItem('aladen_ai_base_url') || 'https://api.groq.com/openai/v1';
-  if (baseUrl.includes('api.opencode.ai/v1') || baseUrl.includes('opencode.ai/zen/v1')) {
+  if (provider === 'ollama') {
+    baseUrl = localStorage.getItem('aladen_ai_ollama_base_url') || 'http://localhost:11434';
+  } else if (baseUrl.includes('api.opencode.ai/v1') || baseUrl.includes('opencode.ai/zen/v1')) {
     baseUrl = 'https://api.groq.com/openai/v1';
   }
   let model = localStorage.getItem('aladen_ai_model') || 'qwen/qwen3.8-27b';
-  if (model === 'opencode-1' || model === 'minimax-01' || model === 'minimax-text-01' || model === 'big-pickle' || model === 'llama-3.3-70b-versatile' || model === 'llama-3.1-8b-instant') {
+  if (provider === 'ollama') {
+    model = localStorage.getItem('aladen_ai_ollama_model') || 'llama3.2';
+  } else if (model === 'opencode-1' || model === 'minimax-01' || model === 'minimax-text-01' || model === 'big-pickle' || model === 'llama-3.3-70b-versatile' || model === 'llama-3.1-8b-instant') {
     model = 'qwen/qwen3.8-27b';
   }
 
@@ -4606,42 +5911,158 @@ function loadStoredAiSettings() {
 function saveStoredAiSettings() {
   const provider = document.getElementById('aiProviderSelect')?.value || 'opencode';
   const apiKey = document.getElementById('aiApiKeyInput')?.value.trim() || '';
-  const baseUrl = document.getElementById('aiBaseUrlInput')?.value.trim() || 'https://api.groq.com/openai/v1';
-  const model = document.getElementById('aiModelInput')?.value.trim() || 'qwen/qwen3.8-27b';
+  const baseUrl = document.getElementById('aiBaseUrlInput')?.value.trim() || (provider === 'ollama' ? 'http://localhost:11434' : 'https://api.groq.com/openai/v1');
+  const model = document.getElementById('aiModelInput')?.value.trim() || (provider === 'ollama' ? 'llama3.2' : 'qwen/qwen3.8-27b');
 
   localStorage.setItem('aladen_ai_provider', provider);
-  localStorage.setItem('aladen_ai_api_key', apiKey);
-  localStorage.setItem('aladen_ai_base_url', baseUrl);
-  localStorage.setItem('aladen_ai_model', model);
+  if (provider === 'ollama') {
+    localStorage.setItem('aladen_ai_ollama_base_url', baseUrl);
+    localStorage.setItem('aladen_ai_ollama_model', model);
+  } else {
+    localStorage.setItem('aladen_ai_api_key', apiKey);
+    localStorage.setItem('aladen_ai_base_url', baseUrl);
+    localStorage.setItem('aladen_ai_model', model);
+  }
 
   const badge = document.getElementById('aiKeyStatusBadge');
   if (badge) {
-    if (apiKey) {
+    if (provider === 'ollama') {
+      badge.textContent = '🦙 Ollama Local (No Key Needed)';
+      badge.style.background = 'rgba(99, 102, 241, 0.18)';
+      badge.style.color = '#818cf8';
+      badge.style.borderColor = 'rgba(99, 102, 241, 0.35)';
+      badge.style.display = 'inline-block';
+    } else if (provider === 'smart-archetype') {
+      badge.textContent = 'Built-in Engine';
+      badge.style.background = 'rgba(16, 185, 129, 0.15)';
+      badge.style.color = '#34d399';
+      badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+      badge.style.display = 'inline-block';
+    } else if (apiKey) {
       badge.textContent = 'API Key Saved';
+      badge.style.background = 'rgba(34, 197, 94, 0.15)';
+      badge.style.color = '#4ade80';
+      badge.style.borderColor = 'rgba(34, 197, 94, 0.3)';
       badge.style.display = 'inline-block';
     } else {
-      badge.textContent = provider === 'smart-archetype' ? 'Built-in Engine' : 'No Key (Archetype Fallback)';
+      badge.textContent = 'No Key (Archetype Fallback)';
+      badge.style.background = 'rgba(245, 158, 11, 0.15)';
+      badge.style.color = '#fbbf24';
+      badge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+      badge.style.display = 'inline-block';
     }
+  }
+}
+
+async function checkOllamaStatus(autoSelect = true) {
+  const statusBox = document.getElementById('ollamaStatusBox');
+  const dot = document.getElementById('ollamaStatusDot');
+  const text = document.getElementById('ollamaStatusText');
+  const select = document.getElementById('ollamaModelSelect');
+  const baseInput = document.getElementById('aiBaseUrlInput');
+  const modelInput = document.getElementById('aiModelInput');
+  const baseUrl = baseInput?.value.trim() || 'http://localhost:11434';
+
+  if (!statusBox || !dot || !text) return;
+  dot.style.background = '#eab308';
+  dot.style.boxShadow = '0 0 6px rgba(234, 179, 8, 0.5)';
+  text.textContent = 'Checking local Ollama connection...';
+
+  try {
+    const res = await fetch(`/api/ai/ollama/models?baseUrl=${encodeURIComponent(baseUrl)}`);
+    const data = await res.json();
+
+    if (data.ok && data.models && data.models.length > 0) {
+      dot.classList.add('connected');
+      dot.style.background = '#22c55e';
+      dot.style.boxShadow = '0 0 8px rgba(34, 197, 94, 0.7)';
+      text.textContent = `🟢 Connected (${data.models.length} model${data.models.length > 1 ? 's' : ''} available)`;
+
+      if (select) {
+        select.style.display = 'inline-block';
+        select.innerHTML = '<option value="">Select local model...</option>';
+        data.models.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.name;
+          const sizeGb = m.size ? ` (${(m.size / (1024 * 1024 * 1024)).toFixed(1)}GB)` : '';
+          opt.textContent = `${m.name}${sizeGb}`;
+          select.appendChild(opt);
+        });
+
+        const currentModel = modelInput?.value.trim();
+        const match = data.models.find(m => m.name === currentModel || m.name.startsWith(currentModel + ':') || (currentModel && currentModel.startsWith(m.name.split(':')[0])));
+        if (match) {
+          select.value = match.name;
+          if (modelInput) modelInput.value = match.name;
+        } else if (autoSelect && data.models[0]) {
+          select.value = data.models[0].name;
+          if (modelInput) modelInput.value = data.models[0].name;
+          saveStoredAiSettings();
+        }
+      }
+    } else if (data.ok && (!data.models || data.models.length === 0)) {
+      dot.classList.remove('connected');
+      dot.style.background = '#f59e0b';
+      dot.style.boxShadow = '0 0 6px rgba(245, 158, 11, 0.6)';
+      text.textContent = '🟡 Ollama online (no models pulled yet: run "ollama run llama3.2")';
+      if (select) select.style.display = 'none';
+    } else {
+      dot.classList.remove('connected');
+      dot.style.background = '#ef4444';
+      dot.style.boxShadow = '0 0 6px rgba(239, 68, 68, 0.6)';
+      text.textContent = '🔴 Offline (Run "ollama serve" or open Ollama)';
+      if (select) select.style.display = 'none';
+    }
+  } catch (err) {
+    dot.classList.remove('connected');
+    dot.style.background = '#ef4444';
+    dot.style.boxShadow = '0 0 6px rgba(239, 68, 68, 0.6)';
+    text.textContent = '🔴 Offline (Ensure Ollama is running)';
+    if (select) select.style.display = 'none';
   }
 }
 
 function updateAiProviderUI(provider) {
   const keyGroup = document.getElementById('aiApiKeyGroup');
   const baseGroup = document.getElementById('aiBaseUrlGroup');
+  const baseLabel = baseGroup?.querySelector('label');
+  const baseInput = document.getElementById('aiBaseUrlInput');
   const modelInput = document.getElementById('aiModelInput');
+  const ollamaBox = document.getElementById('ollamaStatusBox');
 
   if (provider === 'smart-archetype') {
     if (keyGroup) keyGroup.style.display = 'none';
     if (baseGroup) baseGroup.style.display = 'none';
+    if (ollamaBox) ollamaBox.style.display = 'none';
+  } else if (provider === 'ollama') {
+    if (keyGroup) keyGroup.style.display = 'none';
+    if (baseGroup) baseGroup.style.display = 'block';
+    if (baseLabel) baseLabel.textContent = 'Ollama Host Base URL';
+    if (baseInput && (!baseInput.value || baseInput.value.includes('groq.com') || baseInput.value.includes('opencode.ai'))) {
+      baseInput.value = localStorage.getItem('aladen_ai_ollama_base_url') || 'http://localhost:11434';
+    }
+    if (modelInput && (!modelInput.value || modelInput.value.includes('qwen3.8') || modelInput.value.includes('gpt-oss') || modelInput.value.includes('gemini'))) {
+      modelInput.value = localStorage.getItem('aladen_ai_ollama_model') || 'llama3.2';
+    }
+    if (ollamaBox) ollamaBox.style.display = 'flex';
+    checkOllamaStatus(true);
   } else if (provider === 'gemini') {
     if (keyGroup) keyGroup.style.display = 'block';
     if (baseGroup) baseGroup.style.display = 'none';
-    if (modelInput && (!modelInput.value || modelInput.value === 'big-pickle')) modelInput.value = 'gemini-1.5-flash';
+    if (ollamaBox) ollamaBox.style.display = 'none';
+    if (modelInput && (!modelInput.value || modelInput.value === 'big-pickle' || modelInput.value === 'llama3.2')) modelInput.value = 'gemini-1.5-flash';
   } else {
-    // OpenCode / OpenAI-Compatible
+    // OpenCode / Groq / OpenAI-Compatible
     if (keyGroup) keyGroup.style.display = 'block';
     if (baseGroup) baseGroup.style.display = 'block';
-    if (modelInput && (!modelInput.value || modelInput.value === 'gemini-1.5-flash')) modelInput.value = 'big-pickle';
+    if (baseLabel) baseLabel.textContent = 'API Base URL';
+    if (ollamaBox) ollamaBox.style.display = 'none';
+    if (baseInput && baseInput.value.includes('localhost:11434')) {
+      baseInput.value = localStorage.getItem('aladen_ai_base_url') || 'https://api.groq.com/openai/v1';
+    }
+    if (modelInput && (!modelInput.value || modelInput.value === 'gemini-1.5-flash' || modelInput.value === 'llama3.2')) {
+      modelInput.value = 'qwen/qwen3.8-27b';
+    }
   }
 }
 
@@ -4728,14 +6149,18 @@ async function submitAiGenerate() {
   if (submitBtn) submitBtn.disabled = true;
 
   if (loadingTitle) {
-    loadingTitle.textContent = provider === 'opencode'
-      ? `Generating with OpenCode (${model})...`
-      : provider === 'gemini'
-        ? `Generating with Gemini (${model})...`
-        : 'Synthesizing Website Layout...';
+    loadingTitle.textContent = provider === 'ollama'
+      ? `Generating with Ollama (${model})...`
+      : provider === 'opencode'
+        ? `Generating with OpenCode (${model})...`
+        : provider === 'gemini'
+          ? `Generating with Gemini (${model})...`
+          : 'Synthesizing Website Layout...';
   }
   if (loadingSub) {
-    loadingSub.textContent = 'Composing responsive visual components, structure, and theme...';
+    loadingSub.textContent = provider === 'ollama'
+      ? 'Composing website blocks locally via Ollama neural model...'
+      : 'Composing responsive visual components, structure, and theme...';
   }
 
   try {
@@ -4764,6 +6189,8 @@ async function submitAiGenerate() {
 
     if (data.warning) {
       showToast(`⚠️ ${data.warning} (Generated via Smart Archetype)`, 'warning');
+    } else if (data.source === 'ollama-ai') {
+      showToast(`🦙 Generated "${newPage.title}" locally with Ollama (${model})!`, 'success');
     } else if (data.source === 'opencode-ai') {
       showToast(`✨ Generated "${newPage.title}" with OpenCode (${model})!`, 'success');
     } else {
@@ -4814,8 +6241,23 @@ function setupCmsEvents() {
     saveStoredAiSettings();
   });
   document.getElementById('aiApiKeyInput')?.addEventListener('input', saveStoredAiSettings);
-  document.getElementById('aiBaseUrlInput')?.addEventListener('input', saveStoredAiSettings);
+  document.getElementById('aiBaseUrlInput')?.addEventListener('input', () => {
+    saveStoredAiSettings();
+    if (document.getElementById('aiProviderSelect')?.value === 'ollama') {
+      clearTimeout(window._ollamaCheckDebounce);
+      window._ollamaCheckDebounce = setTimeout(() => checkOllamaStatus(false), 500);
+    }
+  });
   document.getElementById('aiModelInput')?.addEventListener('input', saveStoredAiSettings);
+
+  document.getElementById('ollamaRefreshBtn')?.addEventListener('click', () => checkOllamaStatus(true));
+  document.getElementById('ollamaModelSelect')?.addEventListener('change', e => {
+    if (e.target.value) {
+      const inp = document.getElementById('aiModelInput');
+      if (inp) inp.value = e.target.value;
+      saveStoredAiSettings();
+    }
+  });
 
   document.getElementById('aiToggleKeyVisibility')?.addEventListener('click', () => {
     const inp = document.getElementById('aiApiKeyInput');
@@ -4979,10 +6421,267 @@ function setupCmsEvents() {
   });
 }
 
+// ==========================================================================
+// Command Palette (Ctrl + K / Cmd + K)
+// ==========================================================================
+let cmdSelectedIndex = 0;
+let currentCmdItems = [];
+
+function openCommandPalette() {
+  const modal = document.getElementById('commandPaletteModal');
+  const input = document.getElementById('commandPaletteInput');
+  if (!modal || !input) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('open');
+  input.value = '';
+  input.focus();
+  filterCommandPalette('');
+}
+
+function closeCommandPalette() {
+  const modal = document.getElementById('commandPaletteModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.classList.remove('open');
+}
+
+async function filterCommandPalette(q) {
+  const resultsEl = document.getElementById('commandPaletteResults');
+  if (!resultsEl) return;
+  const term = (q || '').toLowerCase().trim();
+  currentCmdItems = [];
+  cmdSelectedIndex = 0;
+
+  // 1. Core Quick Actions
+  const actions = [
+    {
+      type: 'action',
+      title: 'Go to Kanban Board',
+      sub: 'Switch to project workflow view',
+      badge: 'Action',
+      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>',
+      run: () => switchTab('board')
+    },
+    {
+      type: 'action',
+      title: 'Go to Site Builder (CMS)',
+      sub: 'Design pages and visual layouts',
+      badge: 'Action',
+      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>',
+      run: () => switchTab('cms')
+    },
+    {
+      type: 'action',
+      title: 'Create New Site Page',
+      sub: 'Add a new visual CMS webpage',
+      badge: 'Create',
+      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+      run: () => { switchTab('cms'); document.getElementById('cmsNewPageBtn')?.click(); }
+    },
+    {
+      type: 'action',
+      title: 'AI Generate Website',
+      sub: 'Generate full websites with Ollama, Groq, or Gemini',
+      badge: 'AI',
+      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>',
+      run: () => { switchTab('cms'); document.getElementById('cmsAiGenBtn')?.click(); }
+    },
+    {
+      type: 'action',
+      title: 'Toggle Dark / Light Theme',
+      sub: 'Switch application appearance',
+      badge: 'Theme',
+      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+      run: () => document.getElementById('themeBtn')?.click()
+    }
+  ];
+
+  actions.forEach(a => {
+    if (!term || a.title.toLowerCase().includes(term) || a.sub.toLowerCase().includes(term)) {
+      currentCmdItems.push(a);
+    }
+  });
+
+  // 2. CMS Pages
+  if (state.cms && Array.isArray(state.cms.pages)) {
+    state.cms.pages.forEach(pg => {
+      if (!term || (pg.title && pg.title.toLowerCase().includes(term)) || (pg.slug && pg.slug.toLowerCase().includes(term))) {
+        currentCmdItems.push({
+          type: 'page',
+          title: pg.title || 'Untitled Page',
+          sub: `/${pg.slug || ''} • ${pg.status || 'draft'}`,
+          badge: 'Page',
+          icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+          run: () => {
+            switchTab('cms');
+            openCmsPage(pg.id);
+          }
+        });
+      }
+    });
+  }
+
+  // 3. Boards
+  if (Array.isArray(state.boards)) {
+    state.boards.forEach(b => {
+      if (!term || (b.name && b.name.toLowerCase().includes(term))) {
+        currentCmdItems.push({
+          type: 'board',
+          title: b.name,
+          sub: `Kanban Board #${b.id}`,
+          badge: 'Board',
+          icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>',
+          run: async () => {
+            switchTab('board');
+            state.currentBoardId = b.id;
+            const sel = document.getElementById('boardSelect');
+            if (sel) sel.value = b.id;
+            await loadBoard();
+          }
+        });
+      }
+    });
+  }
+
+  // 4. Kanban Cards
+  if (term) {
+    try {
+      const cards = await api.get(`/api/search?q=${encodeURIComponent(term)}`);
+      if (Array.isArray(cards)) {
+        cards.slice(0, 8).forEach(c => {
+          currentCmdItems.push({
+            type: 'card',
+            title: c.title,
+            sub: c.description ? c.description.slice(0, 60) : `Card #${c.id} • ${c.priority || 'medium'}`,
+            badge: 'Card',
+            icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>',
+            run: () => {
+              switchTab('board');
+              openCard(c.id);
+            }
+          });
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  renderCommandPaletteResults();
+}
+
+function renderCommandPaletteResults() {
+  const resultsEl = document.getElementById('commandPaletteResults');
+  if (!resultsEl) return;
+  resultsEl.innerHTML = '';
+
+  if (currentCmdItems.length === 0) {
+    resultsEl.appendChild(el('div', { class: 'muted', style: 'padding:24px;text-align:center;font-size:13px;' }, 'No matching items or actions'));
+    return;
+  }
+
+  currentCmdItems.forEach((item, idx) => {
+    const isSelected = idx === cmdSelectedIndex;
+    const itemEl = el('div', {
+      class: `cmd-item${isSelected ? ' selected' : ''}`,
+      onclick: () => {
+        closeCommandPalette();
+        item.run();
+      },
+      onmouseenter: () => {
+        cmdSelectedIndex = idx;
+        renderCommandPaletteSelection();
+      }
+    }, [
+      el('div', { class: 'cmd-item-icon' }, [createSvg(item.icon)]),
+      el('div', { class: 'cmd-item-content' }, [
+        el('div', { class: 'cmd-item-title' }, item.title),
+        el('div', { class: 'cmd-item-sub' }, item.sub)
+      ]),
+      el('span', { class: 'cmd-item-badge' }, item.badge)
+    ]);
+    resultsEl.appendChild(itemEl);
+  });
+}
+
+function renderCommandPaletteSelection() {
+  const resultsEl = document.getElementById('commandPaletteResults');
+  if (!resultsEl) return;
+  const items = resultsEl.querySelectorAll('.cmd-item');
+  items.forEach((it, idx) => {
+    it.classList.toggle('selected', idx === cmdSelectedIndex);
+    if (idx === cmdSelectedIndex) {
+      it.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
+function setupCommandPalette() {
+  const input = document.getElementById('commandPaletteInput');
+  const backdrop = document.getElementById('commandPaletteBackdrop');
+  if (backdrop) {
+    backdrop.onclick = closeCommandPalette;
+  }
+
+  let filterDebounce;
+  if (input) {
+    input.oninput = () => {
+      clearTimeout(filterDebounce);
+      filterDebounce = setTimeout(() => {
+        filterCommandPalette(input.value);
+      }, 120);
+    };
+
+    input.onkeydown = e => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (currentCmdItems.length > 0) {
+          cmdSelectedIndex = (cmdSelectedIndex + 1) % currentCmdItems.length;
+          renderCommandPaletteSelection();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (currentCmdItems.length > 0) {
+          cmdSelectedIndex = (cmdSelectedIndex - 1 + currentCmdItems.length) % currentCmdItems.length;
+          renderCommandPaletteSelection();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (currentCmdItems[cmdSelectedIndex]) {
+          closeCommandPalette();
+          currentCmdItems[cmdSelectedIndex].run();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeCommandPalette();
+      }
+    };
+  }
+
+  // Global listener for Cmd+K / Ctrl+K and Escape
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      const modal = document.getElementById('commandPaletteModal');
+      if (modal && !modal.classList.contains('hidden')) {
+        closeCommandPalette();
+      } else {
+        openCommandPalette();
+      }
+    } else if (e.key === 'Escape') {
+      const modal = document.getElementById('commandPaletteModal');
+      if (modal && !modal.classList.contains('hidden')) {
+        closeCommandPalette();
+      }
+    }
+  });
+}
+
 (async () => {
   setBoardEvents();
   setupCmsEvents();
   setupTabs();
+  setupCommandPalette();
   await loadBoards();
   await loadBoard();
 })();

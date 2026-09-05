@@ -167,7 +167,7 @@ app.post('/api/columns/:id/cards', (req, res) => {
 
 app.patch('/api/cards/:id', (req, res) => {
   const id = Number(req.params.id);
-  const { title, description, due_date, priority, archived, labelIds } = req.body;
+  const { title, description, due_date, priority, archived, labelIds, cover } = req.body;
 
   const existing = db.prepare('SELECT * FROM cards WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'not found' });
@@ -175,6 +175,10 @@ app.patch('/api/cards/:id', (req, res) => {
   const tx = db.transaction(() => {
     const updates = [];
     const params = [];
+    if (typeof cover === 'string') {
+      updates.push('cover = ?');
+      params.push(cover.trim());
+    }
     if (typeof title === 'string') {
       updates.push('title = ?');
       params.push(title.trim());
@@ -506,6 +510,41 @@ app.delete('/api/reusable-blocks/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Ollama Local AI - Check connection and list installed local models
+app.get('/api/ai/ollama/models', async (req, res) => {
+  const baseUrl = (req.query.baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    const response = await fetch(`${baseUrl}/api/tags`, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return res.json({
+        ok: false,
+        models: [],
+        error: `Ollama returned HTTP ${response.status}`
+      });
+    }
+
+    const data = await response.json();
+    const models = (data.models || []).map(m => ({
+      name: m.name,
+      size: m.size,
+      modified_at: m.modified_at,
+      details: m.details
+    }));
+
+    res.json({ ok: true, models, baseUrl });
+  } catch (err) {
+    res.json({
+      ok: false,
+      models: [],
+      error: `Could not connect to Ollama at ${baseUrl}. Ensure Ollama is running (e.g. run "ollama serve").`
+    });
+  }
+});
+
 // AI Website Generator Endpoint
 app.post('/api/ai/generate-page', async (req, res) => {
   try {
@@ -514,7 +553,7 @@ app.post('/api/ai/generate-page', async (req, res) => {
       preset = 'custom',
       theme = 'dark-card',
       boardId = null,
-      provider = 'opencode', // 'opencode' | 'gemini' | 'auto'
+      provider = 'opencode', // 'opencode' | 'gemini' | 'ollama' | 'auto'
       apiKey = '',
       baseUrl = 'https://api.opencode.ai/v1',
       model = 'opencode-1'
@@ -547,7 +586,20 @@ app.post('/api/ai/generate-page', async (req, res) => {
       }
     }
 
-    // 2. OpenCode / OpenAI-Compatible API Call
+    // 2. Ollama Local AI Call
+    if (!generatedPage && provider === 'ollama' && prompt.trim()) {
+      try {
+        const ollamaBaseUrl = (baseUrl && !baseUrl.includes('opencode') && !baseUrl.includes('groq')) ? baseUrl : 'http://localhost:11434';
+        const ollamaModel = (model && model !== 'opencode-1') ? model : 'llama3.2';
+        generatedPage = await callOllamaPageGenerator(ollamaBaseUrl, ollamaModel, prompt, preset, theme);
+      } catch (err) {
+        const ollamaModel = (model && model !== 'opencode-1') ? model : 'llama3.2';
+        aiError = `Ollama (${ollamaModel}): ${err.message}`;
+        console.warn('Ollama API call failed, falling back to archetype generator:', err.message);
+      }
+    }
+
+    // 3. OpenCode / OpenAI-Compatible API Call
     if (!generatedPage && (provider === 'opencode' || provider === 'openai' || (!provider && effectiveOpenCodeKey)) && effectiveOpenCodeKey && prompt.trim()) {
       try {
         generatedPage = await callOpenCodePageGenerator(effectiveOpenCodeKey, effectiveBaseUrl, effectiveModel, prompt, preset, theme);
@@ -557,7 +609,7 @@ app.post('/api/ai/generate-page', async (req, res) => {
       }
     }
 
-    // 3. Gemini API Call
+    // 4. Gemini API Call
     if (!generatedPage && provider === 'gemini' && effectiveGeminiKey && prompt.trim()) {
       try {
         generatedPage = await callGeminiPageGenerator(effectiveGeminiKey, prompt, preset, theme);
@@ -567,7 +619,7 @@ app.post('/api/ai/generate-page', async (req, res) => {
       }
     }
 
-    // 4. Fallback: Smart Archetype Generator
+    // 5. Fallback: Smart Archetype Generator
     if (!generatedPage) {
       generatedPage = generateArchetypePage(prompt, preset, theme);
     }
@@ -599,7 +651,13 @@ app.post('/api/ai/generate-page', async (req, res) => {
     const createdPage = db.prepare('SELECT * FROM pages WHERE id = ?').get(pageId);
     createdPage.blocks = generatedPage.blocks;
     createdPage.settings = generatedPage.settings;
-    const source = (!aiError && effectiveOpenCodeKey) ? 'opencode-ai' : ((!aiError && effectiveGeminiKey) ? 'gemini-ai' : 'smart-archetype');
+    const source = (!aiError && provider === 'ollama')
+      ? 'ollama-ai'
+      : ((!aiError && effectiveOpenCodeKey)
+        ? 'opencode-ai'
+        : ((!aiError && effectiveGeminiKey)
+          ? 'gemini-ai'
+          : 'smart-archetype'));
     res.json({ page: createdPage, source, warning: aiError });
   } catch (err) {
     console.error('Error generating AI page:', err);
@@ -867,9 +925,37 @@ function generateArchetypePage(prompt, preset, theme) {
             customCss: 'box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(99, 102, 241, 0.2);'
           }
         },
-        { id: 'b_sp3', type: 'spacer', props: { height: 36 } },
+        { id: 'b_sp3', type: 'spacer', props: { height: 28 } },
+        {
+          id: 'b_partners_mrq',
+          type: 'marquee',
+          props: {
+            speed: 'normal',
+            items: [
+              { text: 'TypeScript', icon: '⚡' },
+              { text: 'TailwindCSS', icon: '🎨' },
+              { text: 'Node.js', icon: '🟢' },
+              { text: 'SQLite', icon: '🗄️' },
+              { text: 'GraphQL', icon: '◈' },
+              { text: 'Next.js', icon: '▲' }
+            ]
+          }
+        },
+        { id: 'b_sp3_sub', type: 'spacer', props: { height: 32 } },
         { id: 'b_sec1', type: 'heading', props: { level: 2, text: '✨ Core Platform Capabilities', align: 'center', margin: 8 } },
         { id: 'b_sec1_sub', type: 'paragraph', props: { text: 'Everything you need to ship enterprise-grade intelligence without technical debt.', align: 'center', color: '#94a3b8' } },
+        {
+          id: 'b_bento_grid',
+          type: 'bento',
+          props: {
+            items: [
+              { title: 'Edge Micro-Clusters', subtitle: 'Ultra-low latency inference distributed across 40+ points of presence.', icon: '⚡', tag: 'Speed', metric: '0.4ms', span: 2, image: '' },
+              { title: 'Zero-Trust Architecture', subtitle: 'End-to-end encrypted storage with cryptographic isolation.', icon: '🔒', tag: 'Security', metric: 'SOC-2', span: 1, image: '' },
+              { title: 'Deep Telemetry', subtitle: 'Real-time telemetry and visualization boards for performance tracking.', icon: '📊', tag: 'Insights', metric: '99.99%', span: 1, image: '' },
+              { title: 'Design System & Spatial UI', subtitle: 'Curated color palettes and sleek glassmorphic surfaces for immersive UX.', icon: '🎨', tag: 'Aesthetics', metric: '60fps', span: 2, image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop' }
+            ]
+          }
+        },
         {
           id: 'b_feat_grid',
           type: 'container',
@@ -1117,7 +1203,7 @@ Make the website rich, professional, engaging, with multiple sections (Hero, Fea
 function extractAndParseJson(rawText) {
   if (!rawText) throw new Error('Empty response from AI model');
 
-  // 1. Remove thinking blocks <think>...</think>
+  // 1. Remove thinking tags <think>...</think>
   let text = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
   // 2. Extract markdown code block if present
@@ -1126,38 +1212,105 @@ function extractAndParseJson(rawText) {
     text = codeBlockMatch[1].trim();
   }
 
-  // 3. Find outermost JSON object { ... }
+  // 3. Find outermost JSON object
   const firstBrace = text.indexOf('{');
+  if (firstBrace === -1) throw new Error('No JSON object found in output');
+  text = text.slice(firstBrace);
+
   const lastBrace = text.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    text = text.slice(firstBrace, lastBrace + 1);
+  let candidate = lastBrace !== -1 && lastBrace > 0 ? text.slice(0, lastBrace + 1) : text;
+
+  // Function to try parsing with multi-pass sanitation
+  function tryParse(s) {
+    // 1. Clean trailing commas before } or ]
+    let cleaned = s.replace(/,\s*([\]}])/g, '$1');
+    // 2. Fix missing commas between objects: } { -> }, {
+    cleaned = cleaned.replace(/}\s*(\r?\n\s*){/g, '},$1{');
+    // 3. Fix missing commas between array brackets: ] [ -> ], [
+    cleaned = cleaned.replace(/\]\s*(\r?\n\s*)\[/g, '],$1[');
+    // 4. Fix missing comma after value before next object key: "val" "key": -> "val", "key":
+    cleaned = cleaned.replace(/(["\d]|true|false|null)\s*(\r?\n\s*)"([a-zA-Z0-9_-]+)"\s*:/g, '$1,$2"$3":');
+    // 5. Clean trailing commas again if introduced
+    cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
+
+    return JSON.parse(cleaned);
   }
 
-  // 4. Clean trailing commas before closing braces/brackets
-  text = text.replace(/,\s*([\]}])/g, '$1');
-
+  // Attempt 1: Parse candidate
   try {
-    return JSON.parse(text);
-  } catch (err) {
-    // Attempt auto-recovery for common unclosed brackets/quotes
+    return tryParse(candidate);
+  } catch (e1) {
+    // Attempt 2: Parse full text
     try {
-      let repaired = text;
-      // Close unclosed string if odd number of quotes
-      const quoteCount = (repaired.match(/(?<!\\)"/g) || []).length;
-      if (quoteCount % 2 !== 0) repaired += '"';
+      return tryParse(text);
+    } catch (e2) {}
 
-      const openBraces = (repaired.match(/\{/g) || []).length;
-      const closeBraces = (repaired.match(/\}/g) || []).length;
-      const openBrackets = (repaired.match(/\[/g) || []).length;
-      const closeBrackets = (repaired.match(/\]/g) || []).length;
+    // Attempt 3: Stack-based truncated JSON auto-repair
+    try {
+      let repaired = candidate;
 
-      for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += ']';
-      for (let i = 0; i < openBraces - closeBraces; i++) repaired += '}';
-      repaired = repaired.replace(/,\s*([\]}])/g, '$1');
+      let inString = false;
+      let escaped = false;
+      const stack = [];
 
-      return JSON.parse(repaired);
-    } catch (repairErr) {
-      throw new Error(`Invalid JSON returned by model: ${err.message}`);
+      for (let i = 0; i < repaired.length; i++) {
+        const char = repaired[i];
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        if (!inString) {
+          if (char === '{' || char === '[') {
+            stack.push(char);
+          } else if (char === '}') {
+            if (stack.length && stack[stack.length - 1] === '{') stack.pop();
+          } else if (char === ']') {
+            if (stack.length && stack[stack.length - 1] === '[') stack.pop();
+          }
+        }
+      }
+
+      if (inString) {
+        repaired += '"';
+      }
+
+      // Strip partial key-value or dangling comma at end
+      repaired = repaired.replace(/,\s*$/, '');
+      repaired = repaired.replace(/:\s*$/, ': null');
+      repaired = repaired.replace(/"[a-zA-Z0-9_-]+"\s*:\s*$/, '');
+      repaired = repaired.replace(/,\s*$/, '');
+
+      // Close open structures in LIFO order
+      while (stack.length > 0) {
+        const open = stack.pop();
+        if (open === '{') repaired += '}';
+        else if (open === '[') repaired += ']';
+      }
+
+      return tryParse(repaired);
+    } catch (e3) {
+      // Attempt 4: Fallback to last complete block inside "blocks"
+      try {
+        const lastCompleteBlock = text.lastIndexOf('}');
+        if (lastCompleteBlock !== -1) {
+          let sub = text.slice(0, lastCompleteBlock + 1);
+          if (!sub.endsWith(']}')) {
+            if (sub.endsWith(']')) sub += '}';
+            else sub += ']}';
+          }
+          return tryParse(sub);
+        }
+      } catch (e4) {}
+
+      throw new Error(`Invalid JSON returned by model: ${e1.message}`);
     }
   }
 }
@@ -1205,6 +1358,22 @@ Return ONLY valid JSON (no markdown formatting, no code block backticks) matchin
     // 7. table: { "id": "tbl_1", "type": "table", "props": { "headers": ["Col1", "Col2"], "rows": [["A", "B"], ["C", "D"]], "striped": true, "bordered": true, "customCss": "..." } }
     // 8. divider: { "id": "div_1", "type": "divider", "props": { "style": "solid", "thickness": 1, "margin": 16, "customCss": "..." } }
     // 9. spacer: { "id": "sp_1", "type": "spacer", "props": { "height": 24, "customCss": "..." } }
+    // 10. callout: { "id": "cal_1", "type": "callout", "props": { "type": "info"|"tip"|"warning"|"danger", "icon": "💡", "title": "...", "text": "..." } }
+    // 11. accordion: { "id": "acc_1", "type": "accordion", "props": { "items": [{ "title": "Question?", "content": "Answer..." }] } }
+    // 12. tabs: { "id": "tab_1", "type": "tabs", "props": { "tabs": [{ "title": "Tab Title", "content": "Panel content..." }] } }
+    // 13. pricing: { "id": "prc_1", "type": "pricing", "props": { "plan": "Pro Plan", "price": "$29", "period": "/month", "description": "...", "features": ["Feature 1", "Feature 2"], "ctaLabel": "Get Started", "ctaUrl": "#", "isPopular": true, "badge": "Popular" } }
+    // 14. stat: { "id": "stat_1", "type": "stat", "props": { "label": "Active Users", "value": "128K+", "subtext": "Global", "trend": "+24%", "trendDirection": "up"|"down" } }
+    // 15. testimonial: { "id": "tst_1", "type": "testimonial", "props": { "quote": "...", "author": "Name", "role": "Role", "avatar": "https://images.unsplash.com/...", "rating": 5 } }
+    // 16. video: { "id": "vid_1", "type": "video", "props": { "url": "https://www.youtube.com/watch?v=...", "caption": "..." } }
+    // 17. code: { "id": "cod_1", "type": "code", "props": { "language": "javascript", "code": "console.log('hi');" } }
+    // 18. bento: { "id": "bnt_1", "type": "bento", "props": { "items": [{ "title": "Feature Title", "subtitle": "...", "icon": "⚡", "tag": "Core", "metric": "0.4ms", "span": 1, "image": "" }] } }
+    // 19. comparison: { "id": "cmp_1", "type": "comparison", "props": { "beforeImage": "https://...", "afterImage": "https://...", "beforeLabel": "Before", "afterLabel": "After" } }
+    // 20. tilt-card: { "id": "tlt_1", "type": "tilt-card", "props": { "badge": "Featured", "title": "3D Tilt Title", "subtitle": "...", "ctaLabel": "Learn More", "ctaUrl": "#" } }
+    // 21. marquee: { "id": "mrq_1", "type": "marquee", "props": { "speed": "normal", "items": [{ "text": "Next.js", "icon": "▲" }] } }
+    // 22. countdown: { "id": "cnd_1", "type": "countdown", "props": { "title": "Launch Event", "subtitle": "...", "targetDate": "2026-12-31T23:59:59" } }
+    // 23. timeline: { "id": "tml_1", "type": "timeline", "props": { "items": [{ "title": "Milestone", "date": "Q1 2026", "description": "...", "status": "completed"|"current"|"upcoming" }] } }
+    // 24. form: { "id": "frm_1", "type": "form", "props": { "title": "Contact Us", "description": "...", "buttonLabel": "Send Message" } }
+    // 25. audio: { "id": "aud_1", "type": "audio", "props": { "title": "Episode 01", "artist": "Host Name", "duration": "04:15", "cover": "https://..." } }
   ]
 }
 IMPORTANT STYLING DIRECTIVE:
@@ -1242,6 +1411,142 @@ Make the website rich, professional, engaging, with multiple sections (Hero, Fea
   const data = await response.json();
   const rawText = data.choices?.[0]?.message?.content || '';
   return extractAndParseJson(rawText);
+}
+
+// Ollama Local AI Page Generator
+async function callOllamaPageGenerator(baseUrl = 'http://localhost:11434', model = 'llama3.2', prompt = '', preset = 'custom', theme = 'dark-card') {
+  let endpoint = (baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  let finalModel = (model || 'llama3.2').trim();
+
+  const systemInstruction = `You are an elite web architect and UI/UX designer.
+The user wants to generate a complete visual website in structured JSON for a visual CMS page builder.
+Return ONLY valid JSON (no markdown formatting, no code block backticks) matching this exact schema:
+{
+  "title": "Page Title",
+  "slug": "page-slug",
+  "tags": ["tag1", "tag2"],
+  "settings": {
+    "maxWidth": "860px",
+    "bg": "${theme || 'dark-card'}",
+    "paddingX": 36,
+    "paddingY": 48,
+    "borderRadius": 16,
+    "fontFamily": "inter"
+  },
+  "blocks": [
+    // Array of block objects. Available block types:
+    // 1. heading: { "id": "h_1", "type": "heading", "props": { "level": 1|2|3|4, "text": "...", "align": "left"|"center"|"right", "color": "#hex", "customCss": "..." } }
+    // 2. paragraph: { "id": "p_1", "type": "paragraph", "props": { "text": "...", "align": "left"|"center", "size": "small"|"normal"|"large"|"lead", "color": "#hex", "bold": false, "italic": false, "customCss": "..." } }
+    // 3. button: { "id": "btn_1", "type": "button", "props": { "label": "...", "url": "/p/...", "variant": "filled"|"outline"|"soft", "size": "medium"|"large", "color": "#6366f1", "align": "center"|"left", "customCss": "..." } }
+    // 4. image: { "id": "img_1", "type": "image", "props": { "url": "https://images.unsplash.com/...", "alt": "...", "caption": "...", "width": "100%", "borderRadius": 12, "shadow": true, "customCss": "..." } }
+    // 5. carousel: { "id": "car_1", "type": "carousel", "props": { "aspectRatio": "16/9", "borderRadius": 12, "autoplay": true, "slides": [{ "url": "https://images.unsplash.com/...", "caption": "..." }], "customCss": "..." } }
+    // 6. container: { "id": "cnt_1", "type": "container", "props": { "mode": "grid"|"flex", "columns": 2|3|4, "direction": "row"|"column", "padding": 16, "gap": 16, "bg": "surface"|"subtle"|"transparent", "border": true, "borderRadius": 12, "customCss": "...", "children": [ ...blocks ] } }
+    // 7. table: { "id": "tbl_1", "type": "table", "props": { "headers": ["Col1", "Col2"], "rows": [["A", "B"], ["C", "D"]], "striped": true, "bordered": true, "customCss": "..." } }
+    // 8. divider: { "id": "div_1", "type": "divider", "props": { "style": "solid", "thickness": 1, "margin": 16, "customCss": "..." } }
+    // 9. spacer: { "id": "sp_1", "type": "spacer", "props": { "height": 24, "customCss": "..." } }
+    // 10. callout: { "id": "cal_1", "type": "callout", "props": { "type": "info"|"tip"|"warning"|"danger", "icon": "💡", "title": "...", "text": "..." } }
+    // 11. accordion: { "id": "acc_1", "type": "accordion", "props": { "items": [{ "title": "Question?", "content": "Answer..." }] } }
+    // 12. tabs: { "id": "tab_1", "type": "tabs", "props": { "tabs": [{ "title": "Tab Title", "content": "Panel content..." }] } }
+    // 13. pricing: { "id": "prc_1", "type": "pricing", "props": { "plan": "Pro Plan", "price": "$29", "period": "/month", "description": "...", "features": ["Feature 1", "Feature 2"], "ctaLabel": "Get Started", "ctaUrl": "#", "isPopular": true, "badge": "Popular" } }
+    // 14. stat: { "id": "stat_1", "type": "stat", "props": { "label": "Active Users", "value": "128K+", "subtext": "Global", "trend": "+24%", "trendDirection": "up"|"down" } }
+    // 15. testimonial: { "id": "tst_1", "type": "testimonial", "props": { "quote": "...", "author": "Name", "role": "Role", "avatar": "https://images.unsplash.com/...", "rating": 5 } }
+    // 16. video: { "id": "vid_1", "type": "video", "props": { "url": "https://www.youtube.com/watch?v=...", "caption": "..." } }
+    // 17. code: { "id": "cod_1", "type": "code", "props": { "language": "javascript", "code": "console.log('hi');" } }
+    // 18. bento: { "id": "bnt_1", "type": "bento", "props": { "items": [{ "title": "Feature Title", "subtitle": "...", "icon": "⚡", "tag": "Core", "metric": "0.4ms", "span": 1, "image": "" }] } }
+    // 19. comparison: { "id": "cmp_1", "type": "comparison", "props": { "beforeImage": "https://...", "afterImage": "https://...", "beforeLabel": "Before", "afterLabel": "After" } }
+    // 20. tilt-card: { "id": "tlt_1", "type": "tilt-card", "props": { "badge": "Featured", "title": "3D Tilt Title", "subtitle": "...", "ctaLabel": "Learn More", "ctaUrl": "#" } }
+    // 21. marquee: { "id": "mrq_1", "type": "marquee", "props": { "speed": "normal", "items": [{ "text": "Next.js", "icon": "▲" }] } }
+    // 22. countdown: { "id": "cnd_1", "type": "countdown", "props": { "title": "Launch Event", "subtitle": "...", "targetDate": "2026-12-31T23:59:59" } }
+    // 23. timeline: { "id": "tml_1", "type": "timeline", "props": { "items": [{ "title": "Milestone", "date": "Q1 2026", "description": "...", "status": "completed"|"current"|"upcoming" }] } }
+    // 24. form: { "id": "frm_1", "type": "form", "props": { "title": "Contact Us", "description": "...", "buttonLabel": "Send Message" } }
+    // 25. audio: { "id": "aud_1", "type": "audio", "props": { "title": "Episode 01", "artist": "Host Name", "duration": "04:15", "cover": "https://..." } }
+  ]
+}
+IMPORTANT STYLING DIRECTIVE:
+Every block supports an optional "customCss" string in "props". When needed to elevate the design (e.g. gradient hero titles, glassmorphism containers, glowing CTA buttons, subtle card borders, or badge styling), USE "customCss" to give the page a modern, visually stunning look.
+Make the website rich, professional, engaging, with multiple sections (Hero, Features Grid, Testimonials/Quotes, Pricing or Stats Table, CTA buttons).
+
+CRITICAL SYNTAX & COMPLETION RULES:
+1. Output valid JSON only. Always separate array elements and object properties with commas.
+2. Keep the website concise and complete (5-10 primary blocks). Do not over-nest beyond 2 levels so the entire JSON is fully generated without truncation.`;
+
+  const userContent = `Generate a complete, fully-closed visual website layout in JSON for:\nPrompt: ${prompt}\nTheme: ${theme}\nPreset: ${preset}`;
+
+  let lastError = null;
+
+  // 1. Try native Ollama /api/chat with format: "json"
+  try {
+    const res = await fetch(`${endpoint}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: finalModel,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: userContent }
+        ],
+        format: 'json',
+        stream: false,
+        options: {
+          temperature: 0.7,
+          num_ctx: 8192,
+          num_predict: 4096
+        }
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const rawText = data.message?.content || '';
+      if (rawText) {
+        return extractAndParseJson(rawText);
+      }
+    } else {
+      const errText = await res.text().catch(() => '');
+      lastError = new Error(`Ollama /api/chat returned HTTP ${res.status}: ${errText || 'Endpoint unavailable'}`);
+    }
+  } catch (nativeErr) {
+    lastError = nativeErr;
+    if (nativeErr.code === 'ECONNREFUSED' || (nativeErr.message && (nativeErr.message.includes('fetch failed') || nativeErr.message.includes('ECONNREFUSED')))) {
+      throw new Error(`Could not connect to Ollama at ${endpoint}. Please ensure Ollama is running (e.g. run "ollama serve" or open Ollama desktop app).`);
+    }
+  }
+
+  // 2. Fallback to OpenAI-compatible /v1/chat/completions on Ollama
+  try {
+    const v1Res = await fetch(`${endpoint}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: finalModel,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: userContent }
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 4096,
+        temperature: 0.7
+      })
+    });
+
+    if (!v1Res.ok) {
+      const errText = await v1Res.text().catch(() => '');
+      throw new Error(`Ollama error (${v1Res.status}): ${errText || 'Unavailable'}`);
+    }
+
+    const v1Data = await v1Res.json();
+    const rawText = v1Data.choices?.[0]?.message?.content || '';
+    if (rawText) {
+      return extractAndParseJson(rawText);
+    }
+  } catch (v1Err) {
+    if (v1Err.code === 'ECONNREFUSED' || (v1Err.message && (v1Err.message.includes('fetch failed') || v1Err.message.includes('ECONNREFUSED')))) {
+      throw new Error(`Could not connect to Ollama at ${endpoint}. Please ensure Ollama is running (e.g. run "ollama serve" or open Ollama desktop app).`);
+    }
+    throw lastError || v1Err;
+  }
+
+  throw lastError || new Error('Ollama returned empty response.');
 }
 
 app.get('/p/:slug(*)', (req, res) => {
@@ -1552,6 +1857,382 @@ function renderBlockHtml(b) {
       }
       return `<div class="cms-container" style="${layoutStyle}">${childrenHtml}</div>`;
     }
+    case 'callout': {
+      const type = p.type || 'tip';
+      const colorMap = {
+        tip: { bg: 'rgba(139, 92, 246, 0.1)', border: '#8b5cf6', icon: '💡', titleColor: '#a78bfa' },
+        info: { bg: 'rgba(59, 130, 246, 0.1)', border: '#3b82f6', icon: 'ℹ️', titleColor: '#60a5fa' },
+        success: { bg: 'rgba(16, 185, 129, 0.1)', border: '#10b981', icon: '✅', titleColor: '#34d399' },
+        warning: { bg: 'rgba(245, 158, 11, 0.1)', border: '#f59e0b', icon: '⚠️', titleColor: '#fbbf24' },
+        danger: { bg: 'rgba(239, 68, 68, 0.1)', border: '#ef4444', icon: '🛑', titleColor: '#f87171' }
+      };
+      const themeConfig = colorMap[type] || colorMap.tip;
+      const icon = p.icon || themeConfig.icon;
+      const title = p.title ? `<div style="font-weight:700;font-size:15px;margin-bottom:4px;color:${themeConfig.titleColor};">${escHtml(p.title)}</div>` : '';
+      const text = p.text ? `<div style="font-size:14px;line-height:1.6;opacity:0.95;">${parseRichTextHtml(p.text)}</div>` : '';
+
+      return `<div class="cms-callout cms-callout-${type}" style="border-left:4px solid ${themeConfig.border};background:${themeConfig.bg};padding:14px 18px;border-radius:0 10px 10px 0;margin:16px 0;display:flex;gap:14px;align-items:flex-start;${customCss}">
+        <div style="font-size:20px;line-height:1;margin-top:2px;">${escHtml(icon)}</div>
+        <div style="flex:1;">${title}${text}</div>
+      </div>`;
+    }
+    case 'accordion': {
+      const items = Array.isArray(p.items) ? p.items : [];
+      if (!items.length) return '';
+      const accordionId = 'acc_' + Math.random().toString(36).slice(2, 9);
+      const itemsHtml = items.map((it, idx) => {
+        const isOpen = idx === 0 || it.isOpen;
+        return `
+          <div class="cms-accordion-item" style="border:1px solid rgba(255,255,255,0.1);border-radius:8px;margin-bottom:8px;overflow:hidden;background:rgba(255,255,255,0.02);">
+            <button type="button" class="cms-accordion-trigger" style="width:100%;text-align:left;padding:14px 16px;background:transparent;border:none;color:inherit;font-size:15px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+              <span>${escHtml(it.title || 'FAQ Item')}</span>
+              <span class="cms-accordion-arrow" style="transition:transform 0.2s ease;display:inline-block;font-size:12px;">&#9660;</span>
+            </button>
+            <div class="cms-accordion-panel" style="padding:0 16px 14px;font-size:14px;line-height:1.6;opacity:0.9;display:${isOpen ? 'block' : 'none'};">
+              ${parseRichTextHtml(it.content || '')}
+            </div>
+          </div>
+        `;
+      }).join('');
+      return `<div id="${accordionId}" class="cms-accordion" style="margin:16px 0;${customCss}">${itemsHtml}</div>`;
+    }
+    case 'tabs': {
+      const tabs = Array.isArray(p.tabs) ? p.tabs : [];
+      if (!tabs.length) return '';
+      const tabsId = 'tabs_' + Math.random().toString(36).slice(2, 9);
+      const variant = p.variant || 'pills';
+
+      const navHtml = tabs.map((t, idx) => {
+        const isActive = idx === 0;
+        const pillStyle = variant === 'underline'
+          ? `padding:8px 16px;border-bottom:2px solid ${isActive ? '#6366f1' : 'transparent'};background:transparent;color:${isActive ? '#6366f1' : 'inherit'};font-weight:600;cursor:pointer;border-top:none;border-left:none;border-right:none;`
+          : `padding:8px 16px;border-radius:6px;background:${isActive ? '#6366f1' : 'rgba(255,255,255,0.06)'};color:#fff;font-weight:600;border:none;cursor:pointer;`;
+        return `<button type="button" class="cms-tab-btn ${isActive ? 'active' : ''}" data-target="${tabsId}_pane_${idx}" style="${pillStyle}">${escHtml(t.label || `Tab ${idx + 1}`)}</button>`;
+      }).join('');
+
+      const panesHtml = tabs.map((t, idx) => {
+        const isShown = idx === 0 ? 'display:block;' : 'display:none;';
+        return `<div id="${tabsId}_pane_${idx}" class="cms-tab-pane" style="${isShown}padding:16px 4px;font-size:14.5px;line-height:1.6;">${parseRichTextHtml(t.content || '')}</div>`;
+      }).join('');
+
+      return `<div id="${tabsId}" class="cms-tabs-wrap" style="margin:16px 0;${customCss}">
+        <div class="cms-tabs-nav" style="display:flex;gap:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;overflow-x:auto;">${navHtml}</div>
+        <div class="cms-tabs-content">${panesHtml}</div>
+      </div>`;
+    }
+    case 'pricing': {
+      const plan = escHtml(p.planName || 'Standard Plan');
+      const price = escHtml(p.price || '$29');
+      const period = escHtml(p.period || '/ month');
+      const desc = p.description ? `<p style="margin:6px 0 16px;font-size:13.5px;opacity:0.8;">${escHtml(p.description)}</p>` : '';
+      const badge = p.badge ? `<div style="display:inline-block;padding:4px 10px;font-size:11px;font-weight:700;border-radius:20px;background:linear-gradient(135deg, #6366f1, #ec4899);color:#fff;margin-bottom:12px;letter-spacing:0.4px;">${escHtml(p.badge)}</div>` : '';
+      const features = Array.isArray(p.features) ? p.features : [];
+      const featsHtml = features.map(f => `<li style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13.5px;"><span style="color:#10b981;font-weight:bold;">✓</span> <span>${escHtml(f)}</span></li>`).join('');
+      const btnLabel = escHtml(p.buttonLabel || 'Get Started');
+      const btnUrl = escHtml(p.buttonUrl || '#');
+      const target = p.newTab !== false && !btnUrl.startsWith('/p/') ? ' target="_blank" rel="noopener noreferrer"' : '';
+      const borderStyle = p.highlight ? 'border:2px solid #6366f1;box-shadow:0 12px 32px rgba(99,102,241,0.25);' : 'border:1px solid rgba(255,255,255,0.12);';
+
+      return `<div class="cms-pricing-card" style="border-radius:14px;padding:26px;background:rgba(255,255,255,0.03);${borderStyle}box-sizing:border-box;margin:16px 0;${customCss}">
+        ${badge}
+        <h3 style="margin:0 0 6px;font-size:20px;">${plan}</h3>
+        <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px;">
+          <span style="font-size:32px;font-weight:800;letter-spacing:-0.5px;">${price}</span>
+          <span style="font-size:14px;opacity:0.7;">${period}</span>
+        </div>
+        ${desc}
+        <ul style="list-style:none;padding:0;margin:16px 0 22px;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">${featsHtml}</ul>
+        <a href="${btnUrl}"${target} style="display:block;text-align:center;padding:12px;border-radius:8px;background:${p.highlight ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'rgba(255,255,255,0.1)'};color:#fff;text-decoration:none;font-weight:600;font-size:14px;">${btnLabel} &rarr;</a>
+      </div>`;
+    }
+    case 'stat': {
+      const val = escHtml(p.value || '99.9%');
+      const label = escHtml(p.label || 'Metric Label');
+      const trend = p.trend ? `<span style="font-size:11.5px;padding:2px 8px;border-radius:999px;background:${p.trendType === 'down' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'};color:${p.trendType === 'down' ? '#f87171' : '#34d399'};font-weight:600;">${escHtml(p.trend)}</span>` : '';
+      const icon = p.icon ? `<div style="font-size:22px;margin-bottom:8px;">${escHtml(p.icon)}</div>` : '';
+
+      return `<div class="cms-stat-card" style="padding:20px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.02);margin:12px 0;${customCss}">
+        ${icon}
+        <div style="font-size:36px;font-weight:800;letter-spacing:-1px;line-height:1.1;margin-bottom:6px;">${val}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span style="font-size:13.5px;opacity:0.8;font-weight:500;">${label}</span>
+          ${trend}
+        </div>
+      </div>`;
+    }
+    case 'testimonial': {
+      const quote = parseRichTextHtml(p.quote || 'This platform has dramatically accelerated our team workflow.');
+      const author = escHtml(p.author || 'Jane Doe');
+      const role = escHtml(p.role || 'Product Lead at Acme Corp');
+      const avatar = p.avatar ? `<img src="${escHtml(p.avatar)}" alt="${author}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.2);" />` : '';
+      const rating = Math.min(5, Math.max(1, Number(p.rating) || 5));
+      const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+
+      return `<div class="cms-testimonial-card" style="border-radius:14px;padding:22px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);margin:16px 0;${customCss}">
+        <div style="color:#f59e0b;font-size:16px;letter-spacing:2px;margin-bottom:12px;">${stars}</div>
+        <p style="font-size:15px;line-height:1.6;font-style:italic;margin:0 0 16px;">&ldquo;${quote}&rdquo;</p>
+        <div style="display:flex;align-items:center;gap:12px;">
+          ${avatar}
+          <div>
+            <div style="font-weight:700;font-size:14px;">${author}</div>
+            <div style="font-size:12px;opacity:0.75;">${role}</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    case 'video': {
+      const url = p.url || '';
+      if (!url) return '';
+      const ratio = p.aspectRatio || '16/9';
+      const rad = p.borderRadius != null ? Number(p.borderRadius) : 10;
+      const caption = p.caption ? `<div style="font-size:12.5px;color:#64748b;margin-top:6px;text-align:center;">${escHtml(p.caption)}</div>` : '';
+
+      let playerHtml = '';
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        let yId = '';
+        const m = url.match(/(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#&?]*)/);
+        if (m && m[1]) yId = m[1];
+        playerHtml = `<iframe src="https://www.youtube.com/embed/${escHtml(yId)}" style="width:100%;height:100%;border:none;" allowfullscreen></iframe>`;
+      } else if (url.includes('vimeo.com')) {
+        const m = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|)(\d+)/);
+        const vId = m ? m[3] : '';
+        playerHtml = `<iframe src="https://player.vimeo.com/video/${escHtml(vId)}" style="width:100%;height:100%;border:none;" allowfullscreen></iframe>`;
+      } else {
+        playerHtml = `<video src="${escHtml(url)}" controls style="width:100%;height:100%;object-fit:cover;"></video>`;
+      }
+
+      return `<div class="cms-video-wrap" style="margin:16px 0;${customCss}">
+        <div style="width:100%;aspect-ratio:${ratio};border-radius:${rad}px;overflow:hidden;background:#000;box-shadow:0 8px 24px rgba(0,0,0,0.25);">
+          ${playerHtml}
+        </div>
+        ${caption}
+      </div>`;
+    }
+    case 'code': {
+      const code = escHtml(p.code || '// Enter your code snippet here');
+      const lang = escHtml(p.language || 'javascript');
+      const filename = escHtml(p.filename || 'snippet.js');
+      const codeId = 'code_' + Math.random().toString(36).slice(2, 9);
+
+      return `<div id="${codeId}" class="cms-code-block" style="border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:#0d1117;color:#c9d1d9;font-family:'JetBrains Mono',monospace;margin:16px 0;overflow:hidden;${customCss}">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.08);font-size:12px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#ff5f56;"></span>
+            <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#ffbd2e;"></span>
+            <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#27c93f;"></span>
+            <span style="margin-left:8px;opacity:0.8;font-size:11.5px;">${filename}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="opacity:0.6;font-size:11px;text-transform:uppercase;">${lang}</span>
+            <button type="button" class="cms-copy-code-btn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">Copy</button>
+          </div>
+        </div>
+        <pre style="margin:0;padding:16px;overflow-x:auto;font-size:13px;line-height:1.6;"><code>${code}</code></pre>
+      </div>`;
+    }
+    case 'bento': {
+      const items = Array.isArray(p.items) ? p.items : [];
+      let cardsHtml = '';
+      items.forEach((item, idx) => {
+        const spanClass = item.span === 2 ? 'grid-column: span 2;' : '';
+        const tallClass = item.tall ? 'grid-row: span 2;' : '';
+        const bg = item.bg || 'rgba(255,255,255,0.03)';
+        const icon = item.icon ? `<div style="font-size:24px;margin-bottom:12px;">${escHtml(item.icon)}</div>` : '';
+        const metric = item.metric ? `<div style="font-size:32px;font-weight:800;color:#fff;margin:8px 0;letter-spacing:-0.02em;">${escHtml(item.metric)}</div>` : '';
+        const tag = item.tag ? `<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#818cf8;background:rgba(99,102,241,0.15);padding:3px 8px;border-radius:999px;border:1px solid rgba(99,102,241,0.3);">${escHtml(item.tag)}</span>` : '';
+        const img = item.image ? `<div style="width:100%;height:140px;border-radius:10px;background-image:url('${escHtml(item.image)}');background-size:cover;background-position:center;margin-top:14px;"></div>` : '';
+
+        cardsHtml += `<div class="cms-bento-card" style="background:${bg};border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:24px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 10px 30px rgba(0,0,0,0.25);position:relative;overflow:hidden;${spanClass}${tallClass}">
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              ${icon}
+              ${tag}
+            </div>
+            <h4 style="font-size:18px;font-weight:700;color:#fff;margin:0 0 6px 0;">${escHtml(item.title || 'Feature Tile')}</h4>
+            <p style="font-size:13.5px;color:#94a3b8;line-height:1.5;margin:0;">${parseRichTextHtml(item.subtitle || '')}</p>
+            ${metric}
+          </div>
+          ${img}
+        </div>`;
+      });
+
+      return `<div class="cms-bento-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin:24px 0;${customCss}">
+        ${cardsHtml}
+      </div>`;
+    }
+    case 'comparison': {
+      const beforeImg = escHtml(p.beforeImage || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&auto=format&fit=crop');
+      const afterImg = escHtml(p.afterImage || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&auto=format&fit=crop');
+      const beforeLabel = escHtml(p.beforeLabel || 'Before');
+      const afterLabel = escHtml(p.afterLabel || 'After');
+
+      return `<div class="cms-comparison-container" style="position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;user-select:none;margin:24px 0;box-shadow:0 16px 40px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);${customCss}">
+        <img src="${afterImg}" alt="${afterLabel}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" />
+        <div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.15);z-index:2;">${afterLabel}</div>
+        <div class="cms-comparison-overlay" style="position:absolute;top:0;left:0;bottom:0;width:50%;overflow:hidden;z-index:3;">
+          <img src="${beforeImg}" alt="${beforeLabel}" style="position:absolute;top:0;left:0;height:100%;max-width:none;width:100%;object-fit:cover;" class="cms-before-full-img" />
+          <div style="position:absolute;top:12px;left:16px;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.15);">${beforeLabel}</div>
+        </div>
+        <div class="cms-comparison-handle" style="position:absolute;top:0;bottom:0;left:50%;width:3px;background:#ffffff;box-shadow:0 0 12px rgba(99,102,241,0.8);z-index:5;cursor:ew-resize;transform:translateX(-50%);">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#6366f1;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.5);font-size:14px;font-weight:bold;">⇄</div>
+        </div>
+      </div>`;
+    }
+    case 'tilt-card': {
+      const title = escHtml(p.title || 'Interactive 3D Card');
+      const subtitle = parseRichTextHtml(p.subtitle || 'Move your cursor across this card to experience natural depth and specular reflections.');
+      const badge = p.badge ? `<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#38bdf8;background:rgba(56,189,248,0.15);padding:3px 9px;border-radius:999px;border:1px solid rgba(56,189,248,0.3);">${escHtml(p.badge)}</span>` : '';
+      const cta = p.ctaLabel ? `<a href="${escHtml(p.ctaUrl || '#')}" style="display:inline-flex;align-items:center;gap:6px;background:#6366f1;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;margin-top:16px;box-shadow:0 4px 14px rgba(99,102,241,0.4);">${escHtml(p.ctaLabel)} →</a>` : '';
+
+      return `<div class="cms-tilt-wrap" style="perspective:1000px;margin:24px 0;${customCss}">
+        <div class="cms-tilt-card" style="position:relative;background:linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:36px 30px;box-shadow:0 20px 50px rgba(0,0,0,0.5);transform-style:preserve-3d;transition:transform 0.1s ease-out;overflow:hidden;">
+          <div class="cms-tilt-glare" style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15), transparent 70%);opacity:0;pointer-events:none;transition:opacity 0.2s;"></div>
+          <div style="transform:translateZ(30px);">
+            <div style="margin-bottom:12px;">${badge}</div>
+            <h3 style="font-size:22px;font-weight:800;color:#fff;margin:0 0 8px 0;letter-spacing:-0.01em;">${title}</h3>
+            <p style="font-size:14.5px;color:#94a3b8;line-height:1.6;margin:0;">${subtitle}</p>
+            ${cta}
+          </div>
+        </div>
+      </div>`;
+    }
+    case 'marquee': {
+      let items = (Array.isArray(p.items) && p.items.length > 0) ? p.items : [
+        { text: 'TypeScript', icon: '⚡' },
+        { text: 'TailwindCSS', icon: '🎨' },
+        { text: 'Node.js', icon: '🟢' },
+        { text: 'SQLite', icon: '🗄️' },
+        { text: 'GraphQL', icon: '◈' },
+        { text: 'Next.js', icon: '▲' }
+      ];
+      items = items.map(it => typeof it === 'string' ? { text: it, icon: '✦' } : it);
+      const speed = p.speed === 'fast' ? '14s' : p.speed === 'slow' ? '32s' : '22s';
+
+      let itemsHtml = '';
+      items.forEach(it => {
+        const icon = it.icon ? `<span style="font-size:16px;">${escHtml(it.icon)}</span>` : '✦';
+        itemsHtml += `<div style="display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;color:#f1f5f9;font-size:13.5px;font-weight:600;white-space:nowrap;margin-right:14px;flex-shrink:0;user-select:none;">
+          ${icon}
+          <span>${escHtml(it.text || 'Item')}</span>
+        </div>`;
+      });
+
+      const halfHtml = `<div style="display:flex;flex-shrink:0;align-items:center;"><div style="display:flex;flex-shrink:0;">${itemsHtml}</div><div style="display:flex;flex-shrink:0;">${itemsHtml}</div></div>`;
+
+      return `<div class="cms-marquee-wrap" style="position:relative;width:100%;overflow:hidden;padding:14px 0;margin:24px 0;mask-image:linear-gradient(to right, transparent, black 10%, black 90%, transparent);-webkit-mask-image:linear-gradient(to right, transparent, black 10%, black 90%, transparent);${customCss}">
+        <div class="cms-marquee-track" style="display:flex;width:max-content;flex-shrink:0;will-change:transform;animation:marqueeScroll ${speed} linear infinite;">
+          ${halfHtml}
+          ${halfHtml}
+        </div>
+      </div>`;
+    }
+    case 'countdown': {
+      const targetDate = p.targetDate || '2026-12-31T23:59:59';
+      const title = escHtml(p.title || 'Next Milestone Launch');
+      const subtitle = escHtml(p.subtitle || 'Counting down every second to release');
+
+      return `<div class="cms-countdown-container" data-target="${escHtml(targetDate)}" style="text-align:center;padding:32px 24px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:20px;margin:24px 0;box-shadow:0 14px 40px rgba(0,0,0,0.3);${customCss}">
+        <h3 style="font-size:20px;font-weight:800;color:#fff;margin:0 0 6px 0;">${title}</h3>
+        <p style="font-size:13px;color:#94a3b8;margin:0 0 20px 0;">${subtitle}</p>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;">
+          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;">
+            <div class="cd-val cd-days" style="font-size:32px;font-weight:800;color:#6366f1;line-height:1;">00</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;">Days</div>
+          </div>
+          <div style="font-size:24px;font-weight:bold;color:#6366f1;opacity:0.6;">:</div>
+          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;">
+            <div class="cd-val cd-hours" style="font-size:32px;font-weight:800;color:#6366f1;line-height:1;">00</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;">Hours</div>
+          </div>
+          <div style="font-size:24px;font-weight:bold;color:#6366f1;opacity:0.6;">:</div>
+          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;">
+            <div class="cd-val cd-minutes" style="font-size:32px;font-weight:800;color:#6366f1;line-height:1;">00</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;">Mins</div>
+          </div>
+          <div style="font-size:24px;font-weight:bold;color:#6366f1;opacity:0.6;">:</div>
+          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;">
+            <div class="cd-val cd-seconds" style="font-size:32px;font-weight:800;color:#6366f1;line-height:1;">00</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;">Secs</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    case 'timeline': {
+      const items = Array.isArray(p.items) ? p.items : [];
+      let nodesHtml = '';
+      items.forEach((item, idx) => {
+        const status = item.status || 'upcoming';
+        const statusColor = status === 'completed' ? '#10b981' : status === 'current' ? '#6366f1' : '#94a3b8';
+        const statusLabel = status === 'completed' ? 'Completed' : status === 'current' ? 'In Progress' : 'Planned';
+        const date = item.date ? `<div style="font-size:12px;font-weight:700;color:${statusColor};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${escHtml(item.date)}</div>` : '';
+
+        nodesHtml += `<div style="position:relative;padding-left:36px;margin-bottom:28px;">
+          <div style="position:absolute;left:0;top:4px;width:16px;height:16px;border-radius:50%;background:#0d1117;border:3px solid ${statusColor};box-shadow:0 0 10px ${statusColor}66;z-index:2;"></div>
+          ${date}
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <h4 style="font-size:16px;font-weight:700;color:#fff;margin:0;">${escHtml(item.title || 'Milestone')}</h4>
+            <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}44;">${statusLabel}</span>
+          </div>
+          <p style="font-size:13.5px;color:#94a3b8;line-height:1.5;margin:0;">${parseRichTextHtml(item.description || '')}</p>
+        </div>`;
+      });
+
+      return `<div class="cms-timeline-wrap" style="position:relative;padding:10px 0;margin:24px 0;${customCss}">
+        <div style="position:absolute;top:10px;bottom:10px;left:7px;width:2px;background:rgba(255,255,255,0.1);z-index:1;"></div>
+        ${nodesHtml}
+      </div>`;
+    }
+    case 'form': {
+      const title = escHtml(p.title || 'Get in Touch');
+      const desc = escHtml(p.description || 'We would love to hear from you. Leave your details below.');
+      const btnLabel = escHtml(p.buttonLabel || 'Send Message');
+
+      return `<div class="cms-form-card" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:32px 28px;margin:24px 0;box-shadow:0 16px 40px rgba(0,0,0,0.35);${customCss}">
+        <h3 style="font-size:20px;font-weight:800;color:#fff;margin:0 0 6px 0;">${title}</h3>
+        <p style="font-size:13.5px;color:#94a3b8;margin:0 0 20px 0;line-height:1.5;">${desc}</p>
+        <form class="cms-contact-form" onsubmit="event.preventDefault(); this.querySelector('.form-success-alert').style.display='block'; this.reset();" style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;">Your Name</label>
+            <input type="text" required placeholder="Alex Mercer" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;" />
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;">Email Address</label>
+            <input type="email" required placeholder="alex@example.com" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;" />
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;">Message</label>
+            <textarea rows="3" required placeholder="How can we help you?" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;resize:vertical;"></textarea>
+          </div>
+          <button type="submit" style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:12px 18px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(99,102,241,0.4);transition:background 0.15s;">${btnLabel}</button>
+          <div class="form-success-alert" style="display:none;padding:10px 14px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#34d399;font-size:13px;border-radius:8px;text-align:center;">✓ Thank you! Your message has been received.</div>
+        </form>
+      </div>`;
+    }
+    case 'audio': {
+      const title = escHtml(p.title || 'Track Title');
+      const artist = escHtml(p.artist || 'Podcast Host / Artist');
+      const duration = escHtml(p.duration || '04:15');
+      const cover = p.cover ? `<img src="${escHtml(p.cover)}" style="width:52px;height:52px;border-radius:10px;object-fit:cover;" />` : `<div style="width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;">🎵</div>`;
+
+      return `<div class="cms-audio-card" style="display:flex;align-items:center;gap:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:16px 20px;margin:20px 0;box-shadow:0 10px 30px rgba(0,0,0,0.25);${customCss}">
+        ${cover}
+        <div style="flex:1;overflow:hidden;">
+          <h4 style="font-size:14.5px;font-weight:700;color:#fff;margin:0 0 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</h4>
+          <div style="font-size:12px;color:#94a3b8;">${artist} • <span style="color:#6366f1;">${duration}</span></div>
+          <div class="cms-waveform-bar" style="display:flex;align-items:flex-end;gap:3px;height:18px;margin-top:8px;">
+            <span style="width:3px;height:40%;background:#6366f1;border-radius:2px;"></span>
+            <span style="width:3px;height:70%;background:#6366f1;border-radius:2px;"></span>
+            <span style="width:3px;height:100%;background:#6366f1;border-radius:2px;"></span>
+            <span style="width:3px;height:50%;background:#6366f1;border-radius:2px;"></span>
+            <span style="width:3px;height:80%;background:#6366f1;border-radius:2px;"></span>
+            <span style="width:3px;height:30%;background:#6366f1;border-radius:2px;"></span>
+            <span style="width:3px;height:90%;background:#6366f1;border-radius:2px;"></span>
+            <span style="width:3px;height:60%;background:#6366f1;border-radius:2px;"></span>
+          </div>
+        </div>
+        <button type="button" class="cms-audio-play-btn" style="width:42px;height:42px;border-radius:50%;background:#6366f1;border:none;color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(99,102,241,0.4);flex-shrink:0;">▶</button>
+      </div>`;
+    }
     default:
       return '';
   }
@@ -1621,7 +2302,14 @@ function renderPublishedPage(page, blocks, tags) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css" />
   <style>
+    html, body {
+      height: auto !important;
+      min-height: 100vh !important;
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
+    }
     body { font-family: ${fontFamily}; background: ${pageBg}; color: ${textColor}; margin: 0; min-height: 100vh; }
     .wrap { max-width: ${maxWidth}; margin: ${alignMargin}; padding: ${paddingY} ${paddingX}; border-radius: ${borderRadius}; background: ${cardBg}; min-height: 100vh; box-sizing: border-box; box-shadow: 0 0 0 1px ${borderColor}; }
     .tags { margin-top: 32px; padding-top: 16px; border-top: 1px solid ${borderColor}; font-size: 12px; color: #64748b; }
@@ -1645,6 +2333,33 @@ function renderPublishedPage(page, blocks, tags) {
     .cms-carousel-dots { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 5; }
     .cms-carousel-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.45); border: none; cursor: pointer; transition: all 0.2s; padding: 0; }
     .cms-carousel-dot.active { width: 22px; background: #fff; }
+
+    /* Infinite Marquee Styles */
+    .cms-marquee-wrap {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      padding: 14px 0;
+      margin: 24px 0;
+      mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    }
+    .cms-marquee-track {
+      display: flex;
+      width: max-content;
+      will-change: transform;
+      animation: marqueeScroll 22s linear infinite;
+    }
+    @keyframes marqueeScroll {
+      0% { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-50%, 0, 0); }
+    }
+
+    /* Waveform Animation for Audio */
+    @keyframes wave {
+      0% { height: 25%; }
+      100% { height: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -1680,6 +2395,151 @@ function renderPublishedPage(page, blocks, tags) {
         clearInterval(timer);
         timer = setInterval(() => navigateCarousel(c.id, 1), interval);
       });
+    });
+
+    // Accordion expand/collapse
+    document.querySelectorAll('.cms-accordion-trigger').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const panel = btn.nextElementSibling;
+        const arrow = btn.querySelector('.cms-accordion-arrow');
+        const isClosed = panel.style.display === 'none';
+        panel.style.display = isClosed ? 'block' : 'none';
+        if (arrow) arrow.style.transform = isClosed ? 'rotate(180deg)' : 'rotate(0deg)';
+      });
+    });
+
+    // Tab switcher
+    document.querySelectorAll('.cms-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wrap = btn.closest('.cms-tabs-wrap');
+        const targetId = btn.dataset.target;
+        if (!wrap || !targetId) return;
+        wrap.querySelectorAll('.cms-tab-btn').forEach(b => {
+          b.classList.remove('active');
+          if (b.style.borderBottomColor) b.style.borderBottomColor = 'transparent';
+          else b.style.background = 'rgba(255,255,255,0.06)';
+        });
+        btn.classList.add('active');
+        if (btn.style.borderBottomColor) btn.style.borderBottomColor = '#6366f1';
+        else btn.style.background = '#6366f1';
+        wrap.querySelectorAll('.cms-tab-pane').forEach(p => {
+          p.style.display = p.id === targetId ? 'block' : 'none';
+        });
+      });
+    });
+
+    // Code copy to clipboard
+    document.querySelectorAll('.cms-copy-code-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const codeEl = btn.closest('.cms-code-block').querySelector('code');
+        if (codeEl) {
+          navigator.clipboard.writeText(codeEl.innerText).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = orig, 1800);
+          });
+        }
+      });
+    });
+
+    // Before/After comparison slider
+    document.querySelectorAll('.cms-comparison-container').forEach(container => {
+      const overlay = container.querySelector('.cms-comparison-overlay');
+      const handle = container.querySelector('.cms-comparison-handle');
+      const beforeImg = container.querySelector('.cms-before-full-img');
+      if (!overlay || !handle) return;
+
+      const updateWidth = () => {
+        if (beforeImg) beforeImg.style.width = container.offsetWidth + 'px';
+      };
+      window.addEventListener('resize', updateWidth);
+      updateWidth();
+
+      let isDown = false;
+      const setPos = (clientX) => {
+        const rect = container.getBoundingClientRect();
+        let pct = ((clientX - rect.left) / rect.width) * 100;
+        pct = Math.max(0, Math.min(100, pct));
+        overlay.style.width = pct + '%';
+        handle.style.left = pct + '%';
+      };
+
+      container.addEventListener('mousedown', (e) => { isDown = true; setPos(e.clientX); });
+      window.addEventListener('mouseup', () => { isDown = false; });
+      window.addEventListener('mousemove', (e) => { if (isDown) setPos(e.clientX); });
+      container.addEventListener('touchstart', (e) => { isDown = true; setPos(e.touches[0].clientX); }, { passive: true });
+      window.addEventListener('touchend', () => { isDown = false; });
+      window.addEventListener('touchmove', (e) => { if (isDown) setPos(e.touches[0].clientX); }, { passive: true });
+    });
+
+    // 3D Tilt Card interaction
+    document.querySelectorAll('.cms-tilt-wrap').forEach(wrap => {
+      const card = wrap.querySelector('.cms-tilt-card');
+      const glare = wrap.querySelector('.cms-tilt-glare');
+      if (!card) return;
+
+      wrap.addEventListener('mousemove', e => {
+        const rect = wrap.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const rotX = ((y - cy) / cy) * -12;
+        const rotY = ((x - cx) / cx) * 12;
+        card.style.transform = 'rotateX(' + rotX + 'deg) rotateY(' + rotY + 'deg) scale3d(1.02, 1.02, 1.02)';
+        if (glare) {
+          glare.style.opacity = '1';
+          glare.style.background = 'radial-gradient(circle at ' + x + 'px ' + y + 'px, rgba(255,255,255,0.22), transparent 60%)';
+        }
+      });
+      wrap.addEventListener('mouseleave', () => {
+        card.style.transform = 'rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+        if (glare) glare.style.opacity = '0';
+      });
+    });
+
+    // Live Countdown Timer
+    document.querySelectorAll('.cms-countdown-container').forEach(cnt => {
+      const targetStr = cnt.dataset.target;
+      if (!targetStr) return;
+      const target = new Date(targetStr).getTime();
+      const daysEl = cnt.querySelector('.cd-days');
+      const hoursEl = cnt.querySelector('.cd-hours');
+      const minsEl = cnt.querySelector('.cd-minutes');
+      const secsEl = cnt.querySelector('.cd-seconds');
+
+      const updateCountdown = () => {
+        const now = Date.now();
+        const diff = Math.max(0, target - now);
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const m = Math.floor((diff / (1000 * 60)) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+
+        if (daysEl) daysEl.textContent = String(d).padStart(2, '0');
+        if (hoursEl) hoursEl.textContent = String(h).padStart(2, '0');
+        if (minsEl) minsEl.textContent = String(m).padStart(2, '0');
+        if (secsEl) secsEl.textContent = String(s).padStart(2, '0');
+      };
+      updateCountdown();
+      setInterval(updateCountdown, 1000);
+    });
+
+    // Audio Player play/pause toggle
+    document.querySelectorAll('.cms-audio-card').forEach(card => {
+      const btn = card.querySelector('.cms-audio-play-btn');
+      const bars = card.querySelectorAll('.cms-waveform-bar span');
+      let playing = false;
+      if (btn) {
+        btn.addEventListener('click', () => {
+          playing = !playing;
+          btn.textContent = playing ? '❚❚' : '▶';
+          btn.style.background = playing ? '#ec4899' : '#6366f1';
+          bars.forEach((b, i) => {
+            b.style.animation = playing ? 'wave 0.6s ease-in-out infinite alternate ' + (i * 0.1) + 's' : 'none';
+          });
+        });
+      }
     });
   </script>
 </body>

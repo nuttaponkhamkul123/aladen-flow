@@ -1,13 +1,82 @@
-const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new Database(path.join(DATA_DIR, 'kanban.db'));
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const DB_PATH = path.join(DATA_DIR, 'kanban.db');
+
+let db;
+
+try {
+  const Database = require('better-sqlite3');
+  db = new Database(DB_PATH);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+} catch (_) {
+  const { DatabaseSync } = require('node:sqlite');
+  const rawDb = new DatabaseSync(DB_PATH);
+
+  function norm(params) {
+    if (params.length === 1 && Array.isArray(params[0])) {
+      return [params[0].map(p => (p === undefined ? null : p)), false];
+    }
+    if (params.length === 1 && typeof params[0] === 'object' && params[0] !== null) {
+      return [params[0], true];
+    }
+    return [params.map(p => (p === undefined ? null : p)), false];
+  }
+
+  db = {
+    exec(sql) {
+      return rawDb.exec(sql);
+    },
+    pragma(str) {
+      try {
+        return rawDb.prepare(`PRAGMA ${str}`).all();
+      } catch (_) {
+        return rawDb.exec(`PRAGMA ${str}`);
+      }
+    },
+    prepare(sql) {
+      const stmt = rawDb.prepare(sql);
+      return {
+        run(...params) {
+          const [args, isObj] = norm(params);
+          const res = isObj ? stmt.run(args) : stmt.run(...args);
+          return {
+            changes: Number(res.changes),
+            lastInsertRowid: Number(res.lastInsertRowid)
+          };
+        },
+        get(...params) {
+          const [args, isObj] = norm(params);
+          return isObj ? stmt.get(args) : stmt.get(...args);
+        },
+        all(...params) {
+          const [args, isObj] = norm(params);
+          return isObj ? stmt.all(args) : stmt.all(...args);
+        }
+      };
+    },
+    transaction(fn) {
+      return function(...args) {
+        rawDb.exec('BEGIN');
+        try {
+          const result = fn.apply(this, args);
+          rawDb.exec('COMMIT');
+          return result;
+        } catch (err) {
+          try { rawDb.exec('ROLLBACK'); } catch (_) {}
+          throw err;
+        }
+      };
+    }
+  };
+
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+}
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS boards (
@@ -111,6 +180,9 @@ try {
 } catch (_) {}
 try {
   db.prepare("ALTER TABLE pages ADD COLUMN position INTEGER DEFAULT 0").run();
+} catch (_) {}
+try {
+  db.prepare("ALTER TABLE cards ADD COLUMN cover TEXT DEFAULT ''").run();
 } catch (_) {}
 
 function seedIfEmpty() {

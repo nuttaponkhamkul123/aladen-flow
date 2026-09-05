@@ -155,6 +155,24 @@
         <span>Activity</span>
       </button>
 
+      <div class="board-theme-picker" data-tab-show="board" style="display:flex;align-items:center;">
+        <div class="select-wrapper">
+          <svg class="select-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/>
+          </svg>
+          <select id="boardThemeSelect" aria-label="Select board canvas ambient style">
+            <option value="default">Canvas: Default Dark</option>
+            <option value="aurora">Canvas: Aurora Mesh</option>
+            <option value="nebula">Canvas: Cosmic Nebula</option>
+            <option value="cyberpunk">Canvas: Cyberpunk Night</option>
+            <option value="blueprint">Canvas: Blueprint Grid</option>
+          </select>
+          <svg class="chevron-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
+        </div>
+      </div>
+
       <button id="themeBtn" class="btn-icon" title="Toggle color theme">
         <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
@@ -250,6 +268,30 @@
                 </div>
               </div>
 
+              <div class="palette-item" draggable="true" data-block-type="accordion">
+                <div class="palette-icon-wrap accordion-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="m9 7 3 2 3-2"/><path d="m9 17 3 2 3-2"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Accordion</span>
+                  <span class="palette-sub">FAQ & collapsible lists</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="tabs">
+                <div class="palette-icon-wrap tabs-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9h18"/><rect x="3" y="5" width="6" height="4" rx="1"/><rect x="3" y="5" width="18" height="14" rx="2"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Tabs</span>
+                  <span class="palette-sub">Switchable tab panels</span>
+                </div>
+              </div>
+
               <div class="palette-item" draggable="true" data-block-type="divider">
                 <div class="palette-icon-wrap divider-icon">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -273,6 +315,84 @@
                   <span class="palette-sub">Whitespace gap</span>
                 </div>
               </div>
+
+              <div class="palette-item" draggable="true" data-block-type="bento">
+                <div class="palette-icon-wrap bento-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Bento Grid</span>
+                  <span class="palette-sub">Apple-style bento box</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="timeline">
+                <div class="palette-icon-wrap timeline-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="5" r="3"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="19" r="3"/><line x1="12" y1="8" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="16"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Timeline Roadmap</span>
+                  <span class="palette-sub">Milestone status path</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category: Marketing & Conversion -->
+          <div class="palette-category">
+            <div class="category-title">Marketing & Proof</div>
+            <div class="palette-list">
+              <div class="palette-item" draggable="true" data-block-type="pricing">
+                <div class="palette-icon-wrap pricing-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 7v10"/><path d="M15 9.5a2.5 2.5 0 0 0-5 0c0 3 5 2 5 5a2.5 2.5 0 0 1-5 0"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Pricing Card</span>
+                  <span class="palette-sub">Tiers, features & CTA</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="stat">
+                <div class="palette-icon-wrap stat-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Stats & Metrics</span>
+                  <span class="palette-sub">KPIs & growth counters</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="testimonial">
+                <div class="palette-icon-wrap testimonial-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Testimonial</span>
+                  <span class="palette-sub">Quote, avatar & rating</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="callout">
+                <div class="palette-icon-wrap callout-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Callout Box</span>
+                  <span class="palette-sub">Tips, alerts & banners</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -289,6 +409,42 @@
                 <div class="palette-info">
                   <span class="palette-label">Image</span>
                   <span class="palette-sub">Asset & illustrations</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="video">
+                <div class="palette-icon-wrap video-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="20" height="14" x="2" y="5" rx="3"/><polygon points="10 8 16 12 10 16 10 8"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Video Embed</span>
+                  <span class="palette-sub">YouTube, Vimeo & MP4</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="audio">
+                <div class="palette-icon-wrap audio-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Audio Player</span>
+                  <span class="palette-sub">Podcast & track player</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="marquee">
+                <div class="palette-icon-wrap marquee-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="20" height="12" x="2" y="6" rx="2"/><path d="M12 12h.01"/><path d="M17 12h.01"/><path d="M7 12h.01"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Infinite Marquee</span>
+                  <span class="palette-sub">Scrolling logo ticker</span>
                 </div>
               </div>
 
@@ -315,6 +471,18 @@
                   <span class="palette-sub">Data & comparison</span>
                 </div>
               </div>
+
+              <div class="palette-item" draggable="true" data-block-type="code">
+                <div class="palette-icon-wrap code-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Code Block</span>
+                  <span class="palette-sub">Syntax box & copy button</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -331,6 +499,54 @@
                 <div class="palette-info">
                   <span class="palette-label">Button</span>
                   <span class="palette-sub">CTA & links</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="tilt-card">
+                <div class="palette-icon-wrap tilt-card-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="3"/><path d="m3 9 18-3"/><path d="m9 21 3-18"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">3D Tilt Card</span>
+                  <span class="palette-sub">Cursor gyro & glare</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="comparison">
+                <div class="palette-icon-wrap comparison-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="2"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Before / After</span>
+                  <span class="palette-sub">Interactive split slider</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="countdown">
+                <div class="palette-icon-wrap countdown-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Countdown Timer</span>
+                  <span class="palette-sub">Live launch clock</span>
+                </div>
+              </div>
+
+              <div class="palette-item" draggable="true" data-block-type="form">
+                <div class="palette-icon-wrap form-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Contact Form</span>
+                  <span class="palette-sub">Lead capture form</span>
                 </div>
               </div>
             </div>
@@ -642,6 +858,27 @@
             </div>
           </div>
 
+          <!-- Card Cover Banner Controls -->
+          <div class="aside-row card-cover-picker-row">
+            <label>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+              </svg>
+              Card Cover
+            </label>
+            <div class="cover-gradient-presets">
+              <button type="button" class="cover-preset-dot" data-cover="linear-gradient(135deg, #6366f1, #a855f7)" style="background:linear-gradient(135deg, #6366f1, #a855f7);" title="Cyberpunk Violet"></button>
+              <button type="button" class="cover-preset-dot" data-cover="linear-gradient(135deg, #f59e0b, #ef4444)" style="background:linear-gradient(135deg, #f59e0b, #ef4444);" title="Sunset Blaze"></button>
+              <button type="button" class="cover-preset-dot" data-cover="linear-gradient(135deg, #06b6d4, #3b82f6)" style="background:linear-gradient(135deg, #06b6d4, #3b82f6);" title="Ocean Breeze"></button>
+              <button type="button" class="cover-preset-dot" data-cover="linear-gradient(135deg, #10b981, #059669)" style="background:linear-gradient(135deg, #10b981, #059669);" title="Emerald Forest"></button>
+              <button type="button" class="cover-preset-dot" data-cover="linear-gradient(135deg, #ec4899, #8b5cf6)" style="background:linear-gradient(135deg, #ec4899, #8b5cf6);" title="Neon Fuchsia"></button>
+              <button type="button" class="cover-preset-dot clear" id="cardClearCoverBtn" title="Remove Cover">✕</button>
+            </div>
+            <div style="margin-top:6px;">
+              <input id="cardCoverInput" class="form-input" placeholder="Or paste image URL..." style="font-size:11.5px;padding:4px 8px;" />
+            </div>
+          </div>
+
           <div class="danger-zone">
             <button id="archiveCardBtn" class="btn ghost btn-sm">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -753,6 +990,7 @@
               <div class="select-wrapper">
                 <select id="aiProviderSelect" class="form-select" style="font-size:12.5px;">
                   <option value="opencode">⚡ Groq / OpenAI-Compatible</option>
+                  <option value="ollama">🦙 Ollama (Local AI - Free &amp; Private)</option>
                   <option value="gemini">✨ Google Gemini API</option>
                   <option value="smart-archetype">🧩 Built-in Smart Archetype (No API Key)</option>
                 </select>
@@ -763,11 +1001,29 @@
               <label for="aiModelInput" style="font-size:11.5px;color:var(--text-tertiary);margin-bottom:4px;display:block;">Model Name</label>
               <input type="text" id="aiModelInput" list="aiModelDatalist" class="form-input" placeholder="qwen/qwen3.8-27b" value="qwen/qwen3.8-27b" style="font-size:12.5px;" />
               <datalist id="aiModelDatalist">
+                <option value="llama3.2">llama3.2 (Ollama Local - Recommended)</option>
+                <option value="llama3.1">llama3.1 (Ollama Local)</option>
+                <option value="qwen2.5-coder">qwen2.5-coder (Ollama Local Coding/Web)</option>
+                <option value="qwen2.5">qwen2.5 (Ollama Local)</option>
+                <option value="mistral">mistral (Ollama Local)</option>
+                <option value="deepseek-r1">deepseek-r1 (Ollama Local)</option>
+                <option value="gemma2">gemma2 (Ollama Local)</option>
                 <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b (Groq Ultra Fast)</option>
                 <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Groq GPT 120B)</option>
-                <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
-                <option value="groq/compound">groq/compound</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash (Google Gemini)</option>
               </datalist>
+            </div>
+          </div>
+
+          <!-- Ollama Local AI Connection & Model Auto-detection -->
+          <div id="ollamaStatusBox" style="margin-bottom:10px;padding:8px 12px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius-md);display:none;align-items:center;justify-content:space-between;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+              <span id="ollamaStatusDot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#94a3b8;box-shadow:0 0 6px rgba(148,163,184,0.4);"></span>
+              <span id="ollamaStatusText" style="color:var(--text-secondary);">Checking local Ollama status...</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <select id="ollamaModelSelect" class="form-select" style="font-size:11.5px;padding:3px 8px;display:none;max-width:170px;height:28px;"></select>
+              <button type="button" id="ollamaRefreshBtn" class="btn ghost btn-sm" style="padding:2px 8px;font-size:11px;height:28px;" title="Refresh local Ollama models">🔄 Check Ollama</button>
             </div>
           </div>
 
@@ -813,6 +1069,26 @@
         <button type="button" class="btn primary btn-ai-sparkle" id="submitAiGenerateBtn">
           <span>✨ Generate Website Now</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Command Palette Modal (Ctrl + K / Cmd + K) -->
+  <div id="commandPaletteModal" class="modal hidden command-palette-modal">
+    <div class="modal-backdrop" id="commandPaletteBackdrop"></div>
+    <div class="command-palette-panel">
+      <div class="command-palette-search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input type="text" id="commandPaletteInput" placeholder="Type a command, card title, or page..." autocomplete="off" />
+        <kbd class="shortcut-tag">ESC</kbd>
+      </div>
+      <div id="commandPaletteResults" class="command-palette-results"></div>
+      <div class="command-palette-footer">
+        <div class="cmd-shortcut-hint"><span>↑↓</span> Navigate</div>
+        <div class="cmd-shortcut-hint"><span>↵</span> Select</div>
+        <div class="cmd-shortcut-hint"><span>ESC</span> Close</div>
       </div>
     </div>
   </div>
