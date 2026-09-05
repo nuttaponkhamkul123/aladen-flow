@@ -961,6 +961,78 @@ function switchTab(name) {
 
 // ---------- CMS (block-based site builder) ----------
 const BLOCK_DEFAULTS = {
+  header: {
+    brandName: 'Aladen Studio',
+    brandLogo: '',
+    brandIcon: '✦',
+    brandUrl: '#',
+    logoHeight: 28,
+    layout: 'spread',
+    styleVariant: 'glass',
+    sticky: false,
+    showTopBar: false,
+    topBarBadge: 'NEW',
+    topBarText: 'Spring 2.0 release is now live with drag & drop header carousel',
+    topBarLink: '#',
+    showSearch: false,
+    searchPlaceholder: 'Search...',
+    showCta: true,
+    ctaLabel: 'Get Started',
+    ctaUrl: '#',
+    ctaVariant: 'filled',
+    links: [
+      { label: 'Home', url: '#' },
+      { label: 'Features', url: '#features' },
+      { label: 'Showcase', url: '#showcase' },
+      { label: 'Pricing', url: '#pricing' }
+    ],
+    enableCarousel: true,
+    carouselItemWidth: 'medium',
+    carouselAutoplay: false,
+    carouselInterval: 4,
+    carouselShowArrows: true,
+    carouselShowPrevNext: true,
+    carouselArrowStyle: 'circle',
+    carouselArrowBehavior: 'smooth',
+    carouselShowDots: true,
+    carouselDotStyle: 'bars',
+    carouselDotBehavior: 'smooth',
+    showSlideCounter: true,
+    children: [
+      {
+        id: 'hdr_c1',
+        type: 'callout',
+        props: {
+          type: 'info',
+          icon: '🚀',
+          title: 'Spring 2.0 Released',
+          text: 'Modular website composition with drag & drop carousel slots.'
+        }
+      },
+      {
+        id: 'hdr_c2',
+        type: 'button',
+        props: {
+          label: '✦ Explore Live Showcase',
+          url: '#showcase',
+          variant: 'filled',
+          color: '#6366f1',
+          size: 'medium'
+        }
+      },
+      {
+        id: 'hdr_c3',
+        type: 'stat',
+        props: {
+          label: 'Workflow Boost',
+          value: '10x Faster',
+          subtext: 'Built with Aladenflow',
+          trend: '+99%',
+          trendDirection: 'up'
+        }
+      }
+    ]
+  },
   heading: {
     level: 2,
     text: 'New heading',
@@ -1169,6 +1241,7 @@ const BLOCK_DEFAULTS = {
 };
 
 const BLOCK_LABELS = {
+  header: 'Custom Header (Navbar)',
   heading: 'Heading',
   paragraph: 'Paragraph',
   button: 'Button',
@@ -1202,6 +1275,9 @@ function newBlockId() {
 
 function makeBlock(type) {
   const defaults = BLOCK_DEFAULTS[type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[type])) : {};
+  if (Array.isArray(defaults.children)) {
+    defaults.children = defaults.children.map(child => cloneBlockWithNewIds(child));
+  }
   return {
     id: newBlockId(),
     type,
@@ -1345,6 +1421,12 @@ async function loadCmsPages() {
   if (state.cms.selectedTag) params.set('tag', state.cms.selectedTag);
   state.cms.pages = await api.get(`/api/pages?${params.toString()}`);
   renderCmsPages();
+  if (!state.cms.openPageId && state.cms.pages.length > 0) {
+    const firstPage = state.cms.pages.find(p => p.is_first_page) || state.cms.pages[0];
+    if (firstPage) {
+      openCmsPage(firstPage.id);
+    }
+  }
 }
 
 async function loadCmsTags() {
@@ -1568,28 +1650,45 @@ function renderCmsPages() {
     }
 
     // Page Icon
+    const isFirstPage = !!pageNode.is_first_page;
     const iconSvg = hasChildren
       ? createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>')
-      : createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>');
-    row.appendChild(el('span', { class: `page-node-icon ${hasChildren ? 'folder-icon' : ''}` }, [iconSvg]));
+      : isFirstPage
+        ? createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>')
+        : createSvg('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>');
+    row.appendChild(el('span', { class: `page-node-icon ${hasChildren ? 'folder-icon' : ''} ${isFirstPage ? 'first-page' : ''}` }, [iconSvg]));
 
     // Content
     const fullPath = getPageFullPath(pageNode.id);
+    const metaBadges = [
+      isFirstPage ? el('span', { class: 'p-first-badge' }, [
+        el('span', {}, '★ First')
+      ]) : null,
+      el('span', { class: `p-status ${pageNode.status}` }, pageNode.status),
+      el('span', {
+        class: 'p-slug',
+        onmouseenter: e => showPathTooltip(e, fullPath),
+        onmouseleave: hidePathTooltip
+      }, `/${pageNode.slug}`)
+    ].filter(Boolean);
+
     const info = el('div', { class: 'page-node-info' }, [
       el('div', { class: 'p-title', title: pageNode.title || '(untitled)' }, pageNode.title || '(untitled)'),
-      el('div', { class: 'p-meta' }, [
-        el('span', { class: `p-status ${pageNode.status}` }, pageNode.status),
-        el('span', {
-          class: 'p-slug',
-          onmouseenter: e => showPathTooltip(e, fullPath),
-          onmouseleave: hidePathTooltip
-        }, `/${pageNode.slug}`)
-      ])
+      el('div', { class: 'p-meta' }, metaBadges)
     ]);
     row.appendChild(info);
 
-    // Actions (Add subpage & Delete)
+    // Actions (Set First, Add subpage & Delete)
     const actions = el('div', { class: 'page-node-actions' }, [
+      el('button', {
+        type: 'button',
+        class: `page-action-btn first-page ${isFirstPage ? 'is-active' : ''}`,
+        title: isFirstPage ? 'Current First Page (Homepage)' : 'Set as First Page (Homepage)',
+        onclick: async e => {
+          e.stopPropagation();
+          if (!isFirstPage) await setFirstPage(pageNode.id);
+        }
+      }, [createSvg(`<svg width="11" height="11" viewBox="0 0 24 24" fill="${isFirstPage ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`)]),
       el('button', {
         type: 'button',
         class: 'page-action-btn',
@@ -1758,6 +1857,7 @@ async function openCmsPage(id) {
   }
   setSaveStatus('saved');
   updateViewportUI();
+  updateFirstPageUI();
   applyCanvasSettings();
   renderCanvas();
   renderProps();
@@ -1765,6 +1865,45 @@ async function openCmsPage(id) {
   updateCurrentPageTopbarLabel();
   closePagesPopup();
   switchSidebarTab('blocks');
+}
+
+function updateFirstPageUI() {
+  const btn = document.getElementById('cmsFirstPageToggleBtn');
+  if (!btn) return;
+  if (!state.cms.openPage) {
+    btn.classList.add('hidden');
+    return;
+  }
+  btn.classList.remove('hidden');
+  const isFirst = !!state.cms.openPage.is_first_page;
+  btn.classList.toggle('is-first', isFirst);
+  const icon = btn.querySelector('.first-page-icon');
+  const text = btn.querySelector('.first-page-text');
+  if (icon) icon.textContent = isFirst ? '★' : '☆';
+  if (text) text.textContent = isFirst ? 'First Page' : 'Set First';
+  btn.title = isFirst
+    ? 'This is the First Page (Homepage) of your website (/p)'
+    : 'Click to set this page as the First Page (Homepage)';
+}
+
+async function setFirstPage(pageId) {
+  const id = Number(pageId);
+  try {
+    await api.post(`/api/pages/${id}/set-first`);
+    state.cms.pages.forEach(p => {
+      p.is_first_page = (p.id === id ? 1 : 0);
+    });
+    if (state.cms.openPage) {
+      state.cms.openPage.is_first_page = (state.cms.openPage.id === id ? 1 : 0);
+    }
+    renderCmsPages();
+    updateFirstPageUI();
+    renderProps();
+    const pg = state.cms.pages.find(p => p.id === id);
+    showToast(`"${pg?.title || 'Page'}" set as First Page (Homepage)`, 'success');
+  } catch (err) {
+    showToast('Failed to set first page: ' + (err.message || err), 'error');
+  }
 }
 
 function newCmsPage(parentId = null) {
@@ -1798,6 +1937,7 @@ function newCmsPage(parentId = null) {
   document.getElementById('cmsTagsInput').value = '';
   document.getElementById('cmsPreviewLink').classList.add('hidden');
   setSaveStatus('saved');
+  updateFirstPageUI();
   updateViewportUI();
   applyCanvasSettings();
   renderCanvas();
@@ -1938,7 +2078,7 @@ function getBlocks() {
 function findBlock(id, list = getBlocks()) {
   for (const b of list) {
     if (b.id === id) return b;
-    if (b.type === 'container' && Array.isArray(b.props && b.props.children)) {
+    if ((b.type === 'container' || b.type === 'header') && Array.isArray(b.props && b.props.children)) {
       const found = findBlock(id, b.props.children);
       if (found) return found;
     }
@@ -1951,7 +2091,7 @@ function findBlockLocation(id, list = getBlocks(), parentBlock = null) {
     if (list[i].id === id) {
       return { parentArray: list, index: i, parentBlock, parentContainerId: parentBlock ? parentBlock.id : null };
     }
-    if (list[i].type === 'container' && Array.isArray(list[i].props && list[i].props.children)) {
+    if ((list[i].type === 'container' || list[i].type === 'header') && Array.isArray(list[i].props && list[i].props.children)) {
       const loc = findBlockLocation(id, list[i].props.children, list[i]);
       if (loc) return loc;
     }
@@ -1962,7 +2102,7 @@ function findBlockLocation(id, list = getBlocks(), parentBlock = null) {
 function isDescendant(parentBlockId, testBlockId) {
   if (parentBlockId === testBlockId) return true;
   const parent = findBlock(parentBlockId);
-  if (!parent || parent.type !== 'container' || !Array.isArray(parent.props && parent.props.children)) {
+  if (!parent || (parent.type !== 'container' && parent.type !== 'header') || !Array.isArray(parent.props && parent.props.children)) {
     return false;
   }
   for (const child of parent.props.children) {
@@ -2349,7 +2489,7 @@ function renderBlockContent(block) {
       const bordered = p.bordered ? ' bordered' : '';
       const compact = p.compact ? ' compact' : '';
 
-      const tableEl = el('table', { class: `cms-table${striped}${bordered}${compact}` });
+      const tableEl = el('table', { class: `block-table cms-table${striped}${bordered}${compact}` });
 
       if (hasHeader && headers.length) {
         const thead = el('thead');
@@ -2373,7 +2513,7 @@ function renderBlockContent(block) {
 
       applyCustomCssOverride(tableEl, p.customCss);
 
-      return el('div', { class: 'block block-table-wrap' }, [tableEl]);
+      return el('div', { class: 'block block-table-wrap cms-table-wrap' }, [tableEl]);
     }
     case 'callout': {
       const type = p.type || 'info';
@@ -3000,6 +3140,337 @@ function renderBlockContent(block) {
       applyCustomCssOverride(audioCard, p.customCss);
       return audioCard;
     }
+    case 'header': {
+      const layout = p.layout || 'spread';
+      const variant = p.styleVariant || 'glass';
+      const isSticky = !!p.sticky;
+      const links = Array.isArray(p.links) ? p.links : [];
+      const children = Array.isArray(p.children) ? p.children : [];
+      const enableCarousel = p.enableCarousel !== false;
+
+      const headerChildren = [];
+
+      // Subsection 1: Top Announcement Bar
+      if (p.showTopBar) {
+        const topBarChildren = [];
+        if (p.topBarBadge) {
+          topBarChildren.push(el('span', { class: 'cms-header-topbar-badge' }, p.topBarBadge));
+        }
+        topBarChildren.push(el('a', {
+          class: 'cms-header-topbar-link',
+          href: p.topBarLink || '#'
+        }, p.topBarText || 'Announcement text'));
+        headerChildren.push(el('div', { class: 'cms-header-topbar' }, topBarChildren));
+      }
+
+      // Subsection 2: Main Navigation Bar
+      // Brand Logo & Text
+      const logoHeightStyle = p.logoHeight ? `height:${p.logoHeight}px;max-height:${p.logoHeight}px;` : '';
+      const brandLogo = p.brandLogo
+        ? el('img', { src: p.brandLogo, alt: p.brandName || 'Logo', class: 'cms-header-logo-img', style: logoHeightStyle })
+        : (p.brandIcon ? el('span', { class: 'cms-header-brand-icon' }, p.brandIcon) : null);
+      const brandText = el('span', { class: 'cms-header-brand-name' }, p.brandName || 'Brand');
+      const brandEl = el('a', { class: 'cms-header-brand', href: p.brandUrl || '#' }, brandLogo ? [brandLogo, brandText] : [brandText]);
+
+      // Desktop Nav Links
+      const navLinks = links.map(link => el('a', {
+        class: 'cms-header-link',
+        href: link.url || '#'
+      }, link.label || 'Link'));
+      const navEl = el('nav', { class: 'cms-header-nav' }, navLinks);
+
+      // Actions / Search / CTA / Mobile burger
+      const actionsEl = el('div', { class: 'cms-header-actions' });
+
+      if (p.showSearch) {
+        const searchInput = el('input', {
+          type: 'text',
+          class: 'cms-header-search-input',
+          placeholder: p.searchPlaceholder || 'Search...',
+          onkeydown: (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              showToast(`Search: ${e.target.value}`, 'info');
+            }
+          }
+        });
+        const searchBox = el('div', { class: 'cms-header-search' }, [
+          createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'),
+          searchInput
+        ]);
+        actionsEl.appendChild(searchBox);
+      }
+
+      if (p.showCta !== false) {
+        const ctaBtn = el('a', {
+          class: `cms-header-cta-btn cta-${p.ctaVariant || 'filled'}`,
+          href: p.ctaUrl || '#'
+        }, p.ctaLabel || 'Get Started');
+        actionsEl.appendChild(ctaBtn);
+      }
+
+      // Mobile Hamburger
+      const burger = el('button', {
+        type: 'button',
+        class: 'cms-header-burger',
+        title: 'Toggle Navigation',
+        'aria-label': 'Toggle Navigation'
+      }, [
+        el('span'),
+        el('span'),
+        el('span')
+      ]);
+      actionsEl.appendChild(burger);
+
+      const headerInner = el('div', { class: 'cms-header-inner' }, [
+        brandEl,
+        navEl,
+        actionsEl
+      ]);
+      headerChildren.push(headerInner);
+
+      // Mobile Drawer
+      const mobileNavChildren = links.map(link => el('a', {
+        class: 'cms-header-link',
+        href: link.url || '#'
+      }, link.label || 'Link'));
+
+      if (p.showSearch) {
+        mobileNavChildren.unshift(el('div', { class: 'cms-header-search mobile' }, [
+          createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'),
+          el('input', {
+            type: 'text',
+            class: 'cms-header-search-input',
+            placeholder: p.searchPlaceholder || 'Search...'
+          })
+        ]));
+      }
+
+      if (p.showCta !== false) {
+        mobileNavChildren.push(el('a', {
+          class: `cms-header-cta-btn cta-${p.ctaVariant || 'filled'}`,
+          style: 'width:100%;text-align:center;box-sizing:border-box;margin-top:6px;',
+          href: p.ctaUrl || '#'
+        }, p.ctaLabel || 'Get Started'));
+      }
+
+      const mobileDrawer = el('div', { class: 'cms-header-mobile-drawer' }, mobileNavChildren);
+      burger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        burger.classList.toggle('is-active');
+        mobileDrawer.classList.toggle('is-open');
+      });
+      headerChildren.push(mobileDrawer);
+
+      // Subsection 3: Interactive Carousel Track & Nested Component Dropzone
+      if (enableCarousel) {
+        const itemWidth = p.carouselItemWidth || 'medium';
+        const showArrows = p.carouselShowArrows !== false;
+        const showPrevNext = p.carouselShowPrevNext || 'both';
+        const arrowStyle = p.carouselArrowStyle || 'circle';
+        const arrowBehavior = p.carouselArrowBehavior || 'smooth';
+        const showDots = p.carouselShowDots !== false;
+        const dotStyle = p.carouselDotStyle || 'bars';
+        const dotBehavior = p.carouselDotBehavior || 'smooth';
+        const showSlideCounter = p.showSlideCounter !== false;
+
+        const carouselWrapper = el('div', { class: 'cms-header-carousel-wrapper' });
+        const viewport = el('div', { class: 'cms-header-carousel-viewport' });
+        const track = el('div', {
+          class: 'cms-header-carousel-track',
+          dataset: { containerId: block.id }
+        });
+
+        if (!children.length) {
+          const dropzone = el('div', { class: 'header-carousel-dropzone empty' }, [
+            createSvg('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m9 9 3 3 3-3"/></svg>'),
+            el('span', {}, 'Header Carousel Track — Drag & drop components from the palette here')
+          ]);
+          track.appendChild(dropzone);
+        } else {
+          children.forEach(childBlock => {
+            const childWrap = renderBlockWrap(childBlock, block.id);
+            childWrap.classList.add('cms-header-carousel-slide', `slide-width-${itemWidth}`);
+            track.appendChild(childWrap);
+          });
+        }
+
+        // Attach drag and drop listeners for nested components
+        track.addEventListener('dragover', e => onContainerDragOver(e, block));
+        track.addEventListener('dragleave', e => onContainerDragLeave(e, block));
+        track.addEventListener('drop', e => onContainerDrop(e, block));
+
+        viewport.appendChild(track);
+
+        const getSlideStep = () => {
+          const firstSlide = track.querySelector('.cms-header-carousel-slide');
+          return firstSlide ? (firstSlide.offsetWidth + 14) : 320;
+        };
+
+        // Navigation Arrows
+        let prevArrow = null;
+        let nextArrow = null;
+        const canShowArrows = showArrows && children.length > 1;
+        const showPrev = canShowArrows && (showPrevNext === 'both' || showPrevNext === 'prev-only');
+        const showNext = canShowArrows && (showPrevNext === 'both' || showPrevNext === 'next-only');
+
+        if (showPrev) {
+          prevArrow = el('button', {
+            type: 'button',
+            class: `cms-header-carousel-arrow prev arrow-style-${arrowStyle}`,
+            title: 'Previous Slide',
+            onclick: (e) => {
+              e.stopPropagation();
+              const step = getSlideStep();
+              if (arrowBehavior === 'loop' && track.scrollLeft <= 5) {
+                track.scrollTo({ left: track.scrollWidth, behavior: 'smooth' });
+              } else {
+                track.scrollBy({ left: -step, behavior: 'smooth' });
+              }
+            }
+          }, [createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>')]);
+          carouselWrapper.appendChild(prevArrow);
+        }
+
+        carouselWrapper.appendChild(viewport);
+
+        if (showNext) {
+          nextArrow = el('button', {
+            type: 'button',
+            class: `cms-header-carousel-arrow next arrow-style-${arrowStyle}`,
+            title: 'Next Slide',
+            onclick: (e) => {
+              e.stopPropagation();
+              const step = getSlideStep();
+              if (arrowBehavior === 'loop' && (track.scrollLeft + track.clientWidth >= track.scrollWidth - 10)) {
+                track.scrollTo({ left: 0, behavior: 'smooth' });
+              } else {
+                track.scrollBy({ left: step, behavior: 'smooth' });
+              }
+            }
+          }, [createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>')]);
+          carouselWrapper.appendChild(nextArrow);
+        }
+
+        // Bottom Controls Bar (Pagination Dots + Slide Counter)
+        let counterEl = null;
+        let dotsWrap = null;
+        let dots = [];
+
+        if (children.length > 0 && (showDots || showSlideCounter)) {
+          const controlsBar = el('div', { class: 'cms-header-carousel-controls' });
+
+          if (showDots && children.length > 1) {
+            dotsWrap = el('div', { class: `cms-header-carousel-dots dot-style-${dotStyle}` });
+            dots = children.map((_, idx) => {
+              const dot = el('button', {
+                type: 'button',
+                class: `cms-header-carousel-dot${idx === 0 ? ' active' : ''}`,
+                title: `Slide ${idx + 1}`,
+                onclick: (e) => {
+                  e.stopPropagation();
+                  const slides = track.querySelectorAll('.cms-header-carousel-slide');
+                  if (slides[idx]) {
+                    const scrollBehavior = dotBehavior === 'instant' ? 'auto' : 'smooth';
+                    slides[idx].scrollIntoView({ behavior: scrollBehavior, inline: 'center', block: 'nearest' });
+                  }
+                }
+              }, dotStyle === 'numbers' ? [el('span', {}, String(idx + 1))] : []);
+              return dot;
+            });
+            dots.forEach(d => dotsWrap.appendChild(d));
+            controlsBar.appendChild(dotsWrap);
+          }
+
+          if (showSlideCounter && children.length > 0) {
+            const totalStr = String(children.length).padStart(2, '0');
+            counterEl = el('div', { class: 'cms-header-carousel-counter' }, `01 / ${totalStr}`);
+            controlsBar.appendChild(counterEl);
+          }
+
+          carouselWrapper.appendChild(controlsBar);
+        }
+
+        // Update active dot and counter on scroll
+        let scrollTimer;
+        track.addEventListener('scroll', () => {
+          clearTimeout(scrollTimer);
+          scrollTimer = setTimeout(() => {
+            const slides = Array.from(track.querySelectorAll('.cms-header-carousel-slide'));
+            if (!slides.length) return;
+            const tRect = track.getBoundingClientRect();
+            let closestIdx = 0;
+            let minDiff = Infinity;
+            slides.forEach((s, idx) => {
+              const sRect = s.getBoundingClientRect();
+              const diff = Math.abs((sRect.left + sRect.width / 2) - (tRect.left + tRect.width / 2));
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = idx;
+              }
+            });
+            if (dots.length) {
+              dots.forEach((d, idx) => d.classList.toggle('active', idx === closestIdx));
+            }
+            if (counterEl) {
+              const curStr = String(closestIdx + 1).padStart(2, '0');
+              const totalStr = String(children.length).padStart(2, '0');
+              counterEl.textContent = `${curStr} / ${totalStr}`;
+            }
+          }, 40);
+        }, { passive: true });
+
+        // Drag to scroll
+        let isDown = false;
+        let startX, sLeft;
+        track.addEventListener('mousedown', e => {
+          if (e.target.closest('.block-toolbar, button, input, textarea, a, .container-insert-indicator')) return;
+          isDown = true;
+          startX = e.pageX - track.offsetLeft;
+          sLeft = track.scrollLeft;
+        });
+        window.addEventListener('mouseup', () => { isDown = false; });
+        track.addEventListener('mousemove', e => {
+          if (!isDown) return;
+          e.preventDefault();
+          const x = e.pageX - track.offsetLeft;
+          const walk = (x - startX) * 1.5;
+          track.scrollLeft = sLeft - walk;
+        });
+
+        // Autoplay
+        if (p.carouselAutoplay && children.length > 1) {
+          const interval = (Math.max(2, Number(p.carouselInterval) || 4)) * 1000;
+          let autoTimer = setInterval(() => {
+            if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 10) {
+              track.scrollTo({ left: 0, behavior: 'smooth' });
+            } else {
+              track.scrollBy({ left: getSlideStep(), behavior: 'smooth' });
+            }
+          }, interval);
+          track.addEventListener('mouseenter', () => clearInterval(autoTimer));
+          track.addEventListener('mouseleave', () => {
+            clearInterval(autoTimer);
+            autoTimer = setInterval(() => {
+              if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 10) {
+                track.scrollTo({ left: 0, behavior: 'smooth' });
+              } else {
+                track.scrollBy({ left: getSlideStep(), behavior: 'smooth' });
+              }
+            }, interval);
+          });
+        }
+
+        headerChildren.push(carouselWrapper);
+      }
+
+      const headerEl = el('header', {
+        class: `block cms-header-block layout-${layout} variant-${variant}${isSticky ? ' is-sticky' : ''}`
+      }, headerChildren);
+
+      applyCustomCssOverride(headerEl, p.customCss);
+      return headerEl;
+    }
     default:
       return el('div', { class: 'block' }, 'Unknown block');
   }
@@ -3405,6 +3876,8 @@ function getBlockIconSvg(type) {
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>');
     case 'audio':
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>');
+    case 'header':
+      return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M2 10h20"/><circle cx="6" cy="7" r="1"/><path d="M14 7h4"/></svg>');
     default:
       return createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>');
   }
@@ -3444,7 +3917,7 @@ function renderComponentTree() {
   function tally(list) {
     list.forEach(b => {
       totalCount++;
-      if (b.type === 'container' && Array.isArray(b.props?.children)) {
+      if ((b.type === 'container' || b.type === 'header') && Array.isArray(b.props?.children)) {
         tally(b.props.children);
       }
     });
@@ -3482,10 +3955,10 @@ function scrollToBlock(id) {
   }, 40);
 }
 
-function renderTreeNode(block, depth = 0) {
-    const isContainer = block.type === 'container';
+  function renderTreeNode(block, depth = 0) {
+    const isContainer = (block.type === 'container' || block.type === 'header') && Array.isArray(block.props?.children);
     const isSelected = state.cms.selectedBlockId === block.id;
-    const children = isContainer && Array.isArray(block.props?.children) ? block.props.children : [];
+    const children = Array.isArray(block.props?.children) ? block.props.children : [];
 
     let snippet = '';
     if (block.props) {
@@ -3495,6 +3968,7 @@ function renderTreeNode(block, depth = 0) {
       else if (block.type === 'image') snippet = block.props.caption || '';
       else if (block.type === 'carousel') snippet = `${(block.props.slides || []).length} slides`;
       else if (block.type === 'container') snippet = block.props.mode === 'grid' ? `${block.props.columns || 2} cols` : (block.props.direction || 'row');
+      else if (block.type === 'header') snippet = `${(block.props.children || []).length} slides • ${block.props.brandName || 'Brand'}`;
     }
 
     const nodeWrap = el('div', { class: `tree-node ${isSelected ? 'selected' : ''}` });
@@ -4052,7 +4526,7 @@ function hideDropIndicator() {
   if (state.cms.containerIndicator && state.cms.containerIndicator.parentNode) {
     state.cms.containerIndicator.parentNode.removeChild(state.cms.containerIndicator);
   }
-  document.querySelectorAll('.block-container.drag-over').forEach(el => el.classList.remove('drag-over'));
+  document.querySelectorAll('.block-container.drag-over, .cms-header-carousel-track.drag-over').forEach(el => el.classList.remove('drag-over'));
 }
 
 function onCanvasDragOver(e) {
@@ -4099,7 +4573,7 @@ function onContainerDragOver(e, containerBlock) {
   containerEl.classList.add('drag-over');
 
   const p = containerBlock.props || {};
-  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row')));
+  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || containerBlock.type === 'header';
   const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isGridOrWrap);
   showContainerDropIndicator(containerEl, idx, isGridOrWrap);
 }
@@ -4124,7 +4598,7 @@ function onContainerDrop(e, containerBlock) {
   }
 
   const p = containerBlock.props || {};
-  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row')));
+  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || containerBlock.type === 'header';
   const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isGridOrWrap);
 
   if (state.cms.drag.kind === 'palette') {
@@ -4180,6 +4654,37 @@ function renderCanvasSettings(body) {
   body.appendChild(header);
 
   const wrap = el('div', { class: 'fields' });
+
+  // First Page / Homepage Setting
+  const isFirstPage = !!state.cms.openPage.is_first_page;
+  const firstPageCard = el('div', {
+    class: `first-page-card ${isFirstPage ? 'is-first' : ''}`,
+    style: `background:${isFirstPage ? 'rgba(245,158,11,0.08)' : 'var(--bg-surface-hover)'};border:1px solid ${isFirstPage ? 'rgba(245,158,11,0.35)' : 'var(--border-subtle)'};border-radius:var(--radius-md);padding:12px 14px;margin-bottom:14px;transition:all 0.2s;`
+  }, [
+    el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;' }, [
+      el('div', { style: 'display:flex;align-items:center;gap:6px;' }, [
+        el('span', { style: `font-size:15px;color:${isFirstPage ? '#f59e0b' : 'var(--text-tertiary)'};` }, isFirstPage ? '★' : '☆'),
+        el('strong', { style: `font-size:12.5px;color:${isFirstPage ? '#fbbf24' : 'var(--text-primary)'};` }, 'First Page (Homepage)')
+      ]),
+      isFirstPage
+        ? el('span', { class: 'badge', style: 'background:#f59e0b;color:#1e1b4b;font-weight:700;font-size:10px;padding:2px 7px;border-radius:999px;' }, 'Root /p')
+        : null
+    ]),
+    el('p', { style: 'font-size:11.5px;color:var(--text-secondary);margin:0 0 10px 0;line-height:1.4;' },
+      isFirstPage
+        ? 'This page serves as your site homepage. It is served automatically at /p and opens first in the studio.'
+        : 'Set this page as the default homepage. Visitors landing on /p will see this page first.'
+    ),
+    !isFirstPage ? el('button', {
+      type: 'button',
+      class: 'btn primary btn-sm',
+      style: 'width:100%;justify-content:center;background:#f59e0b;border-color:#f59e0b;color:#1e1b4b;font-weight:700;',
+      onclick: async () => {
+        await setFirstPage(state.cms.openPage.id);
+      }
+    }, '★ Set as First Page') : null
+  ]);
+  wrap.appendChild(firstPageCard);
 
   // 1. Max Width
   const widthPresets = [
@@ -5412,6 +5917,295 @@ function renderProps() {
       wrap.appendChild(field('Cover Artwork Image URL', input('text', p.cover || '', v => { p.cover = v; onPropInput(); })));
       break;
     }
+    case 'header': {
+      if (!Array.isArray(p.links)) p.links = [];
+
+      // Save as Custom Header button
+      const saveCustomHeaderBtn = el('button', {
+        type: 'button',
+        class: 'btn primary btn-sm',
+        style: 'width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin:4px 0 16px;padding:9px 14px;font-weight:700;font-size:12.5px;background:linear-gradient(135deg, #4f46e5, #7c3aed);border:none;border-radius:8px;box-shadow:0 4px 14px rgba(99,102,241,0.35);color:#fff;cursor:pointer;',
+        onclick: () => saveSelectedAsReusableBlock(block.id)
+      }, [
+        createSvg('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>'),
+        el('span', {}, '💾 Save as Custom Header')
+      ]);
+      wrap.appendChild(saveCustomHeaderBtn);
+
+      // Subsections Management
+      const subsectionTitle = el('div', { style: 'margin:8px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Header Subsections');
+      wrap.appendChild(subsectionTitle);
+
+      const showTopBarLabel = el('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-bottom:10px;' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: !!p.showTopBar,
+          onchange: e => { p.showTopBar = e.target.checked; onChange(); }
+        }),
+        el('span', {}, 'Top Announcement Bar (Subsection)')
+      ]);
+      wrap.appendChild(showTopBarLabel);
+
+      if (p.showTopBar) {
+        wrap.appendChild(field('Announcement Badge', input('text', p.topBarBadge || 'NEW', v => { p.topBarBadge = v; onPropInput(); })));
+        wrap.appendChild(field('Announcement Text', input('text', p.topBarText || '', v => { p.topBarText = v; onPropInput(); })));
+        wrap.appendChild(field('Announcement Target Link', input('text', p.topBarLink || '#', v => { p.topBarLink = v; onPropInput(); })));
+      }
+
+      // Brand settings
+      const brandSectionTitle = el('div', { style: 'margin:16px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Brand & Logo');
+      wrap.appendChild(brandSectionTitle);
+      wrap.appendChild(field('Brand Name', input('text', p.brandName || '', v => { p.brandName = v; onPropInput(); })));
+      wrap.appendChild(field('Brand Logo Image URL (Optional)', input('text', p.brandLogo || '', v => { p.brandLogo = v; onPropInput(); })));
+      wrap.appendChild(field('Logo Height (px)', input('number', String(p.logoHeight || 28), v => { p.logoHeight = Number(v) || 28; onPropInput(); }, { min: 16, max: 80 })));
+      wrap.appendChild(field('Brand Icon / Emoji', input('text', p.brandIcon || '✦', v => { p.brandIcon = v; onPropInput(); })));
+      wrap.appendChild(field('Brand Target URL', input('text', p.brandUrl || '#', v => { p.brandUrl = v; onPropInput(); })));
+
+      // Layout & Appearance
+      const layoutSectionTitle = el('div', { style: 'margin:16px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Header Layout & Styling');
+      wrap.appendChild(layoutSectionTitle);
+
+      wrap.appendChild(field('Header Layout', select([
+        ['spread', 'Spread (Logo Left, Links & CTA Right)', p.layout || 'spread'],
+        ['centered', 'Centered (Stacked Brand & Navigation)', p.layout || 'spread'],
+        ['floating', 'Floating Island (Modern Pill Nav)', p.layout || 'spread']
+      ], v => { p.layout = v; onChange(); })));
+
+      wrap.appendChild(field('Visual Variant', select([
+        ['glass', 'Frosted Glassmorphism (Blur & Border)', p.styleVariant || 'glass'],
+        ['solid', 'Solid Surface (Clean Elevated)', p.styleVariant || 'glass'],
+        ['transparent', 'Transparent Overlay', p.styleVariant || 'glass'],
+        ['bordered', 'Bordered Outline', p.styleVariant || 'glass']
+      ], v => { p.styleVariant = v; onChange(); })));
+
+      const stickyLabel = el('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-bottom:12px;' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: !!p.sticky,
+          onchange: e => { p.sticky = e.target.checked; onChange(); }
+        }),
+        el('span', {}, 'Sticky Header (stays fixed at top on scroll)')
+      ]);
+      wrap.appendChild(stickyLabel);
+
+      // Search Bar Settings
+      const searchSectionTitle = el('div', { style: 'margin:16px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Search Bar');
+      wrap.appendChild(searchSectionTitle);
+
+      const showSearchLabel = el('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-bottom:10px;' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: !!p.showSearch,
+          onchange: e => { p.showSearch = e.target.checked; onChange(); }
+        }),
+        el('span', {}, 'Enable Interactive Search Bar')
+      ]);
+      wrap.appendChild(showSearchLabel);
+
+      if (p.showSearch) {
+        wrap.appendChild(field('Search Placeholder', input('text', p.searchPlaceholder || 'Search...', v => { p.searchPlaceholder = v; onPropInput(); })));
+      }
+
+      // Links Manager
+      const linksSectionTitle = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;' }, [
+        el('label', { style: 'font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Navigation Links'),
+        el('button', {
+          type: 'button',
+          class: 'btn secondary btn-sm',
+          style: 'padding:2px 8px;font-size:11px;',
+          onclick: () => {
+            p.links.push({ label: `Link ${p.links.length + 1}`, url: '#' });
+            onChange();
+          }
+        }, '+ Add Link')
+      ]);
+      wrap.appendChild(linksSectionTitle);
+
+      const linksList = el('div', { class: 'header-links-list', style: 'display:flex;flex-direction:column;gap:8px;margin-bottom:14px;' });
+      p.links.forEach((link, idx) => {
+        const row = el('div', { style: 'display:flex;gap:6px;align-items:center;background:rgba(255,255,255,0.02);padding:6px;border-radius:6px;border:1px solid var(--border-subtle);' }, [
+          el('input', {
+            type: 'text',
+            placeholder: 'Label',
+            value: link.label || '',
+            style: 'flex:1;min-width:0;',
+            oninput: e => { link.label = e.target.value; onPropInput(); }
+          }),
+          el('input', {
+            type: 'text',
+            placeholder: 'URL (#/page)',
+            value: link.url || '',
+            style: 'flex:1;min-width:0;',
+            oninput: e => { link.url = e.target.value; onPropInput(); }
+          }),
+          el('button', {
+            type: 'button',
+            class: 'btn ghost btn-sm danger',
+            style: 'padding:4px 6px;font-size:11px;',
+            title: 'Remove Link',
+            onclick: () => { p.links.splice(idx, 1); onChange(); }
+          }, '✕')
+        ]);
+        linksList.appendChild(row);
+      });
+      wrap.appendChild(linksList);
+
+      // Call to Action Settings
+      const ctaSectionTitle = el('div', { style: 'margin:14px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'CTA Action Button');
+      wrap.appendChild(ctaSectionTitle);
+
+      const showCtaLabel = el('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-bottom:10px;' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: p.showCta !== false,
+          onchange: e => { p.showCta = e.target.checked; onChange(); }
+        }),
+        el('span', {}, 'Show Call-to-Action Button')
+      ]);
+      wrap.appendChild(showCtaLabel);
+
+      if (p.showCta !== false) {
+        wrap.appendChild(field('Button Label', input('text', p.ctaLabel || 'Get Started', v => { p.ctaLabel = v; onPropInput(); })));
+        wrap.appendChild(field('Button Target URL', input('text', p.ctaUrl || '#', v => { p.ctaUrl = v; onPropInput(); })));
+        wrap.appendChild(field('Button Style Variant', select([
+          ['filled', 'Gradient Accent (Filled)', p.ctaVariant || 'filled'],
+          ['outline', 'Outline Border', p.ctaVariant || 'filled'],
+          ['glow', 'Neon Glowing Accent', p.ctaVariant || 'filled']
+        ], v => { p.ctaVariant = v; onChange(); })));
+      }
+
+      // Carousel & Nested Component Slot Settings
+      const carouselSectionTitle = el('div', { style: 'margin:18px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Header Component Carousel');
+      wrap.appendChild(carouselSectionTitle);
+
+      const enableCarouselLabel = el('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-bottom:10px;' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: p.enableCarousel !== false,
+          onchange: e => { p.enableCarousel = e.target.checked; onChange(); }
+        }),
+        el('span', {}, 'Enable Carousel Track (Draggable Component Strip)')
+      ]);
+      wrap.appendChild(enableCarouselLabel);
+
+      if (p.enableCarousel !== false) {
+        wrap.appendChild(field('Slide Card Width', select([
+          ['compact', 'Compact Cards (220px)', p.carouselItemWidth || 'medium'],
+          ['medium', 'Medium Cards (320px - Default)', p.carouselItemWidth || 'medium'],
+          ['wide', 'Wide Banners (440px)', p.carouselItemWidth || 'medium'],
+          ['full', 'Full Width (100% per slide)', p.carouselItemWidth || 'medium'],
+          ['auto', 'Auto Content Width', p.carouselItemWidth || 'medium']
+        ], v => { p.carouselItemWidth = v; onChange(); })));
+
+        // Rotation controls
+        const rotationControls = el('div', { style: 'margin:10px 0 8px;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;border:1px solid var(--border-subtle);' }, [
+          el('div', { style: 'font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:8px;' }, 'Carousel Rotation'),
+          el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:8px;' }, [
+            el('input', {
+              type: 'checkbox',
+              checked: !!p.carouselAutoplay,
+              onchange: e => { p.carouselAutoplay = e.target.checked; onChange(); }
+            }),
+            el('span', {}, 'Autoplay (Rotate Automatically)')
+          ])
+        ]);
+        if (p.carouselAutoplay) {
+          rotationControls.appendChild(field('Autoplay Speed (Seconds)', input('number', String(p.carouselInterval || 4), v => { p.carouselInterval = Number(v) || 4; onPropInput(); }, { min: 2, max: 20 })));
+        }
+        wrap.appendChild(rotationControls);
+
+        // Arrow controls & behavior
+        const arrowBox = el('div', { style: 'margin:10px 0 8px;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;border:1px solid var(--border-subtle);' }, [
+          el('div', { style: 'font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:8px;' }, 'Arrow Buttons & Behavior'),
+          el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:8px;' }, [
+            el('input', {
+              type: 'checkbox',
+              checked: p.carouselShowArrows !== false,
+              onchange: e => { p.carouselShowArrows = e.target.checked; onChange(); }
+            }),
+            el('span', {}, 'Show Navigation Arrows')
+          ])
+        ]);
+
+        if (p.carouselShowArrows !== false) {
+          arrowBox.appendChild(field('Show Prev / Next Buttons', select([
+            ['both', 'Show Both Prev & Next Buttons', p.carouselShowPrevNext || 'both'],
+            ['prev-only', 'Show Prev Button Only', p.carouselShowPrevNext || 'both'],
+            ['next-only', 'Show Next Button Only', p.carouselShowPrevNext || 'both']
+          ], v => { p.carouselShowPrevNext = v; onChange(); })));
+
+          arrowBox.appendChild(field('Arrow Button Style', select([
+            ['circle', 'Circle Button (Modern Glass)', p.carouselArrowStyle || 'circle'],
+            ['square', 'Rounded Square Button', p.carouselArrowStyle || 'circle'],
+            ['pill', 'Elongated Pill Button', p.carouselArrowStyle || 'circle'],
+            ['ghost', 'Ghost Minimalist Button', p.carouselArrowStyle || 'circle'],
+            ['glow', 'Neon Glowing Accent Button', p.carouselArrowStyle || 'circle']
+          ], v => { p.carouselArrowStyle = v; onChange(); })));
+
+          arrowBox.appendChild(field('Arrow Navigation Behavior', select([
+            ['smooth', 'Smooth Step Scroll (Standard)', p.carouselArrowBehavior || 'smooth'],
+            ['loop', 'Loop Around (Wrap to Start / End)', p.carouselArrowBehavior || 'smooth']
+          ], v => { p.carouselArrowBehavior = v; onChange(); })));
+        }
+        wrap.appendChild(arrowBox);
+
+        // Dot controls & behavior
+        const dotBox = el('div', { style: 'margin:10px 0 8px;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;border:1px solid var(--border-subtle);' }, [
+          el('div', { style: 'font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:8px;' }, 'Pagination Dots & Behavior'),
+          el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:8px;' }, [
+            el('input', {
+              type: 'checkbox',
+              checked: p.carouselShowDots !== false,
+              onchange: e => { p.carouselShowDots = e.target.checked; onChange(); }
+            }),
+            el('span', {}, 'Show Pagination Dots')
+          ])
+        ]);
+
+        if (p.carouselShowDots !== false) {
+          dotBox.appendChild(field('Dot Button Style', select([
+            ['bars', 'Expanding Accent Bars (Default)', p.carouselDotStyle || 'bars'],
+            ['dots', 'Classic Circular Dots', p.carouselDotStyle || 'bars'],
+            ['numbers', 'Slide Numbers (1, 2, 3...)', p.carouselDotStyle || 'bars'],
+            ['lines', 'Slim Minimalist Dashes', p.carouselDotStyle || 'bars']
+          ], v => { p.carouselDotStyle = v; onChange(); })));
+
+          dotBox.appendChild(field('Dot Click Behavior', select([
+            ['smooth', 'Smooth Centered Scroll', p.carouselDotBehavior || 'smooth'],
+            ['instant', 'Instant Jump to Slide', p.carouselDotBehavior || 'smooth']
+          ], v => { p.carouselDotBehavior = v; onChange(); })));
+        }
+        wrap.appendChild(dotBox);
+
+        // Slide Indicator / Counter
+        const counterBox = el('div', { style: 'margin:10px 0 8px;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;border:1px solid var(--border-subtle);' }, [
+          el('div', { style: 'font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:8px;' }, 'Slide Counter Display'),
+          el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;' }, [
+            el('input', {
+              type: 'checkbox',
+              checked: p.showSlideCounter !== false,
+              onchange: e => { p.showSlideCounter = e.target.checked; onChange(); }
+            }),
+            el('span', {}, 'Show Current Slide Counter (e.g. 01 / 03)')
+          ])
+        ]);
+        wrap.appendChild(counterBox);
+
+        // Quick add buttons for carousel slot
+        const addComponentsTitle = el('div', { style: 'margin:14px 0 6px;font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;' }, 'Quick Add Component to Carousel:');
+        wrap.appendChild(addComponentsTitle);
+
+        const quickBtns = el('div', { style: 'display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;' }, [
+          el('button', { type: 'button', class: 'btn secondary btn-sm', style: 'font-size:11px;padding:3px 7px;', onclick: () => insertBlockAt('callout', block.id) }, '+ Callout'),
+          el('button', { type: 'button', class: 'btn secondary btn-sm', style: 'font-size:11px;padding:3px 7px;', onclick: () => insertBlockAt('button', block.id) }, '+ Button'),
+          el('button', { type: 'button', class: 'btn secondary btn-sm', style: 'font-size:11px;padding:3px 7px;', onclick: () => insertBlockAt('stat', block.id) }, '+ Metric'),
+          el('button', { type: 'button', class: 'btn secondary btn-sm', style: 'font-size:11px;padding:3px 7px;', onclick: () => insertBlockAt('image', block.id) }, '+ Image'),
+          el('button', { type: 'button', class: 'btn secondary btn-sm', style: 'font-size:11px;padding:3px 7px;', onclick: () => insertBlockAt('paragraph', block.id) }, '+ Text')
+        ]);
+        wrap.appendChild(quickBtns);
+      }
+      break;
+    }
   }
 
   // Universal Custom CSS Style setting on every component
@@ -6209,10 +7003,112 @@ async function submitAiGenerate() {
   }
 }
 
+function initPaletteCategoryCollapsing() {
+  const STORAGE_KEY = 'aladen_collapsed_categories';
+  const categories = document.querySelectorAll('.palette-category[data-category]');
+  const toggleAllBtn = document.getElementById('cmsToggleAllSectionsBtn');
+  if (!categories.length) return;
+
+  let collapsedCategories = new Set();
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        collapsedCategories = new Set(parsed);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse collapsed categories from localStorage', e);
+  }
+
+  const saveState = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(collapsedCategories)));
+    } catch (e) {
+      console.warn('Failed to save collapsed categories to localStorage', e);
+    }
+  };
+
+  const updateToggleAllBtnState = () => {
+    if (!toggleAllBtn) return;
+    const allCollapsed = Array.from(categories).every(cat => cat.classList.contains('collapsed'));
+    toggleAllBtn.textContent = allCollapsed ? 'Expand All' : 'Collapse All';
+    toggleAllBtn.setAttribute('aria-expanded', allCollapsed ? 'false' : 'true');
+  };
+
+  categories.forEach(cat => {
+    const catId = cat.dataset.category;
+    if (collapsedCategories.has(catId)) {
+      cat.classList.add('collapsed');
+    }
+
+    const titleEl = cat.querySelector('.category-title');
+    if (titleEl) {
+      titleEl.setAttribute('aria-expanded', cat.classList.contains('collapsed') ? 'false' : 'true');
+
+      const toggle = (e) => {
+        if (e) e.preventDefault();
+        const isCollapsed = cat.classList.toggle('collapsed');
+        titleEl.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        if (isCollapsed) {
+          collapsedCategories.add(catId);
+        } else {
+          collapsedCategories.delete(catId);
+        }
+        saveState();
+        updateToggleAllBtnState();
+      };
+
+      titleEl.addEventListener('click', toggle);
+      titleEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggle();
+        }
+      });
+    }
+  });
+
+  if (toggleAllBtn) {
+    toggleAllBtn.addEventListener('click', () => {
+      const allCollapsed = Array.from(categories).every(cat => cat.classList.contains('collapsed'));
+      if (allCollapsed) {
+        categories.forEach(cat => {
+          cat.classList.remove('collapsed');
+          const title = cat.querySelector('.category-title');
+          if (title) title.setAttribute('aria-expanded', 'true');
+          collapsedCategories.delete(cat.dataset.category);
+        });
+      } else {
+        categories.forEach(cat => {
+          cat.classList.add('collapsed');
+          const title = cat.querySelector('.category-title');
+          if (title) title.setAttribute('aria-expanded', 'false');
+          collapsedCategories.add(cat.dataset.category);
+        });
+      }
+      saveState();
+      updateToggleAllBtnState();
+    });
+  }
+
+  updateToggleAllBtnState();
+}
+
 function setupCmsEvents() {
+  initPaletteCategoryCollapsing();
   document.getElementById('newPageBtn').onclick = newCmsPage;
   document.getElementById('cmsSaveBtn').onclick = saveCmsPage;
   document.getElementById('cmsDeleteBtn').onclick = deleteCmsPage;
+  document.getElementById('cmsFirstPageToggleBtn')?.addEventListener('click', async () => {
+    if (!state.cms.openPage || !state.cms.openPage.id) return;
+    if (state.cms.openPage.is_first_page) {
+      showToast('This page is already the First Page (Homepage)', 'info');
+      return;
+    }
+    await setFirstPage(state.cms.openPage.id);
+  });
 
   // AI Website Generator Triggers
   document.getElementById('cmsAiGenerateBtn')?.addEventListener('click', openAiGenerateModal);

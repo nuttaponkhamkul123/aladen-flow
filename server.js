@@ -339,7 +339,7 @@ function uniqueSlug(base, excludeId = null) {
 
 app.get('/api/pages', (req, res) => {
   const { q, tag, status } = req.query;
-  let sql = `SELECT p.id, p.title, p.slug, p.status, p.parent_id, p.position, p.created_at, p.updated_at,
+  let sql = `SELECT p.id, p.title, p.slug, p.status, p.parent_id, p.position, p.is_first_page, p.created_at, p.updated_at,
     (SELECT GROUP_CONCAT(tag, ',') FROM page_tags pt WHERE pt.page_id = p.id) AS tag_csv
     FROM pages p WHERE 1=1`;
   const params = [];
@@ -404,21 +404,23 @@ app.post('/api/pages', (req, res) => {
   let settingsJson;
   try { settingsJson = JSON.stringify(typeof settings === 'object' && settings !== null ? settings : {}); }
   catch { settingsJson = '{}'; }
+  const pageCount = db.prepare('SELECT COUNT(*) AS c FROM pages').get()?.c || 0;
+  const isFirstPage = pageCount === 0 ? 1 : 0;
   const info = db
-    .prepare('INSERT INTO pages (title, slug, blocks, status, settings, parent_id, position) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(title.trim(), slug, blocksJson, status, settingsJson, parent_id != null ? Number(parent_id) : null, Number(position) || 0);
+    .prepare('INSERT INTO pages (title, slug, blocks, status, settings, parent_id, position, is_first_page) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(title.trim(), slug, blocksJson, status, settingsJson, parent_id != null ? Number(parent_id) : null, Number(position) || 0, isFirstPage);
   const insertTag = db.prepare('INSERT OR IGNORE INTO page_tags (page_id, tag) VALUES (?, ?)');
   (tags || []).forEach(t => {
     if (t && typeof t === 'string') insertTag.run(info.lastInsertRowid, t.trim().toLowerCase());
   });
-  res.json({ id: info.lastInsertRowid, slug });
+  res.json({ id: info.lastInsertRowid, slug, is_first_page: isFirstPage });
 });
 
 app.patch('/api/pages/:id', (req, res) => {
   const id = Number(req.params.id);
   const existing = db.prepare('SELECT * FROM pages WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'not found' });
-  const { title, blocks, status, tags, settings, parent_id, position } = req.body;
+  const { title, blocks, status, tags, settings, parent_id, position, is_first_page } = req.body;
   const tx = db.transaction(() => {
     const updates = [];
     const params = [];
@@ -451,6 +453,15 @@ app.patch('/api/pages/:id', (req, res) => {
       updates.push('position = ?');
       params.push(Number(position) || 0);
     }
+    if (is_first_page !== undefined) {
+      const isFirst = !!is_first_page;
+      if (isFirst) {
+        db.prepare('UPDATE pages SET is_first_page = 0').run();
+        updates.push('is_first_page = 1');
+      } else {
+        updates.push('is_first_page = 0');
+      }
+    }
     if (updates.length) {
       updates.push("updated_at = datetime('now')");
       params.push(id);
@@ -468,6 +479,18 @@ app.patch('/api/pages/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/pages/:id/set-first', (req, res) => {
+  const id = Number(req.params.id);
+  const existing = db.prepare('SELECT id, title FROM pages WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Page not found' });
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE pages SET is_first_page = 0').run();
+    db.prepare('UPDATE pages SET is_first_page = 1 WHERE id = ?').run(id);
+  });
+  tx();
+  res.json({ ok: true, id });
+});
+
 app.post('/api/pages/reorder', (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items)) return res.status(400).json({ error: 'items required' });
@@ -482,7 +505,15 @@ app.post('/api/pages/reorder', (req, res) => {
 });
 
 app.delete('/api/pages/:id', (req, res) => {
-  db.prepare('DELETE FROM pages WHERE id = ?').run(req.params.id);
+  const id = Number(req.params.id);
+  const target = db.prepare('SELECT is_first_page FROM pages WHERE id = ?').get(id);
+  db.prepare('DELETE FROM pages WHERE id = ?').run(id);
+  if (target && target.is_first_page) {
+    const nextFirst = db.prepare('SELECT id FROM pages ORDER BY position ASC, id ASC LIMIT 1').get();
+    if (nextFirst) {
+      db.prepare('UPDATE pages SET is_first_page = 1 WHERE id = ?').run(nextFirst.id);
+    }
+  }
   res.json({ ok: true });
 });
 
@@ -1374,6 +1405,7 @@ Return ONLY valid JSON (no markdown formatting, no code block backticks) matchin
     // 23. timeline: { "id": "tml_1", "type": "timeline", "props": { "items": [{ "title": "Milestone", "date": "Q1 2026", "description": "...", "status": "completed"|"current"|"upcoming" }] } }
     // 24. form: { "id": "frm_1", "type": "form", "props": { "title": "Contact Us", "description": "...", "buttonLabel": "Send Message" } }
     // 25. audio: { "id": "aud_1", "type": "audio", "props": { "title": "Episode 01", "artist": "Host Name", "duration": "04:15", "cover": "https://..." } }
+    // 26. header: { "id": "hdr_1", "type": "header", "props": { "brandName": "Brand Name", "brandIcon": "✦", "layout": "spread"|"centered"|"floating", "styleVariant": "glass"|"solid"|"transparent"|"bordered", "sticky": false, "showCta": true, "ctaLabel": "Get Started", "ctaUrl": "#", "ctaVariant": "filled"|"outline"|"glow", "links": [{ "label": "Features", "url": "#features" }] } }
   ]
 }
 IMPORTANT STYLING DIRECTIVE:
@@ -1460,6 +1492,7 @@ Return ONLY valid JSON (no markdown formatting, no code block backticks) matchin
     // 23. timeline: { "id": "tml_1", "type": "timeline", "props": { "items": [{ "title": "Milestone", "date": "Q1 2026", "description": "...", "status": "completed"|"current"|"upcoming" }] } }
     // 24. form: { "id": "frm_1", "type": "form", "props": { "title": "Contact Us", "description": "...", "buttonLabel": "Send Message" } }
     // 25. audio: { "id": "aud_1", "type": "audio", "props": { "title": "Episode 01", "artist": "Host Name", "duration": "04:15", "cover": "https://..." } }
+    // 26. header: { "id": "hdr_1", "type": "header", "props": { "brandName": "Brand Name", "brandIcon": "✦", "layout": "spread"|"centered"|"floating", "styleVariant": "glass"|"solid"|"transparent"|"bordered", "sticky": false, "showCta": true, "ctaLabel": "Get Started", "ctaUrl": "#", "ctaVariant": "filled"|"outline"|"glow", "links": [{ "label": "Features", "url": "#features" }] } }
   ]
 }
 IMPORTANT STYLING DIRECTIVE:
@@ -1548,6 +1581,24 @@ CRITICAL SYNTAX & COMPLETION RULES:
 
   throw lastError || new Error('Ollama returned empty response.');
 }
+
+app.get('/p', (req, res) => {
+  let page = db.prepare("SELECT * FROM pages WHERE is_first_page = 1 AND status = 'published'").get();
+  if (!page) {
+    page = db.prepare("SELECT * FROM pages WHERE is_first_page = 1").get();
+  }
+  if (!page) {
+    page = db.prepare("SELECT * FROM pages ORDER BY position ASC, id ASC LIMIT 1").get();
+  }
+  if (!page) {
+    return res.redirect('/');
+  }
+  let blocks = [];
+  try { blocks = JSON.parse(page.blocks || '[]'); } catch { }
+  const tags = db.prepare('SELECT tag FROM page_tags WHERE page_id = ?').all(page.id).map(r => r.tag);
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(renderPublishedPage(page, blocks, tags));
+});
 
 app.get('/p/:slug(*)', (req, res) => {
   const rawPath = req.params.slug || '';
@@ -1831,7 +1882,7 @@ function renderBlockHtml(b) {
         return `<tr>${cols.map((_, cIdx) => `<td>${escHtml(rowCells[cIdx] || '')}</td>`).join('')}</tr>`;
       }).join('')}</tbody>`;
 
-      return `<div class="cms-table-wrap" style="overflow-x:auto;margin:16px 0;${customCss}"><table class="cms-table${striped}${bordered}${compact}" style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.5;">${theadHtml}${tbodyHtml}</table></div>`;
+      return `<div class="cms-table-wrap block-table-wrap" style="overflow-x:auto;margin:16px 0;${customCss}"><table class="cms-table block-table${striped}${bordered}${compact}" style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.5;">${theadHtml}${tbodyHtml}</table></div>`;
     }
     case 'container': {
       const mode = p.mode || 'grid';
@@ -2233,6 +2284,116 @@ function renderBlockHtml(b) {
         <button type="button" class="cms-audio-play-btn" style="width:42px;height:42px;border-radius:50%;background:#6366f1;border:none;color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(99,102,241,0.4);flex-shrink:0;">▶</button>
       </div>`;
     }
+    case 'header': {
+      const layout = p.layout || 'spread';
+      const variant = p.styleVariant || 'glass';
+      const isSticky = !!p.sticky;
+      const links = Array.isArray(p.links) ? p.links : [];
+      const children = Array.isArray(p.children) ? p.children : [];
+      const enableCarousel = p.enableCarousel !== false;
+
+      // Subsection 1: Top Announcement Bar
+      let topBarHtml = '';
+      if (p.showTopBar) {
+        const badgeHtml = p.topBarBadge ? `<span class="cms-header-topbar-badge">${escHtml(p.topBarBadge)}</span>` : '';
+        topBarHtml = `<div class="cms-header-topbar">${badgeHtml}<a href="${escHtml(p.topBarLink || '#')}" class="cms-header-topbar-link">${escHtml(p.topBarText || '')}</a></div>`;
+      }
+
+      // Subsection 2: Main Navigation Bar
+      const logoHeightStyle = p.logoHeight ? `height:${p.logoHeight}px;max-height:${p.logoHeight}px;` : '';
+      const brandLogo = p.brandLogo
+        ? `<img src="${escHtml(p.brandLogo)}" alt="${escHtml(p.brandName || 'Logo')}" class="cms-header-logo-img" style="${logoHeightStyle}" />`
+        : (p.brandIcon ? `<span class="cms-header-brand-icon">${escHtml(p.brandIcon)}</span>` : '');
+      const brandText = `<span class="cms-header-brand-name">${escHtml(p.brandName || 'Brand')}</span>`;
+      const brandHtml = `<a href="${escHtml(p.brandUrl || '#')}" class="cms-header-brand">${brandLogo}${brandText}</a>`;
+
+      let navLinksHtml = '';
+      links.forEach(l => {
+        navLinksHtml += `<a href="${escHtml(l.url || '#')}" class="cms-header-link">${escHtml(l.label || 'Link')}</a>`;
+      });
+
+      let searchHtml = '';
+      if (p.showSearch) {
+        searchHtml = `<div class="cms-header-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" class="cms-header-search-input" placeholder="${escHtml(p.searchPlaceholder || 'Search...')}" />
+        </div>`;
+      }
+
+      let ctaHtml = '';
+      if (p.showCta !== false) {
+        ctaHtml = `<a href="${escHtml(p.ctaUrl || '#')}" class="cms-header-cta-btn cta-${escHtml(p.ctaVariant || 'filled')}">${escHtml(p.ctaLabel || 'Get Started')}</a>`;
+      }
+
+      const burgerHtml = `<button type="button" class="cms-header-burger" aria-label="Toggle Navigation"><span></span><span></span><span></span></button>`;
+
+      const mobileSearchHtml = p.showSearch ? `<div class="cms-header-search mobile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="text" class="cms-header-search-input" placeholder="${escHtml(p.searchPlaceholder || 'Search...')}" /></div>` : '';
+      const mobileDrawerHtml = `<div class="cms-header-mobile-drawer">${mobileSearchHtml}${navLinksHtml}${p.showCta !== false ? `<div style="margin-top:6px;">${ctaHtml}</div>` : ''}</div>`;
+
+      // Subsection 3: Component Carousel
+      let carouselHtml = '';
+      if (enableCarousel && children.length > 0) {
+        const itemWidth = p.carouselItemWidth || 'medium';
+        const showArrows = p.carouselShowArrows !== false && children.length > 1;
+        const showPrevNext = p.carouselShowPrevNext || 'both';
+        const showPrev = showArrows && (showPrevNext === 'both' || showPrevNext === 'prev-only');
+        const showNext = showArrows && (showPrevNext === 'both' || showPrevNext === 'next-only');
+        const arrowStyle = p.carouselArrowStyle || 'circle';
+        const arrowBehavior = p.carouselArrowBehavior || 'smooth';
+        const showDots = p.carouselShowDots !== false && children.length > 1;
+        const dotStyle = p.carouselDotStyle || 'bars';
+        const dotBehavior = p.carouselDotBehavior || 'smooth';
+        const showSlideCounter = p.showSlideCounter !== false;
+        const autoplay = p.carouselAutoplay ? 'true' : 'false';
+        const interval = p.carouselInterval || 4;
+
+        let slidesHtml = '';
+        children.forEach(child => {
+          slidesHtml += `<div class="cms-header-carousel-slide slide-width-${itemWidth}">${renderBlockHtml(child)}</div>`;
+        });
+
+        const prevArrowHtml = showPrev ? `<button type="button" class="cms-header-carousel-arrow prev arrow-style-${escHtml(arrowStyle)}" aria-label="Previous Slide"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>` : '';
+        const nextArrowHtml = showNext ? `<button type="button" class="cms-header-carousel-arrow next arrow-style-${escHtml(arrowStyle)}" aria-label="Next Slide"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>` : '';
+
+        let dotsHtml = '';
+        if (showDots) {
+          dotsHtml = `<div class="cms-header-carousel-dots dot-style-${escHtml(dotStyle)}">${children.map((_, idx) => `<button type="button" class="cms-header-carousel-dot${idx === 0 ? ' active' : ''}" data-index="${idx}" aria-label="Slide ${idx + 1}">${dotStyle === 'numbers' ? `<span>${idx + 1}</span>` : ''}</button>`).join('')}</div>`;
+        }
+
+        let counterHtml = '';
+        if (showSlideCounter) {
+          const totalStr = String(children.length).padStart(2, '0');
+          counterHtml = `<div class="cms-header-carousel-counter">01 / ${totalStr}</div>`;
+        }
+
+        let controlsBarHtml = '';
+        if (dotsHtml || counterHtml) {
+          controlsBarHtml = `<div class="cms-header-carousel-controls">${dotsHtml}${counterHtml}</div>`;
+        }
+
+        carouselHtml = `<div class="cms-header-carousel-wrapper" data-autoplay="${autoplay}" data-interval="${interval}" data-arrow-behavior="${escHtml(arrowBehavior)}" data-dot-behavior="${escHtml(dotBehavior)}">
+          ${prevArrowHtml}
+          <div class="cms-header-carousel-viewport">
+            <div class="cms-header-carousel-track">
+              ${slidesHtml}
+            </div>
+          </div>
+          ${nextArrowHtml}
+          ${controlsBarHtml}
+        </div>`;
+      }
+
+      return `<header class="cms-header-block layout-${layout} variant-${variant}${isSticky ? ' is-sticky' : ''}" style="${customCss}">
+        ${topBarHtml}
+        <div class="cms-header-inner">
+          ${brandHtml}
+          <nav class="cms-header-nav">${navLinksHtml}</nav>
+          <div class="cms-header-actions">${searchHtml}${ctaHtml}${burgerHtml}</div>
+        </div>
+        ${mobileDrawerHtml}
+        ${carouselHtml}
+      </header>`;
+    }
     default:
       return '';
   }
@@ -2355,10 +2516,427 @@ function renderPublishedPage(page, blocks, tags) {
       100% { transform: translate3d(-50%, 0, 0); }
     }
 
-    /* Waveform Animation for Audio */
-    @keyframes wave {
-      0% { height: 25%; }
-      100% { height: 100%; }
+    /* Custom Header / Navbar */
+    .cms-header-block {
+      width: 100%;
+      box-sizing: border-box;
+      margin: 10px 0 20px;
+      position: relative;
+      border-radius: 14px;
+      transition: all 0.25s ease;
+    }
+    .cms-header-block.variant-glass {
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    }
+    .cms-header-block.variant-solid {
+      background: #1a2234;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .cms-header-block.variant-transparent {
+      background: transparent;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .cms-header-block.variant-bordered {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1.5px solid rgba(255, 255, 255, 0.14);
+    }
+    .cms-header-block.layout-spread .cms-header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+    }
+    .cms-header-block.layout-centered .cms-header-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 24px;
+    }
+    .cms-header-block.layout-floating {
+      border-radius: 999px;
+      max-width: 96%;
+      margin: 12px auto 24px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    }
+    .cms-header-block.layout-floating .cms-header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 24px;
+    }
+    .cms-header-block.is-sticky {
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+    }
+    .cms-header-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+    }
+    .cms-header-logo-img {
+      max-height: 32px;
+      width: auto;
+      border-radius: 6px;
+    }
+    .cms-header-brand-icon {
+      font-size: 20px;
+      color: #818cf8;
+      text-shadow: 0 0 12px rgba(129, 140, 248, 0.5);
+    }
+    .cms-header-nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cms-header-link {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #cbd5e1;
+      text-decoration: none;
+      padding: 7px 14px;
+      border-radius: 999px;
+      transition: all 0.15s ease;
+    }
+    .cms-header-link:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .cms-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .cms-header-cta-btn {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+    .cms-header-cta-btn.cta-filled {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    }
+    .cms-header-cta-btn.cta-outline {
+      background: transparent;
+      color: #c7d2fe;
+      border: 1.5px solid #6366f1;
+    }
+    .cms-header-cta-btn.cta-glow {
+      background: #6366f1;
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+    }
+    .cms-header-burger {
+      display: none;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      flex-direction: column;
+      justify-content: space-around;
+      width: 28px;
+      height: 26px;
+    }
+    .cms-header-burger span {
+      width: 100%;
+      height: 2px;
+      background: #ffffff;
+      border-radius: 2px;
+      transition: all 0.25s ease;
+    }
+    .cms-header-burger.is-active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .cms-header-burger.is-active span:nth-child(2) { opacity: 0; }
+    .cms-header-burger.is-active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    .cms-header-mobile-drawer {
+      display: none;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 16px 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      flex-direction: column;
+      gap: 12px;
+    }
+    .cms-header-mobile-drawer.is-open { display: flex; }
+    @media (max-width: 768px) {
+      .cms-header-nav { display: none; }
+      .cms-header-burger { display: flex; }
+      .cms-header-block.layout-centered .cms-header-inner {
+        flex-direction: row;
+        justify-content: space-between;
+      }
+    }
+
+    /* Subsections: Top Announcement Bar */
+    .cms-header-topbar {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 16px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: center;
+    }
+    .cms-header-topbar-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border-radius: 20px;
+      background: #6366f1;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+    .cms-header-topbar-link {
+      color: rgba(255, 255, 255, 0.9);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.15s ease;
+    }
+    .cms-header-topbar-link:hover {
+      color: #ffffff;
+      text-decoration: underline;
+    }
+
+    /* Interactive Search Bar */
+    .cms-header-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      color: rgba(255, 255, 255, 0.7);
+      transition: all 0.2s ease;
+    }
+    .cms-header-search:focus-within {
+      background: rgba(255, 255, 255, 0.09);
+      border-color: #6366f1;
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+      color: #ffffff;
+    }
+    .cms-header-search-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: inherit;
+      font-size: 12.5px;
+      width: 130px;
+      transition: width 0.2s ease;
+    }
+    .cms-header-search:focus-within .cms-header-search-input {
+      width: 170px;
+    }
+    .cms-header-search.mobile {
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 6px;
+    }
+    .cms-header-search.mobile .cms-header-search-input {
+      width: 100%;
+    }
+
+    /* Custom Header Carousel */
+    .cms-header-carousel-wrapper {
+      position: relative;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 14px 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .cms-header-carousel-viewport {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      border-radius: 10px;
+    }
+    .cms-header-carousel-track {
+      display: flex;
+      align-items: stretch;
+      gap: 14px;
+      overflow-x: auto;
+      scroll-behavior: smooth;
+      scroll-snap-type: x mandatory;
+      padding: 6px 4px 10px;
+      box-sizing: border-box;
+      width: 100%;
+      scrollbar-width: thin;
+      user-select: none;
+    }
+    .cms-header-carousel-slide {
+      flex-shrink: 0;
+      scroll-snap-align: start;
+      box-sizing: border-box;
+    }
+    .cms-header-carousel-slide.slide-width-compact { width: 220px; min-width: 220px; }
+    .cms-header-carousel-slide.slide-width-medium { width: 320px; min-width: 320px; }
+    .cms-header-carousel-slide.slide-width-wide { width: 440px; min-width: 440px; }
+    .cms-header-carousel-slide.slide-width-full { width: 100%; min-width: 100%; }
+    .cms-header-carousel-slide.slide-width-auto { width: auto; max-width: 440px; }
+
+    /* Navigation Arrow Buttons & Variants */
+    .cms-header-carousel-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      transition: all 0.15s ease;
+    }
+    .cms-header-carousel-arrow:hover {
+      background: #6366f1;
+      transform: translateY(-50%) scale(1.08);
+    }
+    .cms-header-carousel-arrow.prev { left: 6px; }
+    .cms-header-carousel-arrow.next { right: 6px; }
+
+    .cms-header-carousel-arrow.arrow-style-square {
+      border-radius: 8px;
+    }
+    .cms-header-carousel-arrow.arrow-style-pill {
+      width: 38px;
+      border-radius: 20px;
+    }
+    .cms-header-carousel-arrow.arrow-style-ghost {
+      background: transparent;
+      border-color: rgba(255, 255, 255, 0.28);
+      box-shadow: none;
+    }
+    .cms-header-carousel-arrow.arrow-style-glow {
+      box-shadow: 0 0 14px rgba(99, 102, 241, 0.6);
+      border-color: #818cf8;
+    }
+
+    /* Carousel Controls Bar (Dots & Slide Counter) */
+    .cms-header-carousel-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 8px;
+      width: 100%;
+    }
+
+    .cms-header-carousel-counter {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Pagination Dots & Style Variants */
+    .cms-header-carousel-dots {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .cms-header-carousel-dot {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      transition: all 0.2s ease;
+      color: rgba(255, 255, 255, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cms-header-carousel-dot:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Dot style: bars (default) */
+    .cms-header-carousel-dots.dot-style-bars .cms-header-carousel-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .cms-header-carousel-dots.dot-style-bars .cms-header-carousel-dot.active {
+      width: 18px;
+      border-radius: 4px;
+      background: #6366f1;
+      box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+    }
+
+    /* Dot style: dots */
+    .cms-header-carousel-dots.dot-style-dots .cms-header-carousel-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+    .cms-header-carousel-dots.dot-style-dots .cms-header-carousel-dot.active {
+      background: #6366f1;
+      transform: scale(1.3);
+      box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+    }
+
+    /* Dot style: numbers */
+    .cms-header-carousel-dots.dot-style-numbers .cms-header-carousel-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .cms-header-carousel-dots.dot-style-numbers .cms-header-carousel-dot.active {
+      background: #6366f1;
+      color: #ffffff;
+      box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+    }
+
+    /* Dot style: lines */
+    .cms-header-carousel-dots.dot-style-lines .cms-header-carousel-dot {
+      width: 16px;
+      height: 3px;
+      border-radius: 2px;
+    }
+    .cms-header-carousel-dots.dot-style-lines .cms-header-carousel-dot.active {
+      background: #6366f1;
+      width: 24px;
+      box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
     }
   </style>
 </head>
@@ -2541,12 +3119,133 @@ function renderPublishedPage(page, blocks, tags) {
         });
       }
     });
+
+    // Custom Header mobile menu toggle
+    document.querySelectorAll('.cms-header-block').forEach(header => {
+      const burger = header.querySelector('.cms-header-burger');
+      const drawer = header.querySelector('.cms-header-mobile-drawer');
+      if (burger && drawer) {
+        burger.addEventListener('click', () => {
+          burger.classList.toggle('is-active');
+          drawer.classList.toggle('is-open');
+        });
+      }
+    });
+
+    // Custom Header Carousel scrolling & autoplay
+    document.querySelectorAll('.cms-header-carousel-wrapper').forEach(wrapper => {
+      const track = wrapper.querySelector('.cms-header-carousel-track');
+      const prev = wrapper.querySelector('.cms-header-carousel-arrow.prev');
+      const next = wrapper.querySelector('.cms-header-carousel-arrow.next');
+      const dots = wrapper.querySelectorAll('.cms-header-carousel-dot');
+      const counter = wrapper.querySelector('.cms-header-carousel-counter');
+      if (!track) return;
+
+      const getSlideWidth = () => {
+        const slide = track.querySelector('.cms-header-carousel-slide');
+        return slide ? (slide.offsetWidth + 14) : 320;
+      };
+
+      const arrowBehavior = wrapper.dataset.arrowBehavior || 'smooth';
+      const dotBehavior = wrapper.dataset.dotBehavior || 'smooth';
+
+      if (prev) {
+        prev.addEventListener('click', () => {
+          if (arrowBehavior === 'loop' && track.scrollLeft <= 5) {
+            track.scrollTo({ left: track.scrollWidth, behavior: 'smooth' });
+          } else {
+            track.scrollBy({ left: -getSlideWidth(), behavior: 'smooth' });
+          }
+        });
+      }
+      if (next) {
+        next.addEventListener('click', () => {
+          if (arrowBehavior === 'loop' && (track.scrollLeft + track.clientWidth >= track.scrollWidth - 10)) {
+            track.scrollTo({ left: 0, behavior: 'smooth' });
+          } else {
+            track.scrollBy({ left: getSlideWidth(), behavior: 'smooth' });
+          }
+        });
+      }
+
+      dots.forEach((d, idx) => {
+        d.addEventListener('click', () => {
+          const slides = track.querySelectorAll('.cms-header-carousel-slide');
+          if (slides[idx]) {
+            slides[idx].scrollIntoView({ behavior: dotBehavior === 'instant' ? 'auto' : 'smooth', inline: 'center', block: 'nearest' });
+          }
+        });
+      });
+
+      track.addEventListener('scroll', () => {
+        const slides = Array.from(track.querySelectorAll('.cms-header-carousel-slide'));
+        if (!slides.length) return;
+        const tRect = track.getBoundingClientRect();
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        slides.forEach((s, idx) => {
+          const sRect = s.getBoundingClientRect();
+          const diff = Math.abs((sRect.left + sRect.width / 2) - (tRect.left + tRect.width / 2));
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestIdx = idx;
+          }
+        });
+        if (dots.length) {
+          dots.forEach((d, idx) => d.classList.toggle('active', idx === closestIdx));
+        }
+        if (counter) {
+          const curStr = String(closestIdx + 1).padStart(2, '0');
+          const totalStr = String(slides.length).padStart(2, '0');
+          counter.textContent = curStr + ' / ' + totalStr;
+        }
+      }, { passive: true });
+
+      if (wrapper.dataset.autoplay === 'true') {
+        const interval = (Math.max(2, parseFloat(wrapper.dataset.interval) || 4)) * 1000;
+        let timer = setInterval(() => {
+          if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 10) {
+            track.scrollTo({ left: 0, behavior: 'smooth' });
+          } else {
+            track.scrollBy({ left: getSlideWidth(), behavior: 'smooth' });
+          }
+        }, interval);
+        wrapper.addEventListener('mouseenter', () => clearInterval(timer));
+        wrapper.addEventListener('mouseleave', () => {
+          clearInterval(timer);
+          timer = setInterval(() => {
+            if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 10) {
+              track.scrollTo({ left: 0, behavior: 'smooth' });
+            } else {
+              track.scrollBy({ left: getSlideWidth(), behavior: 'smooth' });
+            }
+          }, interval);
+        });
+      }
+    });
+
+    // Custom Header Search Input Handler
+    document.querySelectorAll('.cms-header-search-input').forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const q = input.value.trim();
+          if (q) {
+            alert('Search query: ' + q);
+          }
+        }
+      });
+    });
   </script>
 </body>
 </html>`;
 }
 
 const PORT = process.env.PORT || 3456;
-app.listen(PORT, () => {
-  console.log(`Kanban app running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Kanban app running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = { app, renderBlockHtml, renderPublishedPage };

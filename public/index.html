@@ -222,9 +222,20 @@
 
         <!-- Pre-defined Categorized Blocks -->
         <div id="cmsStandardBlocksView" class="palette-scroll-wrap">
+          <div class="palette-toolbar">
+            <span class="palette-sections-label">Block Sections</span>
+            <button type="button" id="cmsToggleAllSectionsBtn" class="palette-toggle-all-btn" title="Toggle collapse / expand for all block sections">Collapse All</button>
+          </div>
+
           <!-- Category: Typography -->
-          <div class="palette-category">
-            <div class="category-title">Typography & Text</div>
+          <div class="palette-category" data-category="typography">
+            <div class="category-title" role="button" tabindex="0" title="Click to collapse / expand section">
+              <svg class="category-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <span class="category-name">Typography & Text</span>
+              <span class="category-count">2</span>
+            </div>
             <div class="palette-list">
               <div class="palette-item" draggable="true" data-block-type="heading">
                 <div class="palette-icon-wrap heading-icon">
@@ -253,9 +264,27 @@
           </div>
 
           <!-- Category: Layout & Structure -->
-          <div class="palette-category">
-            <div class="category-title">Layout & Structure</div>
+          <div class="palette-category" data-category="layout">
+            <div class="category-title" role="button" tabindex="0" title="Click to collapse / expand section">
+              <svg class="category-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <span class="category-name">Layout & Structure</span>
+              <span class="category-count">8</span>
+            </div>
             <div class="palette-list">
+              <div class="palette-item" draggable="true" data-block-type="header">
+                <div class="palette-icon-wrap header-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="20" height="16" x="2" y="4" rx="2"/><path d="M2 10h20"/><circle cx="6" cy="7" r="1"/><path d="M14 7h4"/>
+                  </svg>
+                </div>
+                <div class="palette-info">
+                  <span class="palette-label">Custom Header</span>
+                  <span class="palette-sub">Navbar, logo & links</span>
+                </div>
+              </div>
+
               <div class="palette-item" draggable="true" data-block-type="container">
                 <div class="palette-icon-wrap container-icon">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -343,8 +372,14 @@
           </div>
 
           <!-- Category: Marketing & Conversion -->
-          <div class="palette-category">
-            <div class="category-title">Marketing & Proof</div>
+          <div class="palette-category" data-category="marketing">
+            <div class="category-title" role="button" tabindex="0" title="Click to collapse / expand section">
+              <svg class="category-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <span class="category-name">Marketing & Proof</span>
+              <span class="category-count">4</span>
+            </div>
             <div class="palette-list">
               <div class="palette-item" draggable="true" data-block-type="pricing">
                 <div class="palette-icon-wrap pricing-icon">
@@ -397,8 +432,14 @@
           </div>
 
           <!-- Category: Media & Data -->
-          <div class="palette-category">
-            <div class="category-title">Media & Content</div>
+          <div class="palette-category" data-category="media">
+            <div class="category-title" role="button" tabindex="0" title="Click to collapse / expand section">
+              <svg class="category-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <span class="category-name">Media & Content</span>
+              <span class="category-count">6</span>
+            </div>
             <div class="palette-list">
               <div class="palette-item" draggable="true" data-block-type="image">
                 <div class="palette-icon-wrap image-icon">
@@ -486,9 +527,15 @@
             </div>
           </div>
 
-          <!-- Category: Interactive -->
-          <div class="palette-category">
-            <div class="category-title">Interactive & Action</div>
+          <!-- Category: Dynamic & Visual -->
+          <div class="palette-category" data-category="interactive">
+            <div class="category-title" role="button" tabindex="0" title="Click to collapse / expand section">
+              <svg class="category-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <span class="category-name">Interactive & Action</span>
+              <span class="category-count">5</span>
+            </div>
             <div class="palette-list">
               <div class="palette-item" draggable="true" data-block-type="button">
                 <div class="palette-icon-wrap button-icon">
@@ -606,6 +653,10 @@
                 <option value="published">● Published</option>
               </select>
             </div>
+            <button id="cmsFirstPageToggleBtn" type="button" class="first-page-btn" title="Designate as site First Page (Homepage)">
+              <span class="first-page-icon">★</span>
+              <span class="first-page-text">First Page</span>
+            </button>
             <div class="tags-input-wrap">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/>

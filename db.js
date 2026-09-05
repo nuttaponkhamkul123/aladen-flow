@@ -60,14 +60,14 @@ try {
       };
     },
     transaction(fn) {
-      return function(...args) {
+      return function (...args) {
         rawDb.exec('BEGIN');
         try {
           const result = fn.apply(this, args);
           rawDb.exec('COMMIT');
           return result;
         } catch (err) {
-          try { rawDb.exec('ROLLBACK'); } catch (_) {}
+          try { rawDb.exec('ROLLBACK'); } catch (_) { }
           throw err;
         }
       };
@@ -174,16 +174,30 @@ CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag);
 
 try {
   db.prepare("ALTER TABLE pages ADD COLUMN settings TEXT DEFAULT '{}'").run();
-} catch (_) {}
+} catch (_) { }
 try {
   db.prepare("ALTER TABLE pages ADD COLUMN parent_id INTEGER DEFAULT NULL").run();
-} catch (_) {}
+} catch (_) { }
 try {
   db.prepare("ALTER TABLE pages ADD COLUMN position INTEGER DEFAULT 0").run();
-} catch (_) {}
+} catch (_) { }
 try {
   db.prepare("ALTER TABLE cards ADD COLUMN cover TEXT DEFAULT ''").run();
-} catch (_) {}
+} catch (_) { }
+try {
+  db.prepare("ALTER TABLE pages ADD COLUMN is_first_page INTEGER DEFAULT 0").run();
+} catch (_) { }
+
+// Ensure a default first page is designated if pages exist
+try {
+  const hasFirst = db.prepare("SELECT COUNT(*) AS c FROM pages WHERE is_first_page = 1").get();
+  if (!hasFirst || !hasFirst.c) {
+    const top = db.prepare("SELECT id FROM pages ORDER BY position ASC, id ASC LIMIT 1").get();
+    if (top) {
+      db.prepare("UPDATE pages SET is_first_page = 1 WHERE id = ?").run(top.id);
+    }
+  }
+} catch (_) { }
 
 function seedIfEmpty() {
   const boardCount = db.prepare('SELECT COUNT(*) AS c FROM boards').get().c;
