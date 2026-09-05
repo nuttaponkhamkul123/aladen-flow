@@ -5599,6 +5599,7 @@ body {
   position: relative;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: inherit;
+  pointer-events: auto !important;
 }
 
 /* Subsections: Top Announcement Bar */
@@ -6042,9 +6043,56 @@ body {
   max-width: 440px;
 }
 
-/* Clean inside nested block wraps */
+/* Clean inside nested block wraps in Header Carousel */
 .cms-header-carousel-slide.block-wrap {
+  position: relative;
   background: transparent;
+  outline: 1.5px solid rgba(255, 255, 255, 0.08);
+  outline-offset: 2px;
+  border-radius: var(--radius-md, 10px);
+  cursor: pointer;
+  pointer-events: auto !important;
+  user-select: auto;
+  transition: outline 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.cms-header-carousel-slide.block-wrap:hover {
+  outline: 2px dashed var(--accent-primary, #6366f1) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 18px rgba(99, 102, 241, 0.35) !important;
+  transform: translateY(-2px);
+  z-index: 35 !important;
+}
+
+.cms-header-carousel-slide.block-wrap.selected {
+  outline: 2px solid var(--accent-primary, #6366f1) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 22px rgba(99, 102, 241, 0.5) !important;
+  z-index: 36 !important;
+}
+
+/* Ensure inner toolbar appears directly on top-right of inner slide */
+.cms-header-carousel-slide.block-wrap > .block-toolbar {
+  position: absolute;
+  top: 6px !important;
+  right: 6px !important;
+  z-index: 50 !important;
+  display: none;
+  background: var(--bg-surface-elevated, #1e293b);
+  border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.2));
+  border-radius: var(--radius-sm, 6px);
+  padding: 3px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.cms-header-carousel-slide.block-wrap:hover > .block-toolbar,
+.cms-header-carousel-slide.block-wrap.selected > .block-toolbar {
+  display: flex !important;
+}
+
+/* Dim outer header outline when hovering an inner slide so the sub component is crystal clear */
+.block-wrap:has(.cms-header-carousel-slide:hover):not(.selected) {
+  outline-color: transparent !important;
 }
 
 .cms-header-carousel-slide .cms-form-card,
@@ -6052,12 +6100,14 @@ body {
 .cms-header-carousel-slide .cms-tilt-wrap,
 .cms-header-carousel-slide .cms-stat-card {
   margin: 0 !important;
+  pointer-events: auto;
 }
 
 .cms-header-carousel-slide .cms-callout-box {
   margin: 0 !important;
   box-sizing: border-box;
   height: 100%;
+  pointer-events: auto;
 }
 
 /* Navigation Arrow Buttons */

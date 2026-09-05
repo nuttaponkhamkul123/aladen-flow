@@ -3424,7 +3424,7 @@ function renderBlockContent(block) {
         let isDown = false;
         let startX, sLeft;
         track.addEventListener('mousedown', e => {
-          if (e.target.closest('.block-toolbar, button, input, textarea, a, .container-insert-indicator')) return;
+          if (e.target.closest('.block-wrap, .block-toolbar, button, input, textarea, a, .container-insert-indicator')) return;
           isDown = true;
           startX = e.pageX - track.offsetLeft;
           sLeft = track.scrollLeft;
@@ -3465,7 +3465,7 @@ function renderBlockContent(block) {
       }
 
       const headerEl = el('header', {
-        class: `block cms-header-block layout-${layout} variant-${variant}${isSticky ? ' is-sticky' : ''}`
+        class: `cms-header-block layout-${layout} variant-${variant}${isSticky ? ' is-sticky' : ''}`
       }, headerChildren);
 
       applyCustomCssOverride(headerEl, p.customCss);
