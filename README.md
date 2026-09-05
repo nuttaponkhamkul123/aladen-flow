@@ -1,4 +1,4 @@
-# Kanban App
+# aladen flow App
 
 A feature-rich Kanban board app with SQLite storage. Built with Node.js + Express + better-sqlite3 on the backend, and a vanilla JS drag-and-drop frontend.
 
