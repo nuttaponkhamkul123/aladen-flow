@@ -2408,6 +2408,7 @@ function renderPublishedPage(page, blocks, tags) {
   } catch (_) { settings = {}; }
 
   const maxWidth = settings.maxWidth || '760px';
+  const minWidth = settings.minWidth || '0px';
   const paddingX = (settings.paddingX != null ? Number(settings.paddingX) : 24) + 'px';
   const paddingY = (settings.paddingY != null ? Number(settings.paddingY) : 48) + 'px';
   const marginY = (settings.marginY != null ? Number(settings.marginY) : 0) + 'px';
@@ -2472,7 +2473,7 @@ function renderPublishedPage(page, blocks, tags) {
       overflow-y: auto !important;
     }
     body { font-family: ${fontFamily}; background: ${pageBg}; color: ${textColor}; margin: 0; min-height: 100vh; }
-    .wrap { max-width: ${maxWidth}; margin: ${alignMargin}; padding: ${paddingY} ${paddingX}; border-radius: ${borderRadius}; background: ${cardBg}; min-height: 100vh; box-sizing: border-box; box-shadow: 0 0 0 1px ${borderColor}; }
+    .wrap { max-width: ${maxWidth}; min-width: ${minWidth}; margin: ${alignMargin}; padding: ${paddingY} ${paddingX}; border-radius: ${borderRadius}; background: ${cardBg}; min-height: 100vh; box-sizing: border-box; box-shadow: 0 0 0 1px ${borderColor}; }
     .tags { margin-top: 32px; padding-top: 16px; border-top: 1px solid ${borderColor}; font-size: 12px; color: #64748b; }
     .tags span { display: inline-block; background: rgba(100,116,139,0.15); padding: 2px 8px; border-radius: 999px; margin-right: 4px; }
     .cms-table th { background: rgba(100,116,139,0.12); color: inherit; font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 2px solid ${borderColor}; }
@@ -2804,25 +2805,27 @@ function renderPublishedPage(page, blocks, tags) {
       position: absolute;
       top: 50%;
       transform: translateY(-50%);
-      z-index: 10;
-      width: 32px;
-      height: 32px;
+      z-index: 100 !important;
+      pointer-events: auto !important;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
-      background: rgba(15, 23, 42, 0.75);
+      background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.22);
       color: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      cursor: pointer !important;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
       transition: all 0.15s ease;
     }
     .cms-header-carousel-arrow:hover {
       background: #6366f1;
-      transform: translateY(-50%) scale(1.08);
+      transform: translateY(-50%) scale(1.1);
+      box-shadow: 0 0 16px rgba(99, 102, 241, 0.5);
     }
     .cms-header-carousel-arrow.prev { left: 6px; }
     .cms-header-carousel-arrow.next { right: 6px; }
@@ -2844,6 +2847,35 @@ function renderPublishedPage(page, blocks, tags) {
       border-color: #818cf8;
     }
 
+    /* Carousel Presentation Layouts: fullscreen, stack, vertical */
+    .cms-header-carousel-track.layout-fullscreen .cms-header-carousel-slide {
+      width: 100% !important;
+      min-width: 100% !important;
+      max-width: 100% !important;
+      scroll-snap-align: center;
+    }
+
+    .cms-header-carousel-track.layout-stack {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .cms-header-carousel-track.layout-vertical {
+      flex-direction: column !important;
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
+      max-height: 240px;
+      scroll-snap-type: y mandatory !important;
+    }
+
+    .cms-header-carousel-track.layout-vertical .cms-header-carousel-slide {
+      width: 100% !important;
+      min-width: 100% !important;
+      scroll-snap-align: start;
+    }
+
     /* Carousel Controls Bar (Dots & Slide Counter) */
     .cms-header-carousel-controls {
       display: flex;
@@ -2852,6 +2884,9 @@ function renderPublishedPage(page, blocks, tags) {
       gap: 14px;
       margin-top: 8px;
       width: 100%;
+      position: relative;
+      z-index: 50 !important;
+      pointer-events: auto !important;
     }
 
     .cms-header-carousel-counter {

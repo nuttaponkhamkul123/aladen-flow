@@ -18,3 +18,5 @@ can customize arrow button and behavior
 can customize dot button and behavior
 can cusomize show dot, show arrow, show prev next, show current slide 
 
+
+carousel : this can be customize as full screen carousel , stack or even vertical

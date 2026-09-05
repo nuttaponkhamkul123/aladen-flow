@@ -41,6 +41,7 @@ const state = {
     reusableBlocks: [],
     pageDrag: null,
     pageCollapsed: {},
+    propsSections: {},
     viewportMode: 'desktop',
     viewportWidth: null,
     viewportOrientation: 'portrait',
@@ -1829,6 +1830,7 @@ async function openCmsPage(id) {
   page.blocks = Array.isArray(page.blocks) ? page.blocks : [];
   page.settings = (page.settings && typeof page.settings === 'object') ? page.settings : {
     maxWidth: '820px',
+    minWidth: '0px',
     bg: 'default',
     customBg: '#0f172a',
     paddingX: 36,
@@ -1917,6 +1919,7 @@ function newCmsPage(parentId = null) {
     blocks: [],
     settings: {
       maxWidth: '820px',
+      minWidth: '0px',
       bg: 'default',
       customBg: '#0f172a',
       paddingX: 36,
@@ -2365,8 +2368,7 @@ function renderBlockContent(block) {
       if (currentIdx < 0) currentIdx = slides.length - 1;
       state.cms.carouselIdx[block.id] = currentIdx;
 
-      const activeSlide = slides[currentIdx] || slides[0] || {};
-      const ratioStyle = p.aspectRatio && p.aspectRatio !== 'auto' ? `aspect-ratio:${p.aspectRatio};` : 'min-height:220px;';
+      const ratioStyle = p.aspectRatio && p.aspectRatio !== 'auto' ? `aspect-ratio:${p.aspectRatio};` : 'min-height:260px;';
       const radStyle = `border-radius:${p.borderRadius != null ? p.borderRadius : 10}px;`;
 
       const carouselWrap = el('div', {
@@ -2376,32 +2378,67 @@ function renderBlockContent(block) {
 
       applyCustomCssOverride(carouselWrap, p.customCss);
 
-      const slideEl = el('div', { class: 'carousel-slide-view' });
-      if (activeSlide.url) {
-        slideEl.appendChild(el('img', { src: activeSlide.url, alt: activeSlide.caption || '' }));
-      } else {
-        slideEl.appendChild(el('div', { class: 'carousel-no-img' }, 'No image URL provided for this slide'));
-      }
+      const trackEl = el('div', { class: 'carousel-slides-track' });
+      const slideEls = [];
 
-      if (activeSlide.linkUrl) {
-        slideEl.style.cursor = 'pointer';
-        slideEl.addEventListener('click', e => {
-          if (state.cms.isPreviewMode) {
-            handleComponentNavigation(activeSlide.linkUrl, activeSlide.newTab, e);
-          }
+      slides.forEach((s, idx) => {
+        const slideItem = el('div', {
+          class: `carousel-slide-item${idx === currentIdx ? ' active' : ''}`
         });
-      }
 
-      if (p.showCaptions !== false && activeSlide.caption) {
-        slideEl.appendChild(el('div', { class: 'carousel-caption-overlay' }, [
-          el('span', { class: 'carousel-caption-text' }, activeSlide.caption)
-        ]));
-      }
+        if (s.url) {
+          const img = el('img', { src: s.url, alt: s.caption || '' });
+          img.onerror = () => {
+            img.style.display = 'none';
+            slideItem.appendChild(el('div', { class: 'carousel-no-img' }, 'Failed to load slide image'));
+          };
+          slideItem.appendChild(img);
+        } else {
+          slideItem.appendChild(el('div', { class: 'carousel-no-img' }, 'No image URL provided for this slide'));
+        }
 
-      carouselWrap.appendChild(slideEl);
+        if (s.linkUrl) {
+          slideItem.style.cursor = 'pointer';
+          slideItem.addEventListener('click', e => {
+            if (state.cms.isPreviewMode) {
+              handleComponentNavigation(s.linkUrl, s.newTab, e);
+            }
+          });
+        }
+
+        if (p.showCaptions !== false && s.caption) {
+          slideItem.appendChild(el('div', { class: 'carousel-caption-overlay' }, [
+            el('span', { class: 'carousel-caption-text' }, s.caption)
+          ]));
+        }
+
+        trackEl.appendChild(slideItem);
+        slideEls.push(slideItem);
+      });
+
+      carouselWrap.appendChild(trackEl);
 
       // Slide counter badge
-      carouselWrap.appendChild(el('div', { class: 'carousel-badge' }, `${currentIdx + 1} / ${slides.length}`));
+      const badgeEl = el('div', { class: 'carousel-badge' }, `${currentIdx + 1} / ${slides.length}`);
+      carouselWrap.appendChild(badgeEl);
+
+      const dotEls = [];
+
+      const goToSlide = (newIdx) => {
+        if (!slides.length) return;
+        currentIdx = (newIdx + slides.length) % slides.length;
+        state.cms.carouselIdx[block.id] = currentIdx;
+
+        slideEls.forEach((item, idx) => {
+          item.classList.toggle('active', idx === currentIdx);
+        });
+
+        dotEls.forEach((dot, idx) => {
+          dot.classList.toggle('active', idx === currentIdx);
+        });
+
+        badgeEl.textContent = `${currentIdx + 1} / ${slides.length}`;
+      };
 
       // Navigation arrows
       if (p.showArrows !== false && slides.length > 1) {
@@ -2410,9 +2447,9 @@ function renderBlockContent(block) {
           class: 'carousel-nav-btn prev',
           title: 'Previous slide',
           onclick: (e) => {
+            e.preventDefault();
             e.stopPropagation();
-            state.cms.carouselIdx[block.id] = (currentIdx - 1 + slides.length) % slides.length;
-            renderCanvas();
+            goToSlide(currentIdx - 1);
           }
         }, [createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>')]);
 
@@ -2421,9 +2458,9 @@ function renderBlockContent(block) {
           class: 'carousel-nav-btn next',
           title: 'Next slide',
           onclick: (e) => {
+            e.preventDefault();
             e.stopPropagation();
-            state.cms.carouselIdx[block.id] = (currentIdx + 1) % slides.length;
-            renderCanvas();
+            goToSlide(currentIdx + 1);
           }
         }, [createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>')]);
 
@@ -2440,15 +2477,85 @@ function renderBlockContent(block) {
             class: `carousel-dot${idx === currentIdx ? ' active' : ''}`,
             title: `Go to slide ${idx + 1}`,
             onclick: (e) => {
+              e.preventDefault();
               e.stopPropagation();
-              state.cms.carouselIdx[block.id] = idx;
-              renderCanvas();
+              goToSlide(idx);
             }
           });
           dotsWrap.appendChild(dot);
+          dotEls.push(dot);
         });
         carouselWrap.appendChild(dotsWrap);
       }
+
+      // Autoplay Slides rotation
+      if (p.autoplay && slides.length > 1) {
+        const interval = Math.max(1, Number(p.interval) || 4) * 1000;
+        let timer = setInterval(() => {
+          goToSlide(currentIdx + 1);
+        }, interval);
+
+        carouselWrap.addEventListener('mouseenter', () => {
+          clearInterval(timer);
+        });
+
+        carouselWrap.addEventListener('mouseleave', () => {
+          clearInterval(timer);
+          timer = setInterval(() => {
+            goToSlide(currentIdx + 1);
+          }, interval);
+        });
+      }
+
+      // Touch and mouse drag swipe support
+      let dragStartX = 0;
+      let dragDiffX = 0;
+      let isDragging = false;
+
+      carouselWrap.addEventListener('touchstart', e => {
+        if (e.touches && e.touches[0]) {
+          dragStartX = e.touches[0].clientX;
+          dragDiffX = 0;
+        }
+      }, { passive: true });
+
+      carouselWrap.addEventListener('touchmove', e => {
+        if (e.touches && e.touches[0]) {
+          dragDiffX = e.touches[0].clientX - dragStartX;
+        }
+      }, { passive: true });
+
+      carouselWrap.addEventListener('touchend', () => {
+        if (dragDiffX > 35) {
+          goToSlide(currentIdx - 1);
+        } else if (dragDiffX < -35) {
+          goToSlide(currentIdx + 1);
+        }
+        dragDiffX = 0;
+      });
+
+      carouselWrap.addEventListener('mousedown', e => {
+        if (e.target.closest('button, a, input, textarea, .block-toolbar')) return;
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragDiffX = 0;
+      });
+
+      window.addEventListener('mousemove', e => {
+        if (!isDragging) return;
+        dragDiffX = e.clientX - dragStartX;
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        if (dragDiffX > 45) {
+          goToSlide(currentIdx - 1);
+        } else if (dragDiffX < -45) {
+          goToSlide(currentIdx + 1);
+        }
+        dragDiffX = 0;
+      });
 
       return carouselWrap;
     }
@@ -3265,6 +3372,7 @@ function renderBlockContent(block) {
       // Subsection 3: Interactive Carousel Track & Nested Component Dropzone
       if (enableCarousel) {
         const itemWidth = p.carouselItemWidth || 'medium';
+        const carouselLayout = p.carouselLayout || 'horizontal';
         const showArrows = p.carouselShowArrows !== false;
         const showPrevNext = p.carouselShowPrevNext || 'both';
         const arrowStyle = p.carouselArrowStyle || 'circle';
@@ -3274,10 +3382,10 @@ function renderBlockContent(block) {
         const dotBehavior = p.carouselDotBehavior || 'smooth';
         const showSlideCounter = p.showSlideCounter !== false;
 
-        const carouselWrapper = el('div', { class: 'cms-header-carousel-wrapper' });
+        const carouselWrapper = el('div', { class: `cms-header-carousel-wrapper variant-${carouselLayout}` });
         const viewport = el('div', { class: 'cms-header-carousel-viewport' });
         const track = el('div', {
-          class: 'cms-header-carousel-track',
+          class: `cms-header-carousel-track layout-${carouselLayout}`,
           dataset: { containerId: block.id }
         });
 
@@ -3372,7 +3480,10 @@ function renderBlockContent(block) {
                   const slides = track.querySelectorAll('.cms-header-carousel-slide');
                   if (slides[idx]) {
                     const scrollBehavior = dotBehavior === 'instant' ? 'auto' : 'smooth';
-                    slides[idx].scrollIntoView({ behavior: scrollBehavior, inline: 'center', block: 'nearest' });
+                    track.scrollTo({
+                      left: slides[idx].offsetLeft - track.offsetLeft - 10,
+                      behavior: scrollBehavior
+                    });
                   }
                 }
               }, dotStyle === 'numbers' ? [el('span', {}, String(idx + 1))] : []);
@@ -3420,22 +3531,24 @@ function renderBlockContent(block) {
           }, 40);
         }, { passive: true });
 
-        // Drag to scroll
+        // Drag to scroll with distance threshold
         let isDown = false;
-        let startX, sLeft;
+        let startX = 0, startY = 0, sLeft = 0;
         track.addEventListener('mousedown', e => {
-          if (e.target.closest('.block-wrap, .block-toolbar, button, input, textarea, a, .container-insert-indicator')) return;
+          if (e.target.closest('button, input, textarea, a, .container-insert-indicator, .block-toolbar')) return;
           isDown = true;
-          startX = e.pageX - track.offsetLeft;
+          startX = e.pageX;
+          startY = e.pageY;
           sLeft = track.scrollLeft;
         });
         window.addEventListener('mouseup', () => { isDown = false; });
         track.addEventListener('mousemove', e => {
           if (!isDown) return;
-          e.preventDefault();
-          const x = e.pageX - track.offsetLeft;
-          const walk = (x - startX) * 1.5;
-          track.scrollLeft = sLeft - walk;
+          const diffX = e.pageX - startX;
+          const diffY = e.pageY - startY;
+          if (Math.abs(diffX) > 6 && Math.abs(diffX) > Math.abs(diffY)) {
+            track.scrollLeft = sLeft - (diffX * 1.3);
+          }
         });
 
         // Autoplay
@@ -3759,6 +3872,16 @@ function applyCanvasSettings() {
   }
 
   viewport.style.maxWidth = targetWidth;
+
+  const targetMinWidth = (!state.cms.isPreviewMode && settings.minWidth) ? settings.minWidth : '0px';
+  viewport.style.minWidth = targetMinWidth;
+  canvas.style.minWidth = targetMinWidth;
+
+  const isFullWidth = targetWidth === '100%';
+  const viewportContainer = document.getElementById('canvasViewportContainer');
+  if (viewportContainer) {
+    viewportContainer.classList.toggle('full-width', isFullWidth);
+  }
 
   viewport.classList.toggle('has-device-frame', showFrame);
   viewport.classList.toggle('is-mobile-viewport', mode === 'mobile');
@@ -4611,6 +4734,39 @@ function onContainerDrop(e, containerBlock) {
   state.cms.drag = null;
 }
 
+function propsSection(id, title, svg, bodyNodes, opts = {}) {
+  const key = `cs_${id}`;
+  const collapsed = state.cms.propsSections[key] != null
+    ? state.cms.propsSections[key]
+    : !!opts.startCollapsed;
+  const header = el('button', {
+    type: 'button',
+    class: 'props-section-header',
+    'aria-expanded': String(!collapsed),
+    onclick: () => {
+      const nowCollapsed = section.classList.contains('collapsed');
+      state.cms.propsSections[key] = !nowCollapsed;
+      section.classList.toggle('collapsed', !nowCollapsed);
+      header.setAttribute('aria-expanded', String(nowCollapsed));
+    }
+  }, [
+    el('span', { class: 'props-section-chevron' }, [
+      createSvg('<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>')
+    ]),
+    el('span', { class: 'props-section-title' }, [
+      svg || createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>'),
+      el('span', {}, title)
+    ])
+  ]);
+  const section = el('section', { class: `props-section${collapsed ? ' collapsed' : ''}` }, [
+    header,
+    el('div', { class: 'props-section-body' }, [
+      el('div', { class: 'props-section-body-inner' }, bodyNodes)
+    ])
+  ]);
+  return section;
+}
+
 function renderCanvasSettings(body) {
   if (!state.cms.openPage) {
     body.appendChild(el('div', { class: 'no-selection-state' }, [
@@ -4623,6 +4779,7 @@ function renderCanvasSettings(body) {
   if (!state.cms.openPage.settings || typeof state.cms.openPage.settings !== 'object') {
     state.cms.openPage.settings = {
       maxWidth: '820px',
+      minWidth: '0px',
       bg: 'default',
       customBg: '#0f172a',
       paddingX: '36px',
@@ -4686,7 +4843,7 @@ function renderCanvasSettings(body) {
   ]);
   wrap.appendChild(firstPageCard);
 
-  // 1. Max Width
+  // --- Layout ---
   const widthPresets = [
     ['640px', 'Narrow (640px)'],
     ['760px', 'Standard (760px)'],
@@ -4694,92 +4851,90 @@ function renderCanvasSettings(body) {
     ['960px', 'Wide (960px)'],
     ['100%', 'Full Width (100% of Viewport)']
   ];
-  wrap.appendChild(field('Canvas Max Width', select(
-    widthPresets.map(([val, label]) => [val, label, s.maxWidth || '820px']),
-    v => { s.maxWidth = v; onSettingsChange(); }
-  )));
+  const minWidthPresets = [
+    ['0px', 'None (0px)'],
+    ['320px', 'Small (320px)'],
+    ['480px', 'Medium (480px)'],
+    ['640px', 'Large (640px)'],
+    ['768px', 'Tablet (768px)'],
+    ['100%', 'Full Width (100%)']
+  ];
+  const layoutIcon = createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>');
+  const layoutBody = el('div', {}, [
+    field('Canvas Max Width', select(
+      widthPresets.map(([val, label]) => [val, label, s.maxWidth || '820px']),
+      v => { s.maxWidth = v; onSettingsChange(); }
+    )),
+    field('Canvas Min Width', select(
+      minWidthPresets.map(([val, label]) => [val, label, s.minWidth || '0px']),
+      v => { s.minWidth = v; onSettingsChange(); }
+    )),
+    field('Canvas Alignment', select([
+      ['center', 'Center Aligned in Editor', s.align || 'center'],
+      ['left', 'Left Aligned in Editor', s.align || 'center']
+    ], v => { s.align = v; onSettingsChange(); }))
+  ]);
+  wrap.appendChild(propsSection('layout', 'Layout', layoutIcon, layoutBody));
 
-  // 2. Alignment
-  wrap.appendChild(field('Canvas Alignment', select([
-    ['center', 'Center Aligned in Editor', s.align || 'center'],
-    ['left', 'Left Aligned in Editor', s.align || 'center']
-  ], v => { s.align = v; onSettingsChange(); })));
-
-  // 3. Background Theme
-  wrap.appendChild(field('Canvas Background Theme', select([
-    ['default', 'Default Studio Dark', s.bg || 'default'],
-    ['pure-black', 'OLED Pure Black (#000000)', s.bg || 'default'],
-    ['deep-navy', 'Deep Navy (#0a1324)', s.bg || 'default'],
-    ['dark-card', 'Slate Card (#111827)', s.bg || 'default'],
-    ['light', 'Clean Light Card (#ffffff)', s.bg || 'default'],
-    ['custom', 'Custom Background Color...', s.bg || 'default']
-  ], v => { s.bg = v; onSettingsChange(); })));
-
+  // --- Appearance ---
+  const appearanceIcon = createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6 6 11a6 6 0 0 1-12 0c0-5 6-11 6-11z"/></svg>');
+  const radiusInput = input('number', s.borderRadius != null ? s.borderRadius : 16, v => {
+    s.borderRadius = Math.max(0, Number(v) || 0);
+    onSettingsInput();
+  }, { min: 0, max: 64, step: 2 });
+  const appearanceBody = el('div', {}, [
+    field('Canvas Background Theme', select([
+      ['default', 'Default Studio Dark', s.bg || 'default'],
+      ['pure-black', 'OLED Pure Black (#000000)', s.bg || 'default'],
+      ['deep-navy', 'Deep Navy (#0a1324)', s.bg || 'default'],
+      ['dark-card', 'Slate Card (#111827)', s.bg || 'default'],
+      ['light', 'Clean Light Card (#ffffff)', s.bg || 'default'],
+      ['custom', 'Custom Background Color...', s.bg || 'default']
+    ], v => { s.bg = v; onSettingsChange(); }))
+  ]);
   if (s.bg === 'custom') {
-    wrap.appendChild(colorField('Custom Background Color', s.customBg || '#0f172a', '#0f172a', v => {
+    appearanceBody.appendChild(colorField('Custom Background Color', s.customBg || '#0f172a', '#0f172a', v => {
       s.customBg = v;
       onSettingsInput();
     }));
   }
-
-  // 4. Typography
-  wrap.appendChild(field('Typography Font Family', select([
+  appearanceBody.appendChild(field('Typography Font Family', select([
     ['system', 'System Default (San Francisco / Segoe UI)', s.fontFamily || 'system'],
     ['inter', 'Inter (Modern Tech / Clean)', s.fontFamily || 'system'],
     ['outfit', 'Outfit (Modern Geometric / Display)', s.fontFamily || 'system'],
     ['roboto', 'Roboto (Classic Sans)', s.fontFamily || 'system'],
     ['mono', 'JetBrains Mono (Code / Editorial)', s.fontFamily || 'system']
   ], v => { s.fontFamily = v; onSettingsChange(); })));
+  appearanceBody.appendChild(field('Corner Border Radius (px)', radiusInput));
+  wrap.appendChild(propsSection('appearance', 'Appearance', appearanceIcon, appearanceBody));
 
-  // 5. Canvas Inner Padding
-  wrap.appendChild(el('div', { class: 'field-group-title', style: 'font-size:11px;font-weight:700;color:var(--accent-primary);text-transform:uppercase;margin:16px 0 6px;letter-spacing:0.5px;display:flex;align-items:center;gap:4px;' }, [
-    createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>'),
-    el('span', {}, 'Canvas Inner Padding')
-  ]));
-  
+  // --- Spacing ---
+  const spacingIcon = createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>');
   const padYInput = input('number', s.paddingY != null ? s.paddingY : 44, v => {
     s.paddingY = Math.max(0, Number(v) || 0);
     onSettingsInput();
   }, { min: 0, max: 300, step: 4 });
-  wrap.appendChild(field('Padding Top & Bottom (px)', padYInput));
-
   const padXInput = input('number', s.paddingX != null ? s.paddingX : 36, v => {
     s.paddingX = Math.max(0, Number(v) || 0);
     onSettingsInput();
   }, { min: 0, max: 200, step: 4 });
-  wrap.appendChild(field('Padding Left & Right (px)', padXInput));
-
-  // 6. Canvas Outer Margin
-  wrap.appendChild(el('div', { class: 'field-group-title', style: 'font-size:11px;font-weight:700;color:var(--accent-primary);text-transform:uppercase;margin:16px 0 6px;letter-spacing:0.5px;display:flex;align-items:center;gap:4px;' }, [
-    createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>'),
-    el('span', {}, 'Canvas Outer Margin')
-  ]));
-
   const marginYInput = input('number', s.marginY != null ? s.marginY : 0, v => {
     s.marginY = Math.max(0, Number(v) || 0);
     onSettingsInput();
   }, { min: 0, max: 200, step: 4 });
-  wrap.appendChild(field('Margin Top & Bottom (px)', marginYInput));
-
   const marginXInput = input('number', s.marginX != null ? s.marginX : 0, v => {
     s.marginX = Math.max(0, Number(v) || 0);
     onSettingsInput();
   }, { min: 0, max: 200, step: 4 });
-  wrap.appendChild(field('Margin Left & Right (px)', marginXInput));
+  const spacingBody = el('div', {}, [
+    field('Padding Top & Bottom (px)', padYInput),
+    field('Padding Left & Right (px)', padXInput),
+    field('Margin Top & Bottom (px)', marginYInput),
+    field('Margin Left & Right (px)', marginXInput)
+  ]);
+  wrap.appendChild(propsSection('spacing', 'Spacing', spacingIcon, spacingBody));
 
-  // 7. Canvas Frame & Corners
-  wrap.appendChild(el('div', { class: 'field-group-title', style: 'font-size:11px;font-weight:700;color:var(--accent-primary);text-transform:uppercase;margin:16px 0 6px;letter-spacing:0.5px;display:flex;align-items:center;gap:4px;' }, [
-    createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>'),
-    el('span', {}, 'Canvas Frame & Corners')
-  ]));
-
-  const radiusInput = input('number', s.borderRadius != null ? s.borderRadius : 16, v => {
-    s.borderRadius = Math.max(0, Number(v) || 0);
-    onSettingsInput();
-  }, { min: 0, max: 64, step: 2 });
-  wrap.appendChild(field('Corner Border Radius (px)', radiusInput));
-
-  // 6. Page Statistics
+  // --- Page Summary ---
   const blocks = state.cms.openPage.blocks || [];
   let wordCount = 0;
   function countWords(b) {
@@ -4800,9 +4955,8 @@ function renderCanvasSettings(body) {
 
   const statsCard = el('div', {
     class: 'canvas-stats-card',
-    style: 'background:var(--bg-surface-hover);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:12px;margin:16px 0;'
+    style: 'background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:12px;'
   }, [
-    el('div', { style: 'font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-bottom:8px;' }, 'Page Summary'),
     el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;' }, [
       el('div', {}, [el('span', { style: 'color:var(--text-tertiary);display:block;font-size:11px;' }, 'Total Blocks'), el('strong', { style: 'color:var(--text-primary);font-size:14px;' }, `${blocks.length}`)]),
       el('div', {}, [el('span', { style: 'color:var(--text-tertiary);display:block;font-size:11px;' }, 'Word Count'), el('strong', { style: 'color:var(--text-primary);font-size:14px;' }, `${wordCount}`)]),
@@ -4810,11 +4964,11 @@ function renderCanvasSettings(body) {
       el('div', {}, [el('span', { style: 'color:var(--text-tertiary);display:block;font-size:11px;' }, 'Live Status'), el('strong', { style: 'color:var(--accent-primary);font-size:13px;' }, state.cms.openPage.status === 'published' ? 'Published' : 'Draft')])
     ])
   ]);
-  wrap.appendChild(statsCard);
+  const summaryIcon = createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>');
+  wrap.appendChild(propsSection('summary', 'Page Summary', summaryIcon, [statsCard], { startCollapsed: true }));
 
-  // 7. Quick Actions
-  const actionsWrap = el('div', { style: 'margin-top:14px;' }, [
-    el('label', { style: 'font-weight:700;font-size:11px;color:var(--text-tertiary);text-transform:uppercase;display:block;margin-bottom:6px;' }, 'Canvas Actions'),
+  // --- Canvas Actions ---
+  const actionsWrap = el('div', {}, [
     el('div', { style: 'display:flex;flex-direction:column;gap:6px;' }, [
       el('button', {
         type: 'button',
@@ -4846,7 +5000,8 @@ function renderCanvasSettings(body) {
       }, 'Clear All Blocks')
     ])
   ]);
-  wrap.appendChild(actionsWrap);
+  const actionsIcon = createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>');
+  wrap.appendChild(propsSection('actions', 'Canvas Actions', actionsIcon, [actionsWrap]));
 
   body.appendChild(wrap);
 }
@@ -4909,7 +5064,13 @@ function renderProps() {
   ]);
   body.appendChild(headerActions);
 
-  const wrap = el('div', { class: 'fields' });
+  const wrapRoot = el('div', { class: 'fields' });
+  let wrap = wrapRoot;
+  const sectionIcon = (paths) => createSvg(`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`);
+  const section = (id, title, svg, opts = {}) => {
+    wrapRoot.appendChild(propsSection(`${block.type}_${id}`, title, svg, [], opts));
+    wrap = wrapRoot.lastElementChild.querySelector('.props-section-body-inner');
+  };
   const p = block.props;
 
   const onChange = (delay = 80) => {
@@ -4925,6 +5086,7 @@ function renderProps() {
 
   switch (block.type) {
     case 'heading': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Level', select([
         ['1', 'Heading 1 (H1)', String(p.level || 2)],
         ['2', 'Heading 2 (H2)', String(p.level || 2)],
@@ -4936,6 +5098,7 @@ function renderProps() {
 
       wrap.appendChild(richTextField('Text Content', p.text || '', v => { p.text = v; onPropInput(); }));
 
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(field('Alignment', select([
         ['left', 'Left Aligned', p.align || 'left'],
         ['center', 'Centered', p.align || 'left'],
@@ -4952,12 +5115,15 @@ function renderProps() {
         onPropInput();
       })));
 
+      section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(navigationLinkField('Click Action (Link to Page / URL)', p, onPropInput, 'linkUrl'));
       break;
     }
     case 'paragraph': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(richTextField('Body Text', p.text || '', v => { p.text = v; onPropInput(); }));
 
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(field('Text Alignment', select([
         ['left', 'Left', p.align || 'left'],
         ['center', 'Center', p.align || 'left'],
@@ -4987,14 +5153,18 @@ function renderProps() {
         onChange();
       }));
 
+      section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(navigationLinkField('Click Action (Link to Page / URL)', p, onPropInput, 'linkUrl'));
       break;
     }
     case 'button': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Button Label', input('text', p.label || '', v => { p.label = v; onPropInput(); })));
       
+      section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(navigationLinkField('Button Click Destination (Page / URL)', p, onPropInput, 'url'));
 
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(field('Button Style', select([
         ['filled', 'Solid Filled', p.variant || 'filled'],
         ['outline', 'Outline / Ghost', p.variant || 'filled'],
@@ -5031,12 +5201,15 @@ function renderProps() {
       break;
     }
     case 'image': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Image URL', input('text', p.url || '', v => { p.url = v; onPropInput(); })));
       wrap.appendChild(field('Alt Description', input('text', p.alt || '', v => { p.alt = v; onPropInput(); })));
       wrap.appendChild(field('Caption (optional)', input('text', p.caption || '', v => { p.caption = v; onPropInput(); })));
       
+      section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(navigationLinkField('Image Click Destination (Page / URL)', p, onPropInput, 'linkUrl'));
 
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(field('Image Width', select([
         ['100%', '100% (Full)', p.width || '100%'],
         ['75%', '75% (Wide)', p.width || '100%'],
@@ -5076,6 +5249,7 @@ function renderProps() {
     case 'carousel': {
       if (!Array.isArray(p.slides)) p.slides = [];
 
+      section('layout', 'Layout', sectionIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>'));
       wrap.appendChild(field('Aspect Ratio', select([
         ['16/9', '16:9 (Widescreen)', p.aspectRatio || '16/9'],
         ['4/3', '4:3 (Standard Photo)', p.aspectRatio || '16/9'],
@@ -5089,6 +5263,7 @@ function renderProps() {
         onPropInput();
       })));
 
+      section('behavior', 'Behavior', sectionIcon('<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'));
       wrap.appendChild(checkbox('Autoplay Slides', !!p.autoplay, v => {
         p.autoplay = v;
         onChange();
@@ -5116,6 +5291,7 @@ function renderProps() {
         onChange();
       }));
 
+      section('slides', 'Slides', sectionIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'));
       wrap.appendChild(el('div', { class: 'props-section-header' }, [
         el('label', { style: 'font-weight:600;' }, `Slides (${p.slides.length})`),
         el('button', {
@@ -5197,6 +5373,7 @@ function renderProps() {
       break;
     }
     case 'divider': {
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(field('Line Style', select([
         ['solid', 'Solid Line', p.style || 'solid'],
         ['dashed', 'Dashed Line', p.style || 'solid'],
@@ -5230,6 +5407,7 @@ function renderProps() {
       break;
     }
     case 'spacer': {
+      section('size', 'Size', sectionIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>'));
       wrap.appendChild(field('Height (px)', input('number', String(p.height || 24), v => {
         const n = Math.max(8, Math.min(300, Number(v) || 24));
         p.height = n;
@@ -5251,6 +5429,7 @@ function renderProps() {
       if (!Array.isArray(p.headers)) p.headers = ['Feature', 'Description', 'Status'];
       if (!Array.isArray(p.rows)) p.rows = [];
 
+      section('appearance', 'Appearance', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(checkbox('Show Header Row', p.hasHeader !== false, v => {
         p.hasHeader = v;
         onChange();
@@ -5267,6 +5446,8 @@ function renderProps() {
         p.compact = v;
         onChange();
       }));
+
+      section('content', 'Content', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
 
       const btnGroup = el('div', { class: 'props-btn-group' }, [
         el('button', {
@@ -5343,6 +5524,8 @@ function renderProps() {
     case 'container': {
       if (!Array.isArray(p.children)) p.children = [];
 
+      section('layout', 'Layout', sectionIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>'));
+
       const modeGroup = el('div', { class: 'props-btn-group' }, [
         el('button', {
           type: 'button',
@@ -5400,6 +5583,7 @@ function renderProps() {
         onPropInput();
       })));
 
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(field('Padding (px)', input('number', String(p.padding ?? 16), v => {
         p.padding = Math.max(0, Math.min(64, Number(v) || 0));
         onPropInput();
@@ -5427,8 +5611,10 @@ function renderProps() {
         onChange();
       }));
 
+      section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(navigationLinkField('Card Click Destination (Link Entire Container)', p, onPropInput, 'linkUrl'));
 
+      section('content', 'Content', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
       wrap.appendChild(el('label', { style: 'font-weight:600;margin-top:14px;display:block;' }, 'Add Block Inside:'));
       const quickAdd = el('div', { class: 'container-quick-add' }, [
         el('button', { type: 'button', onclick: () => insertBlockAt('heading', block.id) }, '+ Heading'),
@@ -5493,6 +5679,7 @@ function renderProps() {
       break;
     }
     case 'callout': {
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(field('Callout Style', select([
         ['info', 'Information (Blue)', p.type || 'info'],
         ['tip', 'Tip / Success (Green)', p.type || 'info'],
@@ -5500,6 +5687,7 @@ function renderProps() {
         ['danger', 'Danger / Alert (Red)', p.type || 'info']
       ], v => { p.type = v; onChange(); })));
 
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Icon (Emoji or Symbol)', input('text', p.icon || '💡', v => {
         p.icon = v;
         onPropInput();
@@ -5523,6 +5711,8 @@ function renderProps() {
     }
     case 'accordion': {
       if (!Array.isArray(p.items)) p.items = [];
+
+      section('items', 'Items', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
 
       const itemsHeader = el('div', {
         style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;'
@@ -5575,6 +5765,8 @@ function renderProps() {
     case 'tabs': {
       if (!Array.isArray(p.tabs)) p.tabs = [];
 
+      section('items', 'Items', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
+
       const tabsHeader = el('div', {
         style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;'
       }, [
@@ -5624,6 +5816,7 @@ function renderProps() {
       break;
     }
     case 'pricing': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Plan Name', input('text', p.plan || '', v => {
         p.plan = v;
         onPropInput();
@@ -5644,6 +5837,7 @@ function renderProps() {
         onPropInput();
       })));
 
+      section('promo', 'Promo Label', sectionIcon('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'));
       wrap.appendChild(checkbox('Highlight as Most Popular', !!p.isPopular, v => {
         p.isPopular = v;
         onChange();
@@ -5656,6 +5850,7 @@ function renderProps() {
         })));
       }
 
+      section('features', 'Features', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
       if (!Array.isArray(p.features)) p.features = [];
       const featText = p.features.join('\n');
       const featArea = el('textarea', {
@@ -5669,6 +5864,7 @@ function renderProps() {
       };
       wrap.appendChild(field('Plan Features (1 per line)', featArea));
 
+      section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(field('CTA Button Text', input('text', p.ctaLabel || 'Get Started', v => {
         p.ctaLabel = v;
         onPropInput();
@@ -5678,6 +5874,7 @@ function renderProps() {
       break;
     }
     case 'stat': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Metric Value', input('text', p.value || '', v => {
         p.value = v;
         onPropInput();
@@ -5693,6 +5890,7 @@ function renderProps() {
         onPropInput();
       })));
 
+      section('trend', 'Trend', sectionIcon('<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>'));
       wrap.appendChild(field('Trend Pill Text', input('text', p.trend || '', v => {
         p.trend = v;
         onPropInput();
@@ -5705,6 +5903,7 @@ function renderProps() {
       break;
     }
     case 'testimonial': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(richTextField('Quote', p.quote || '', v => {
         p.quote = v;
         onPropInput();
@@ -5725,6 +5924,7 @@ function renderProps() {
         onPropInput();
       })));
 
+      section('style', 'Style', sectionIcon('<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>'));
       wrap.appendChild(field('Rating Stars', select([
         ['5', '★★★★★ (5 Stars)', String(p.rating || 5)],
         ['4', '★★★★☆ (4 Stars)', String(p.rating || 5)],
@@ -5735,6 +5935,7 @@ function renderProps() {
       break;
     }
     case 'video': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Video URL (YouTube or Vimeo)', input('text', p.url || '', v => {
         p.url = v;
         onPropInput();
@@ -5747,6 +5948,7 @@ function renderProps() {
       break;
     }
     case 'code': {
+      section('content', 'Code', sectionIcon('<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'));
       wrap.appendChild(field('Language Label', input('text', p.language || 'javascript', v => {
         p.language = v;
         onPropInput();
@@ -5766,6 +5968,7 @@ function renderProps() {
     }
     case 'bento': {
       if (!Array.isArray(p.items)) p.items = [];
+      section('cards', 'Bento Cards', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
       const addBtn = el('button', {
         type: 'button',
         class: 'btn secondary btn-sm',
@@ -5804,6 +6007,7 @@ function renderProps() {
       break;
     }
     case 'comparison': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Before Image URL', input('text', p.beforeImage || '', v => { p.beforeImage = v; onPropInput(); })));
       wrap.appendChild(field('Before Label', input('text', p.beforeLabel || 'Before', v => { p.beforeLabel = v; onPropInput(); })));
       wrap.appendChild(field('After Image URL', input('text', p.afterImage || '', v => { p.afterImage = v; onPropInput(); })));
@@ -5811,16 +6015,19 @@ function renderProps() {
       break;
     }
     case 'tilt-card': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Badge Text', input('text', p.badge || '', v => { p.badge = v; onPropInput(); })));
       wrap.appendChild(field('Card Title', input('text', p.title || '', v => { p.title = v; onPropInput(); })));
       const subArea = el('textarea', { class: 'input', style: 'height:80px;' }, p.subtitle || '');
       subArea.oninput = () => { p.subtitle = subArea.value; onPropInput(); };
       wrap.appendChild(field('Card Description', subArea));
+      section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(field('CTA Button Text (Optional)', input('text', p.ctaLabel || '', v => { p.ctaLabel = v; onPropInput(); })));
       wrap.appendChild(field('CTA Link URL', input('text', p.ctaUrl || '', v => { p.ctaUrl = v; onPropInput(); })));
       break;
     }
     case 'marquee': {
+      section('animation', 'Animation', sectionIcon('<polygon points="5 3 19 12 5 21 5 3"/>'));
       wrap.appendChild(field('Scroll Speed', select([
         ['slow', 'Gentle & Slow (30s)', p.speed || 'normal'],
         ['normal', 'Standard Pace (20s)', p.speed || 'normal'],
@@ -5828,6 +6035,7 @@ function renderProps() {
       ], v => { p.speed = v; onChange(); })));
 
       if (!Array.isArray(p.items)) p.items = [];
+      section('items', 'Items', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
       const addBtn = el('button', {
         type: 'button',
         class: 'btn secondary btn-sm',
@@ -5859,6 +6067,7 @@ function renderProps() {
       break;
     }
     case 'countdown': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Headline', input('text', p.title || '', v => { p.title = v; onPropInput(); })));
       wrap.appendChild(field('Subtitle', input('text', p.subtitle || '', v => { p.subtitle = v; onPropInput(); })));
       wrap.appendChild(field('Target Date & Time (ISO 8601)', input('text', p.targetDate || '2026-12-31T23:59:59', v => {
@@ -5869,6 +6078,7 @@ function renderProps() {
     }
     case 'timeline': {
       if (!Array.isArray(p.items)) p.items = [];
+      section('milestones', 'Milestones', sectionIcon('<path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>'));
       const addBtn = el('button', {
         type: 'button',
         class: 'btn secondary btn-sm',
@@ -5905,12 +6115,14 @@ function renderProps() {
       break;
     }
     case 'form': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Form Title', input('text', p.title || '', v => { p.title = v; onPropInput(); })));
       wrap.appendChild(field('Description Subtitle', input('text', p.description || '', v => { p.description = v; onPropInput(); })));
       wrap.appendChild(field('Button Label', input('text', p.buttonLabel || 'Send Message', v => { p.buttonLabel = v; onPropInput(); })));
       break;
     }
     case 'audio': {
+      section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Track Title', input('text', p.title || '', v => { p.title = v; onPropInput(); })));
       wrap.appendChild(field('Artist / Host', input('text', p.artist || '', v => { p.artist = v; onPropInput(); })));
       wrap.appendChild(field('Duration Label (e.g. 03:45)', input('text', p.duration || '03:45', v => { p.duration = v; onPropInput(); })));
@@ -5919,6 +6131,8 @@ function renderProps() {
     }
     case 'header': {
       if (!Array.isArray(p.links)) p.links = [];
+
+      section('save', 'Save & Manage', sectionIcon('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'));
 
       // Save as Custom Header button
       const saveCustomHeaderBtn = el('button', {
@@ -5933,6 +6147,7 @@ function renderProps() {
       wrap.appendChild(saveCustomHeaderBtn);
 
       // Subsections Management
+      section('subsections', 'Header Subsections', sectionIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>'));
       const subsectionTitle = el('div', { style: 'margin:8px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Header Subsections');
       wrap.appendChild(subsectionTitle);
 
@@ -5953,6 +6168,7 @@ function renderProps() {
       }
 
       // Brand settings
+      section('brand', 'Brand & Logo', sectionIcon('<path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v6h-6"/><path d="M9 15l3-3 3 3-3 3-3-3z"/>'));
       const brandSectionTitle = el('div', { style: 'margin:16px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Brand & Logo');
       wrap.appendChild(brandSectionTitle);
       wrap.appendChild(field('Brand Name', input('text', p.brandName || '', v => { p.brandName = v; onPropInput(); })));
@@ -5962,6 +6178,7 @@ function renderProps() {
       wrap.appendChild(field('Brand Target URL', input('text', p.brandUrl || '#', v => { p.brandUrl = v; onPropInput(); })));
 
       // Layout & Appearance
+      section('layout', 'Layout & Styling', sectionIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>'));
       const layoutSectionTitle = el('div', { style: 'margin:16px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Header Layout & Styling');
       wrap.appendChild(layoutSectionTitle);
 
@@ -5989,6 +6206,7 @@ function renderProps() {
       wrap.appendChild(stickyLabel);
 
       // Search Bar Settings
+      section('search', 'Search Bar', sectionIcon('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'));
       const searchSectionTitle = el('div', { style: 'margin:16px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Search Bar');
       wrap.appendChild(searchSectionTitle);
 
@@ -6007,6 +6225,7 @@ function renderProps() {
       }
 
       // Links Manager
+      section('links', 'Navigation Links', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       const linksSectionTitle = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;' }, [
         el('label', { style: 'font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Navigation Links'),
         el('button', {
@@ -6051,6 +6270,7 @@ function renderProps() {
       wrap.appendChild(linksList);
 
       // Call to Action Settings
+      section('cta', 'CTA Button', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       const ctaSectionTitle = el('div', { style: 'margin:14px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'CTA Action Button');
       wrap.appendChild(ctaSectionTitle);
 
@@ -6075,6 +6295,7 @@ function renderProps() {
       }
 
       // Carousel & Nested Component Slot Settings
+      section('carousel', 'Header Carousel', sectionIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'));
       const carouselSectionTitle = el('div', { style: 'margin:18px 0 8px;font-weight:700;font-size:11.5px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.5px;' }, 'Header Component Carousel');
       wrap.appendChild(carouselSectionTitle);
 
@@ -6096,6 +6317,13 @@ function renderProps() {
           ['full', 'Full Width (100% per slide)', p.carouselItemWidth || 'medium'],
           ['auto', 'Auto Content Width', p.carouselItemWidth || 'medium']
         ], v => { p.carouselItemWidth = v; onChange(); })));
+
+        wrap.appendChild(field('Presentation Layout', select([
+          ['horizontal', 'Continuous Strip Carousel (Default)', p.carouselLayout || 'horizontal'],
+          ['fullscreen', 'Full-Width Hero Slide (100% Focus)', p.carouselLayout || 'horizontal'],
+          ['stack', 'Stacked Cards Carousel (Overlapping 3D)', p.carouselLayout || 'horizontal'],
+          ['vertical', 'Vertical Carousel Track', p.carouselLayout || 'horizontal']
+        ], v => { p.carouselLayout = v; onChange(); })));
 
         // Rotation controls
         const rotationControls = el('div', { style: 'margin:10px 0 8px;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;border:1px solid var(--border-subtle);' }, [
@@ -6209,9 +6437,10 @@ function renderProps() {
   }
 
   // Universal Custom CSS Style setting on every component
+  wrap = wrapRoot;
   wrap.appendChild(customCssField(block, onPropInput));
 
-  body.appendChild(wrap);
+  body.appendChild(wrapRoot);
 }
 
 function customCssField(block, onPropChange) {
