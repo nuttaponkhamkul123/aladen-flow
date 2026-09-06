@@ -78,11 +78,11 @@ function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   if (!container) return;
   const toast = el('div', { class: `toast toast-${type}` }, [
-    createSvg(type === 'success' 
+    createSvg(type === 'success'
       ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
       : type === 'danger'
-      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
-      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+        ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+        : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
     ),
     el('span', {}, message)
   ]);
@@ -460,6 +460,7 @@ function setBoardEvents() {
   document.getElementById('themeBtn').onclick = () => {
     document.body.classList.toggle('theme-light');
     document.body.classList.toggle('theme-dark');
+    if (typeof syncCanvasTheme === 'function') syncCanvasTheme();
   };
 
   // Kanban Canvas Ambient Theme Picker
@@ -776,7 +777,7 @@ function onCardDragStart(e) {
   };
   card.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
-  try { e.dataTransfer.setData('text/plain', card.dataset.id); } catch (_) {}
+  try { e.dataTransfer.setData('text/plain', card.dataset.id); } catch (_) { }
 }
 
 function onCardDragEnd(e) {
@@ -1658,7 +1659,7 @@ function renderCmsPages() {
           const currentSiblings = state.cms.pages
             .filter(p => (p.parent_id != null ? Number(p.parent_id) : null) === newParentId && Number(p.id) !== draggedId)
             .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
-          
+
           const targetIndex = currentSiblings.findIndex(p => Number(p.id) === Number(pageNode.id));
           if (targetIndex >= 0) {
             const insertIdx = dropPos === 'before' ? targetIndex : targetIndex + 1;
@@ -2227,7 +2228,7 @@ function applyCustomCssOverride(targetElement, customCssString) {
     try {
       targetElement.style.setProperty(prop, val, priority);
     } catch (_) {
-      try { targetElement.style[prop] = val; } catch (__) {}
+      try { targetElement.style[prop] = val; } catch (__) { }
     }
   });
 }
@@ -3280,18 +3281,20 @@ function renderBlockContent(block) {
     case 'audio': {
       const cover = p.cover
         ? el('img', { src: p.cover, style: 'width:52px;height:52px;border-radius:10px;object-fit:cover;' })
-        : el('div', { style: 'width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;' }, '🎵');
+        : el('div', { style: 'width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;color:#fff;' }, [
+          createSvg('<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>')
+        ]);
 
       const info = el('div', { style: 'flex:1;overflow:hidden;' }, [
-        el('h4', { style: 'font-size:14.5px;font-weight:700;color:#fff;margin:0 0 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' }, p.title || 'Track Title'),
+        el('h4', { style: 'font-size:14px;font-weight:700;color:#fff;margin:0 0 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' }, p.title || 'Track Title'),
         el('div', { style: 'font-size:12px;color:#94a3b8;' }, [
           document.createTextNode(`${p.artist || 'Podcast Host / Artist'} • `),
-          el('span', { style: 'color:#6366f1;' }, p.duration || '04:15')
+          el('span', { style: 'color:var(--accent-primary,#3b82f6);' }, p.duration || '04:15')
         ])
       ]);
 
       const waveformBars = [40, 70, 100, 50, 80, 30, 90, 60].map((h, i) => {
-        return el('span', { style: `width:3px;height:${h}%;background:#6366f1;border-radius:2px;` });
+        return el('span', { style: `width:3px;height:${h}%;background:var(--accent-primary,#3b82f6);border-radius:2px;` });
       });
       const waveform = el('div', { class: 'cms-waveform-bar', style: 'display:flex;align-items:flex-end;gap:3px;height:18px;margin-top:8px;' }, waveformBars);
       info.appendChild(waveform);
@@ -3994,6 +3997,8 @@ function initViewportResizers() {
     handle.classList.add('is-resizing');
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    const iframe = document.getElementById('cmsCanvasFrame');
+    if (iframe) iframe.style.pointerEvents = 'none';
   };
 
   leftResizer.addEventListener('mousedown', e => onMouseDown(e, leftResizer));
@@ -4017,14 +4022,267 @@ function initViewportResizers() {
       rightResizer.classList.remove('is-resizing');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      const iframe = document.getElementById('cmsCanvasFrame');
+      if (iframe) iframe.style.pointerEvents = '';
     }
   });
+}
+
+function getCanvasDocument() {
+  const frame = document.getElementById('cmsCanvasFrame');
+  return frame?.contentDocument || frame?.contentWindow?.document || null;
+}
+
+function getCanvasElement() {
+  const doc = getCanvasDocument();
+  if (doc) {
+    const el = doc.getElementById('cmsCanvas');
+    if (el) return el;
+  }
+  return document.getElementById('cmsCanvas');
+}
+
+function getCanvasBlockElement(id) {
+  const doc = getCanvasDocument();
+  if (doc) {
+    const el = doc.getElementById(id) || doc.querySelector(`[data-block-id="${id}"]`);
+    if (el) return el;
+  }
+  return document.getElementById(id) || document.querySelector(`[data-block-id="${id}"]`);
+}
+
+function syncCanvasTheme() {
+  const doc = getCanvasDocument();
+  if (doc && doc.body) {
+    const isLight = document.body.classList.contains('theme-light');
+    doc.body.classList.toggle('theme-light', isLight);
+    doc.body.classList.toggle('theme-dark', !isLight);
+  }
+}
+
+function getCanvasContentHeight() {
+  const doc = getCanvasDocument();
+  if (!doc) return 560;
+  const canvas = doc.getElementById('cmsCanvas');
+  if (!canvas) return 560;
+
+  const rect = canvas.getBoundingClientRect();
+  const scrollH = canvas.scrollHeight || 0;
+  const offsetH = canvas.offsetHeight || 0;
+
+  let maxChildBottom = 0;
+  const children = canvas.children;
+  for (let i = 0; i < children.length; i++) {
+    const c = children[i];
+    if (c.classList.contains('drop-indicator') || c.classList.contains('container-insert-indicator')) continue;
+    const cBottom = c.offsetTop + c.offsetHeight;
+    if (cBottom > maxChildBottom) maxChildBottom = cBottom;
+  }
+
+  const computedPaddingBottom = parseFloat(doc.defaultView?.getComputedStyle(canvas).paddingBottom) || 44;
+  const childTotalH = maxChildBottom > 0 ? maxChildBottom + computedPaddingBottom : 0;
+
+  return Math.max(540, Math.ceil(Math.max(rect.height, scrollH, offsetH, childTotalH)));
+}
+
+function updateIframeHeight() {
+  const iframe = document.getElementById('cmsCanvasFrame');
+  if (!iframe) return;
+  const doc = getCanvasDocument();
+  const mode = state.cms.viewportMode || 'desktop';
+  const showFrame = state.cms.deviceFrame && (mode === 'mobile' || mode === 'tablet');
+  const isLandscape = state.cms.viewportOrientation === 'landscape';
+
+  if (doc && doc.body) {
+    doc.body.classList.toggle('is-device-frame', !!showFrame);
+  }
+
+  if (showFrame) {
+    iframe.style.height = isLandscape ? '360px' : '680px';
+  } else if (mode === 'mobile') {
+    iframe.style.height = isLandscape ? '375px' : '720px';
+  } else if (mode === 'tablet') {
+    iframe.style.height = isLandscape ? '768px' : '1024px';
+  } else {
+    const contentH = getCanvasContentHeight();
+    iframe.style.height = `${contentH + 8}px`;
+  }
+}
+
+let _canvasIframeInitialized = false;
+
+function setupCanvasIframe(callback) {
+  const frame = document.getElementById('cmsCanvasFrame');
+  if (!frame) {
+    if (callback) callback();
+    return;
+  }
+
+  const initDoc = () => {
+    try {
+      const doc = frame.contentDocument || frame.contentWindow?.document;
+      if (!doc) return;
+      if (doc.getElementById('cmsCanvas')) {
+        attachCanvasIframeListeners(doc);
+        syncCanvasTheme();
+        if (callback) callback();
+        return;
+      }
+      doc.open();
+      doc.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      background: transparent;
+      box-sizing: border-box;
+      overflow-x: hidden;
+    }
+    *, *::before, *::after {
+      box-sizing: inherit;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      background: transparent;
+      color: var(--text-primary);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      box-sizing: border-box;
+      overflow-x: hidden;
+      overflow-y: visible;
+    }
+    body.is-device-frame {
+      height: 100%;
+      overflow-y: auto;
+    }
+    #cmsCanvas {
+      width: 100%;
+      min-height: 520px;
+      height: auto;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+    body.is-device-frame #cmsCanvas {
+      min-height: 100%;
+    }
+  </style>
+</head>
+<body class="canvas-iframe-body ${document.body.classList.contains('theme-light') ? 'theme-light' : 'theme-dark'}">
+  <div id="cmsCanvas" class="cms-canvas"></div>
+</body>
+</html>`);
+      doc.close();
+
+      attachCanvasIframeListeners(doc);
+      syncCanvasTheme();
+      _canvasIframeInitialized = true;
+      if (callback) callback();
+    } catch (err) {
+      console.error('Error initializing canvas iframe:', err);
+    }
+  };
+
+  if (frame.contentDocument && frame.contentDocument.readyState === 'complete' && frame.contentDocument.body) {
+    initDoc();
+  } else {
+    frame.addEventListener('load', initDoc, { once: true });
+    initDoc();
+  }
+}
+
+function attachCanvasIframeListeners(doc) {
+  if (!doc || doc._hasCanvasListeners) return;
+  doc._hasCanvasListeners = true;
+
+  const canvas = doc.getElementById('cmsCanvas');
+  const target = canvas || doc.body;
+
+  target.addEventListener('dragover', onCanvasDragOver);
+  target.addEventListener('dragleave', onCanvasDragLeave);
+  target.addEventListener('drop', onCanvasDrop);
+  target.addEventListener('click', onDeselectCanvas);
+
+  doc.addEventListener('dragover', e => {
+    if (e.target === doc.body || e.target === doc.documentElement) {
+      onCanvasDragOver(e);
+    }
+  });
+  doc.addEventListener('dragleave', e => {
+    if (e.target === doc.body || e.target === doc.documentElement) {
+      onCanvasDragLeave(e);
+    }
+  });
+  doc.addEventListener('drop', e => {
+    if (e.target === doc.body || e.target === doc.documentElement) {
+      onCanvasDrop(e);
+    }
+  });
+  doc.addEventListener('click', e => {
+    if (e.target === doc.body || e.target === doc.documentElement) {
+      onDeselectCanvas(e);
+    }
+  });
+
+  doc.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || e.key === 'Delete' || e.key === 'Backspace' || (e.ctrlKey || e.metaKey)) {
+      document.dispatchEvent(new KeyboardEvent(e.type, {
+        key: e.key,
+        code: e.code,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey,
+        bubbles: true
+      }));
+    }
+  });
+
+  if (canvas && doc.defaultView?.ResizeObserver) {
+    const ro = new doc.defaultView.ResizeObserver(() => {
+      const mode = state.cms.viewportMode || 'desktop';
+      const showFrame = state.cms.deviceFrame && (mode === 'mobile' || mode === 'tablet');
+      if (!showFrame && mode === 'desktop') {
+        const h = getCanvasContentHeight();
+        const iframe = document.getElementById('cmsCanvasFrame');
+        if (iframe && Math.abs(parseInt(iframe.style.height || '0') - (h + 8)) > 2) {
+          iframe.style.height = `${h + 8}px`;
+        }
+      }
+    });
+    ro.observe(canvas);
+  }
+}
+
+function onDeselectCanvas(e) {
+  const canvas = getCanvasElement();
+  const canvasWrap = document.querySelector('.cms-canvas-wrap');
+  const viewport = document.querySelector('.canvas-viewport');
+  const doc = getCanvasDocument();
+  if (e.target === canvas || e.target === canvasWrap || e.target === viewport || e.target.classList?.contains('cms-empty-canvas') || (doc && e.target === doc.body)) {
+    state.cms.selectedBlockId = null;
+    renderCanvas();
+    renderProps();
+  }
 }
 
 function applyCanvasSettings() {
   const settings = (state.cms.openPage && state.cms.openPage.settings) || {};
   const viewport = document.querySelector('.canvas-viewport');
-  const canvas = document.getElementById('cmsCanvas');
+  const canvas = getCanvasElement();
   const frameTop = document.getElementById('cmsDeviceFrameTop');
   const frameBottom = document.getElementById('cmsDeviceFrameBottom');
   if (!canvas || !viewport) return;
@@ -4118,6 +4376,12 @@ function applyCanvasSettings() {
 
   const isCanvasActive = !state.cms.selectedBlockId && !!state.cms.openPage && !state.cms.isPreviewMode;
   canvas.classList.toggle('is-active', isCanvasActive);
+  viewport.classList.remove('is-active');
+  const iframe = document.getElementById('cmsCanvasFrame');
+  if (iframe) iframe.classList.remove('is-active');
+
+  syncCanvasTheme();
+  updateIframeHeight();
 }
 
 function getBlockIconSvg(type) {
@@ -4239,19 +4503,19 @@ function renderComponentTree() {
     return;
   }
 
-function scrollToBlock(id) {
-  setTimeout(() => {
-    const blockEl = document.getElementById(id) || document.querySelector(`[data-block-id="${id}"]`);
-    if (!blockEl) return;
-    blockEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-    blockEl.classList.remove('pulse-highlight');
-    void blockEl.offsetWidth; // Reflow to re-trigger animation
-    blockEl.classList.add('pulse-highlight');
+  function scrollToBlock(id) {
     setTimeout(() => {
+      const blockEl = getCanvasBlockElement(id);
+      if (!blockEl) return;
+      blockEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
       blockEl.classList.remove('pulse-highlight');
-    }, 1200);
-  }, 40);
-}
+      void blockEl.offsetWidth; // Reflow to re-trigger animation
+      blockEl.classList.add('pulse-highlight');
+      setTimeout(() => {
+        blockEl.classList.remove('pulse-highlight');
+      }, 1200);
+    }, 40);
+  }
 
   function renderTreeNode(block, depth = 0) {
     const isContainer = (block.type === 'container' || block.type === 'header') && Array.isArray(block.props?.children);
@@ -4281,11 +4545,11 @@ function scrollToBlock(id) {
         scrollToBlock(block.id);
       },
       onmouseenter: () => {
-        const blockEl = document.getElementById(block.id) || document.querySelector(`[data-block-id="${block.id}"]`);
+        const blockEl = getCanvasBlockElement(block.id);
         if (blockEl) blockEl.classList.add('tree-hover-highlight');
       },
       onmouseleave: () => {
-        const blockEl = document.getElementById(block.id) || document.querySelector(`[data-block-id="${block.id}"]`);
+        const blockEl = getCanvasBlockElement(block.id);
         if (blockEl) blockEl.classList.remove('tree-hover-highlight');
       },
       ondragstart: e => {
@@ -4490,8 +4754,12 @@ function canvasZoneDivider(zone) {
 }
 
 function renderCanvas() {
+  const canvas = getCanvasElement();
+  if (!canvas) {
+    setupCanvasIframe(() => renderCanvas());
+    return;
+  }
   applyCanvasSettings();
-  const canvas = document.getElementById('cmsCanvas');
   canvas.innerHTML = '';
   const blocks = getBlocks();
   if (!blocks.length) {
@@ -4512,6 +4780,7 @@ function renderCanvas() {
       canvas.appendChild(renderBlockWrap(block));
     });
   }
+  updateIframeHeight();
   renderComponentTree();
 }
 
@@ -4726,7 +4995,7 @@ function onBlockDragStart(e, block) {
   state.cms.drag = { kind: 'block', id: block.id };
   e.currentTarget.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
-  try { e.dataTransfer.setData('application/x-block-id', block.id); } catch (_) {}
+  try { e.dataTransfer.setData('application/x-block-id', block.id); } catch (_) { }
   e.dataTransfer.setData('text/plain', block.id);
   e.stopPropagation();
 }
@@ -4901,6 +5170,10 @@ function hideDropIndicator() {
   if (state.cms.containerIndicator && state.cms.containerIndicator.parentNode) {
     state.cms.containerIndicator.parentNode.removeChild(state.cms.containerIndicator);
   }
+  const canvasDoc = getCanvasDocument();
+  if (canvasDoc) {
+    canvasDoc.querySelectorAll('.block-container.drag-over, .cms-header-carousel-track.drag-over').forEach(el => el.classList.remove('drag-over'));
+  }
   document.querySelectorAll('.block-container.drag-over, .cms-header-carousel-track.drag-over').forEach(el => el.classList.remove('drag-over'));
 }
 
@@ -4908,21 +5181,23 @@ function onCanvasDragOver(e) {
   if (!state.cms.drag) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = (state.cms.drag.kind === 'palette' || state.cms.drag.kind === 'reusable') ? 'copy' : 'move';
-  const canvas = document.getElementById('cmsCanvas');
+  const canvas = getCanvasElement();
+  if (!canvas) return;
   const idx = getTopLevelInsertIndex(canvas, e.clientY);
   showTopLevelDropIndicator(canvas, idx);
 }
 
 function onCanvasDragLeave(e) {
-  const canvas = document.getElementById('cmsCanvas');
-  if (e.relatedTarget && canvas.contains(e.relatedTarget)) return;
+  const canvas = getCanvasElement();
+  if (canvas && e.relatedTarget && canvas.contains(e.relatedTarget)) return;
   hideDropIndicator();
 }
 
 function onCanvasDrop(e) {
   e.preventDefault();
   hideDropIndicator();
-  const canvas = document.getElementById('cmsCanvas');
+  const canvas = getCanvasElement();
+  if (!canvas) return;
   const idx = getTopLevelInsertIndex(canvas, e.clientY);
   if (!state.cms.drag) return;
   if (state.cms.drag.kind === 'palette') {
@@ -5412,7 +5687,7 @@ function renderProps() {
     case 'button': {
       section('content', 'Content', sectionIcon('<line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/>'));
       wrap.appendChild(field('Button Label', input('text', p.label || '', v => { p.label = v; onPropInput(); })));
-      
+
       section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(navigationLinkField('Button Click Destination (Page / URL)', p, onPropInput, 'url'));
 
@@ -5457,7 +5732,7 @@ function renderProps() {
       wrap.appendChild(field('Image URL', input('text', p.url || '', v => { p.url = v; onPropInput(); })));
       wrap.appendChild(field('Alt Description', input('text', p.alt || '', v => { p.alt = v; onPropInput(); })));
       wrap.appendChild(field('Caption (optional)', input('text', p.caption || '', v => { p.caption = v; onPropInput(); })));
-      
+
       section('action', 'Action', sectionIcon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'));
       wrap.appendChild(navigationLinkField('Image Click Destination (Page / URL)', p, onPropInput, 'linkUrl'));
 
@@ -5732,7 +6007,7 @@ function renderProps() {
       wrap.appendChild(btnGroup);
 
       const matrixEditor = el('div', { class: 'table-matrix-editor' });
-      
+
       if (p.hasHeader !== false) {
         const headerInputs = p.headers.map((h, colIdx) => {
           return input('text', h, v => {
@@ -6390,11 +6665,11 @@ function renderProps() {
       const saveCustomHeaderBtn = el('button', {
         type: 'button',
         class: 'btn primary btn-sm',
-        style: 'width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin:4px 0 16px;padding:9px 14px;font-weight:700;font-size:12.5px;background:linear-gradient(135deg, #4f46e5, #7c3aed);border:none;border-radius:8px;box-shadow:0 4px 14px rgba(99,102,241,0.35);color:#fff;cursor:pointer;',
+        style: 'width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin:4px 0 16px;padding:8px 14px;font-weight:600;font-size:13px;',
         onclick: () => saveSelectedAsReusableBlock(block.id)
       }, [
-        createSvg('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>'),
-        el('span', {}, '💾 Save as Custom Header')
+        createSvg('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>'),
+        el('span', {}, 'Save as Custom Header')
       ]);
       wrap.appendChild(saveCustomHeaderBtn);
 
@@ -7098,14 +7373,14 @@ function colorField(label, value, defaultVal, onChange) {
   container.appendChild(labelEl);
 
   const curVal = value || defaultVal || '#6366f1';
-  
+
   // Custom Color Picker Swatch Box
   const swatchBox = el('div', {
     class: 'color-swatch-box',
     title: 'Click to open color picker',
     style: `background-color:${curVal};`
   });
-  
+
   const hiddenColorInput = el('input', {
     type: 'color',
     class: 'hidden-color-input',
@@ -7206,7 +7481,7 @@ function richTextField(label, value, onInput) {
   const container = el('div', { class: 'field rich-text-field-container' });
   const labelEl = el('label', { style: 'display:flex;justify-content:space-between;align-items:center;' }, [
     el('span', {}, label),
-    el('span', { style: 'font-size:10px;color:var(--text-tertiary);font-weight:normal;' }, '✨ Partial styling enabled')
+    el('span', { style: 'font-size:10.5px;color:var(--text-tertiary);font-weight:500;' }, 'Rich markup enabled')
   ]);
   container.appendChild(labelEl);
 
@@ -7270,18 +7545,18 @@ function richTextField(label, value, onInput) {
     type: 'button',
     class: 'rich-text-btn',
     title: 'Rainbow gradient text ([gradient](text))',
-    style: 'background:linear-gradient(135deg,rgba(129,140,248,0.25),rgba(236,72,153,0.25));border:1px solid rgba(129,140,248,0.4);color:#c7d2fe;',
+    style: 'background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(147,51,234,0.2));border:1px solid rgba(59,130,246,0.3);color:#93c5fd;',
     onclick: () => wrapSelection('[gradient](', ')', 'Gradient Phrase')
-  }, '🌈 Gradient');
+  }, 'Gradient');
 
   // 6. Glow Button
   const glowBtn = el('button', {
     type: 'button',
     class: 'rich-text-btn',
-    title: 'Glowing neon text ([glow:#818cf8](text))',
-    style: 'color:#818cf8;',
-    onclick: () => wrapSelection('[glow:#818cf8](', ')', 'Glowing Text')
-  }, '✨ Glow');
+    title: 'Glowing neon text ([glow:#3b82f6](text))',
+    style: 'color:#60a5fa;',
+    onclick: () => wrapSelection('[glow:#3b82f6](', ')', 'Glowing Text')
+  }, 'Glow');
 
   // 7. Highlight / Background Mark Button
   const hlBtn = el('button', {
@@ -7290,7 +7565,7 @@ function richTextField(label, value, onInput) {
     title: 'Highlighted background ([bg:rgba(245,158,11,0.25)](text))',
     style: 'color:#fbbf24;',
     onclick: () => wrapSelection('[bg:rgba(245,158,11,0.25)](', ')', 'highlighted text')
-  }, '🖍️ Mark');
+  }, 'Highlight');
 
   // 8. Badge Pill Button
   const badgeBtn = el('button', {
@@ -7299,7 +7574,7 @@ function richTextField(label, value, onInput) {
     title: 'Badge pill badge ([badge:#38bdf8](text))',
     style: 'color:#38bdf8;',
     onclick: () => wrapSelection('[badge:#38bdf8](', ')', 'Badge')
-  }, '🏷️ Pill');
+  }, 'Badge');
 
   toolsRow.appendChild(boldBtn);
   toolsRow.appendChild(italicBtn);
@@ -7313,7 +7588,7 @@ function richTextField(label, value, onInput) {
 
   // Row 2: Color Swatches Row
   const colorsRow = el('div', { class: 'rich-colors-row' });
-  colorsRow.appendChild(el('span', { class: 'rich-colors-label' }, '🎨 Color:'));
+  colorsRow.appendChild(el('span', { class: 'rich-colors-label' }, 'Color:'));
 
   const swatches = [
     { color: '#ffffff', name: 'White' },
@@ -7353,7 +7628,7 @@ function richTextField(label, value, onInput) {
   toolbar.appendChild(colorsRow);
 
   const hint = el('div', { class: 'rich-text-helper-hint' }, [
-    '💡 Tip: Select any text and click a style above to format only that specific part.'
+    'Tip: Select any text and click a style above to format only that specific part.'
   ]);
 
   container.appendChild(toolbar);
@@ -7363,85 +7638,137 @@ function richTextField(label, value, onInput) {
 }
 
 function select(options, onChange) {
-  const sel = el('select', { onchange: e => onChange(e.target.value) });
-  options.forEach(([val, lbl, sel2]) => {
-    sel.appendChild(el('option', { value: val, ...(val === sel2 ? { selected: '' } : {}) }, lbl));
+  const sel = el('select');
+  options.forEach(opt => {
+    const [val, label, selected] = Array.isArray(opt) ? opt : [opt, opt, false];
+    const o = el('option', { value: val }, label);
+    const isSelected = selected === true || (selected !== false && selected != null && selected !== '' && String(val) === String(selected));
+    if (isSelected) o.selected = true;
+    sel.appendChild(o);
   });
+  sel.onchange = () => onChange(sel.value);
   return sel;
 }
 
-function navigationLinkField(label, propObj, onPropChange, urlKey = 'url', newTabKey = 'newTab') {
-  const currentUrl = propObj[urlKey] || '';
-  const isPage = currentUrl.startsWith('/p/');
-  const currentMode = !currentUrl ? 'none' : (isPage ? 'page' : 'custom');
+function navigationLinkField(label, targetObj, onPropChange, propName = 'linkUrl') {
+  const container = el('div', { class: 'field nav-link-field-wrap' });
+  const curVal = (targetObj && targetObj[propName]) || '';
 
-  const container = el('div', { class: 'field nav-link-field-wrap' }, [
-    el('label', { style: 'display:flex;align-items:center;justify-content:space-between;' }, [
-      el('span', {}, label || 'Click Navigation Action'),
-      currentUrl ? el('span', { class: 'link-type-tag' }, isPage ? 'Internal Page' : 'External Link') : false
-    ])
+  function detectType(val) {
+    if (!val || val === '#' || val === '') return 'none';
+    if (val.startsWith('/p/')) return 'page';
+    if (val.startsWith('#')) return 'anchor';
+    return 'url';
+  }
+
+  let activeType = detectType(curVal);
+
+  const typeBadge = el('span', { class: 'link-type-tag' }, activeType.toUpperCase());
+  const header = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;' }, [
+    el('label', { style: 'font-weight:600;font-size:12px;margin:0;' }, label || 'Click Action (Link to Page / URL)'),
+    typeBadge
   ]);
+  container.appendChild(header);
 
-  const modeSelect = select([
-    ['none', 'None (No click action)', currentMode === 'none' ? 'none' : ''],
-    ['page', '📄 Internal Document / Page', currentMode === 'page' ? 'page' : ''],
-    ['custom', '🔗 Custom URL / External Link', currentMode === 'custom' ? 'custom' : '']
-  ], mode => {
-    if (mode === 'none') {
-      propObj[urlKey] = '';
-    } else if (mode === 'page') {
-      const otherPages = state.cms.pages.filter(p => p.id !== state.cms.openPageId);
-      const target = otherPages[0] || state.cms.pages[0];
-      propObj[urlKey] = target ? `/p/${target.slug}` : '/p/';
-    } else if (mode === 'custom') {
-      propObj[urlKey] = 'https://';
-    }
-    onPropChange();
-    renderProps();
-  });
+  const modeRow = el('div', { class: 'props-btn-group', style: 'margin-bottom:8px;' });
+  const modes = [
+    ['none', 'None'],
+    ['page', 'Internal Page'],
+    ['url', 'Web URL'],
+    ['anchor', 'Anchor (#)']
+  ];
 
-  container.appendChild(modeSelect);
+  const controlsWrap = el('div', { class: 'nav-link-controls', style: 'display:flex;flex-direction:column;gap:8px;' });
 
-  if (currentMode === 'page') {
-    const pageOptions = state.cms.pages.map(p => [
-      `/p/${p.slug}`,
-      `📄 ${p.title || 'Untitled'} (/p/${p.slug})`,
-      currentUrl === `/p/${p.slug}` ? `/p/${p.slug}` : ''
-    ]);
-    if (!pageOptions.some(opt => opt[0] === currentUrl) && currentUrl) {
-      pageOptions.unshift([currentUrl, `Current: ${currentUrl}`, currentUrl]);
-    }
-    if (!pageOptions.length) {
-      pageOptions.push(['/p/', 'No pages available yet', '/p/']);
-    }
+  function renderControls() {
+    controlsWrap.innerHTML = '';
+    modeRow.innerHTML = '';
+    typeBadge.textContent = activeType.toUpperCase();
 
-    const pageSelect = select(pageOptions, v => {
-      propObj[urlKey] = v;
-      onPropChange();
+    modes.forEach(([m, text]) => {
+      const btn = el('button', {
+        type: 'button',
+        class: activeType === m ? 'active' : '',
+        onclick: () => {
+          activeType = m;
+          if (m === 'none') {
+            targetObj[propName] = '';
+            onPropChange();
+          } else if (m === 'page') {
+            const firstPage = state.cms?.pages?.[0];
+            if (firstPage && (!targetObj[propName] || !targetObj[propName].startsWith('/p/'))) {
+              targetObj[propName] = `/p/${firstPage.slug || firstPage.id}`;
+              onPropChange();
+            }
+          } else if (m === 'anchor') {
+            if (!targetObj[propName] || !targetObj[propName].startsWith('#')) {
+              targetObj[propName] = '#section';
+              onPropChange();
+            }
+          } else if (m === 'url') {
+            if (!targetObj[propName] || targetObj[propName].startsWith('/p/') || targetObj[propName].startsWith('#')) {
+              targetObj[propName] = 'https://';
+              onPropChange();
+            }
+          }
+          renderControls();
+        }
+      }, text);
+      modeRow.appendChild(btn);
     });
-    pageSelect.style.marginTop = '6px';
-    container.appendChild(pageSelect);
-  } else if (currentMode === 'custom') {
-    const customInput = input('text', currentUrl, v => {
-      propObj[urlKey] = v;
-      onPropChange();
-    });
-    customInput.placeholder = 'https://example.com or #section';
-    customInput.style.marginTop = '6px';
-    container.appendChild(customInput);
+
+    if (activeType === 'page') {
+      const pages = (state.cms && Array.isArray(state.cms.pages)) ? state.cms.pages : [];
+      if (pages.length === 0) {
+        controlsWrap.appendChild(el('div', { style: 'font-size:11.5px;color:var(--text-tertiary);' }, 'No other pages created yet.'));
+      } else {
+        const currentSlug = targetObj[propName] || '';
+        const pageOptions = pages.map(p => {
+          const pathVal = `/p/${p.slug || p.id}`;
+          return [pathVal, `${p.title || 'Untitled'} (${pathVal})`, pathVal === currentSlug];
+        });
+        const sel = select(pageOptions, val => {
+          targetObj[propName] = val;
+          onPropChange();
+        });
+        controlsWrap.appendChild(field('Select Target Page', sel));
+      }
+    } else if (activeType === 'url') {
+      const inp = input('text', targetObj[propName] || '', v => {
+        targetObj[propName] = v.trim();
+        onPropChange();
+      });
+      inp.placeholder = 'https://example.com/demo';
+      controlsWrap.appendChild(field('Target Destination URL', inp));
+    } else if (activeType === 'anchor') {
+      const inp = input('text', targetObj[propName] || '', v => {
+        let clean = v.trim();
+        if (clean && !clean.startsWith('#')) clean = '#' + clean;
+        targetObj[propName] = clean;
+        onPropChange();
+      });
+      inp.placeholder = '#features or #pricing';
+      controlsWrap.appendChild(field('Section Element ID or Anchor', inp));
+    }
+
+    if (activeType !== 'none') {
+      const tabCheck = checkbox('Open in new tab / window', !!targetObj.newTab, checked => {
+        targetObj.newTab = checked;
+        onPropChange();
+      });
+      tabCheck.style.marginTop = '4px';
+      controlsWrap.appendChild(tabCheck);
+    }
   }
 
-  if (currentUrl) {
-    const newTabChk = checkbox('Open in New Tab', propObj[newTabKey] !== false, v => {
-      propObj[newTabKey] = v;
-      onPropChange();
-    });
-    newTabChk.style.marginTop = '6px';
-    container.appendChild(newTabChk);
-  }
+  container.appendChild(modeRow);
+  container.appendChild(controlsWrap);
+  renderControls();
 
   return container;
 }
+
+const fieldActionLink = navigationLinkField;
 
 // AI Website Generator State & Handlers
 state.cms.aiMode = 'prompt';
@@ -7502,10 +7829,10 @@ function saveStoredAiSettings() {
   const badge = document.getElementById('aiKeyStatusBadge');
   if (badge) {
     if (provider === 'ollama') {
-      badge.textContent = '🦙 Ollama Local (No Key Needed)';
-      badge.style.background = 'rgba(99, 102, 241, 0.18)';
-      badge.style.color = '#818cf8';
-      badge.style.borderColor = 'rgba(99, 102, 241, 0.35)';
+      badge.textContent = 'Ollama Local (No Key Needed)';
+      badge.style.background = 'rgba(59, 130, 246, 0.15)';
+      badge.style.color = '#60a5fa';
+      badge.style.borderColor = 'rgba(59, 130, 246, 0.3)';
       badge.style.display = 'inline-block';
     } else if (provider === 'smart-archetype') {
       badge.textContent = 'Built-in Engine';
@@ -7551,7 +7878,7 @@ async function checkOllamaStatus(autoSelect = true) {
       dot.classList.add('connected');
       dot.style.background = '#22c55e';
       dot.style.boxShadow = '0 0 8px rgba(34, 197, 94, 0.7)';
-      text.textContent = `🟢 Connected (${data.models.length} model${data.models.length > 1 ? 's' : ''} available)`;
+      text.textContent = `Connected (${data.models.length} model${data.models.length > 1 ? 's' : ''} available)`;
 
       if (select) {
         select.style.display = 'inline-block';
@@ -7579,20 +7906,20 @@ async function checkOllamaStatus(autoSelect = true) {
       dot.classList.remove('connected');
       dot.style.background = '#f59e0b';
       dot.style.boxShadow = '0 0 6px rgba(245, 158, 11, 0.6)';
-      text.textContent = '🟡 Ollama online (no models pulled yet: run "ollama run llama3.2")';
+      text.textContent = 'Ollama online (no models pulled yet: run "ollama run llama3.2")';
       if (select) select.style.display = 'none';
     } else {
       dot.classList.remove('connected');
       dot.style.background = '#ef4444';
       dot.style.boxShadow = '0 0 6px rgba(239, 68, 68, 0.6)';
-      text.textContent = '🔴 Offline (Run "ollama serve" or open Ollama)';
+      text.textContent = 'Offline (Run "ollama serve" or open Ollama)';
       if (select) select.style.display = 'none';
     }
   } catch (err) {
     dot.classList.remove('connected');
     dot.style.background = '#ef4444';
     dot.style.boxShadow = '0 0 6px rgba(239, 68, 68, 0.6)';
-    text.textContent = '🔴 Offline (Ensure Ollama is running)';
+    text.textContent = 'Offline (Ensure Ollama is running)';
     if (select) select.style.display = 'none';
   }
 }
@@ -7655,7 +7982,7 @@ function openAiGenerateModal() {
     (state.boards || []).forEach(b => {
       const opt = document.createElement('option');
       opt.value = b.id;
-      opt.textContent = `📋 ${b.name || b.title || 'Untitled Board'}`;
+      opt.textContent = b.name || b.title || 'Untitled Board';
       if (b.id === state.currentBoardId) opt.selected = true;
       boardSelect.appendChild(opt);
     });
@@ -7763,13 +8090,13 @@ async function submitAiGenerate() {
     const newPage = data.page;
 
     if (data.warning) {
-      showToast(`⚠️ ${data.warning} (Generated via Smart Archetype)`, 'warning');
+      showToast(`${data.warning} (Generated via Smart Archetype)`, 'warning');
     } else if (data.source === 'ollama-ai') {
-      showToast(`🦙 Generated "${newPage.title}" locally with Ollama (${model})!`, 'success');
+      showToast(`Generated "${newPage.title}" locally with Ollama (${model})!`, 'success');
     } else if (data.source === 'opencode-ai') {
-      showToast(`✨ Generated "${newPage.title}" with OpenCode (${model})!`, 'success');
+      showToast(`Generated "${newPage.title}" with OpenCode (${model})!`, 'success');
     } else {
-      showToast(`✨ Generated "${newPage.title}" successfully!`, 'success');
+      showToast(`Generated "${newPage.title}" successfully!`, 'success');
     }
     closeAiGenerateModal();
 
@@ -7947,22 +8274,10 @@ function setupCmsEvents() {
 
   state.cms.indicator = el('div', { class: 'drop-indicator' });
 
-  const canvas = document.getElementById('cmsCanvas');
   const canvasWrap = document.querySelector('.cms-canvas-wrap');
-  const viewport = document.querySelector('.canvas-viewport');
 
-  const onDeselectCanvas = e => {
-    if (e.target === canvas || e.target === canvasWrap || e.target === viewport || e.target.classList.contains('cms-empty-canvas')) {
-      state.cms.selectedBlockId = null;
-      renderCanvas();
-      renderProps();
-    }
-  };
+  setupCanvasIframe();
 
-  canvas.addEventListener('dragover', onCanvasDragOver);
-  canvas.addEventListener('dragleave', onCanvasDragLeave);
-  canvas.addEventListener('drop', onCanvasDrop);
-  canvas.addEventListener('click', onDeselectCanvas);
   if (canvasWrap) {
     canvasWrap.addEventListener('click', onDeselectCanvas);
     canvasWrap.addEventListener('dragover', onCanvasDragOver);
@@ -8027,7 +8342,7 @@ function setupCmsEvents() {
   document.getElementById('cmsViewportMobileBtn')?.addEventListener('click', () => setViewportMode('mobile'));
   document.getElementById('cmsViewportRotateBtn')?.addEventListener('click', toggleViewportOrientation);
   document.getElementById('cmsViewportFrameToggle')?.addEventListener('click', toggleDeviceFrame);
-  
+
   document.getElementById('cmsEditModeBtn')?.addEventListener('click', () => togglePreviewMode(false));
   document.getElementById('cmsPreviewModeBtn')?.addEventListener('click', () => togglePreviewMode(true));
   document.getElementById('cmsExitPreviewBtn')?.addEventListener('click', () => togglePreviewMode(false));
