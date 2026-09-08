@@ -26,6 +26,11 @@ try {
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+
+const distBrowserPath = path.join(__dirname, 'frontend', 'dist', 'frontend', 'browser');
+if (fs.existsSync(distBrowserPath)) {
+  app.use(express.static(distBrowserPath));
+}
 app.use(express.static(path.join(__dirname, 'public')));
 
 function logActivity(cardId, boardId, message) {
@@ -3637,6 +3642,15 @@ function renderPublishedPage(page, blocks, tags) {
   </script>
 </body>
 </html>`;
+}
+
+if (fs.existsSync(distBrowserPath)) {
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/p')) {
+      return next();
+    }
+    res.sendFile(path.join(distBrowserPath, 'index.html'));
+  });
 }
 
 const PORT = process.env.PORT || 3456;

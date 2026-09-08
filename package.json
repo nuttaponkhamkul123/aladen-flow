@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build:frontend": "npm run build --prefix frontend",
+    "start:frontend": "npm start --prefix frontend"
   },
   "dependencies": {
     "cors": "^2.8.5",
