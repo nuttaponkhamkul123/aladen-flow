@@ -4073,38 +4073,81 @@ function setupViewportBundleDropdown() {
   if (!bundleBtn || !menu || bundleBtn._hasListener) return;
   bundleBtn._hasListener = true;
 
+  // Move menu to document.body so it acts as a portal and cannot be clipped by any container overflow
+  if (menu.parentNode !== document.body) {
+    document.body.appendChild(menu);
+  }
+
+  const updateMenuPosition = () => {
+    const rect = bundleBtn.getBoundingClientRect();
+    const menuWidth = menu.offsetWidth || 200;
+    let left = rect.left + (rect.width / 2) - (menuWidth / 2);
+    if (left < 10) left = 10;
+    if (left + menuWidth > window.innerWidth - 10) {
+      left = Math.max(10, window.innerWidth - menuWidth - 10);
+    }
+    menu.style.position = 'fixed';
+    menu.style.top = `${Math.round(rect.bottom + 6)}px`;
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.transform = 'none';
+    menu.style.zIndex = '999999';
+  };
+
+  const openMenu = () => {
+    menu.classList.remove('hidden');
+    updateMenuPosition();
+    bundleBtn.classList.add('is-open');
+  };
+
+  const closeMenu = () => {
+    menu.classList.add('hidden');
+    bundleBtn.classList.remove('is-open');
+  };
+
   bundleBtn.addEventListener('click', e => {
     e.stopPropagation();
-    menu.classList.toggle('hidden');
+    if (menu.classList.contains('hidden')) {
+      openMenu();
+    } else {
+      closeMenu();
+    }
   });
 
   menu.querySelectorAll('[data-viewport]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       setViewportMode(btn.dataset.viewport);
-      menu.classList.add('hidden');
+      closeMenu();
     });
   });
 
   document.getElementById('cmsBundleRotateBtn')?.addEventListener('click', e => {
     e.stopPropagation();
     toggleViewportOrientation();
+    updateMenuPosition();
   });
 
   document.getElementById('cmsBundleFrameBtn')?.addEventListener('click', e => {
     e.stopPropagation();
     toggleDeviceFrame();
+    updateMenuPosition();
   });
 
   document.addEventListener('click', e => {
     if (!menu.contains(e.target) && !bundleBtn.contains(e.target)) {
-      menu.classList.add('hidden');
+      closeMenu();
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if (!menu.classList.contains('hidden')) {
+      updateMenuPosition();
     }
   });
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      menu.classList.add('hidden');
+      closeMenu();
     }
   });
 }
