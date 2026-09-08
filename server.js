@@ -1732,13 +1732,13 @@ function makeBlockBgCss(p) {
   const type = p.bgType || 'none';
   let css = '';
   if (type === 'color' && p.bgColor) {
-    css += `background:${p.bgColor};`;
+    css += `background:${p.bgColor};background-color:${p.bgColor};`;
   } else if (type === 'gradient' && p.bgGradient) {
     css += `background:${p.bgGradient};`;
   } else if (type === 'image' && p.bgImage) {
-    css += `background-image:url("${p.bgImage}");background-size:${p.bgSize || 'cover'};background-position:${p.bgPosition || 'center'};background-repeat:${p.bgRepeat || 'no-repeat'};`;
+    css += `background-image:url('${p.bgImage}');background-size:${p.bgSize || 'cover'};background-position:${p.bgPosition || 'center'};background-repeat:${p.bgRepeat || 'no-repeat'};`;
   }
-  if (p.parallax && type !== 'none') css += 'background-attachment:fixed;';
+  if (p.parallax && type === 'image') css += 'background-attachment:fixed;';
   return css;
 }
 
@@ -1748,15 +1748,16 @@ function injectBgStyleIntoFirstTag(html, css) {
   const gt = html.indexOf('>');
   if (gt === -1) return html;
   const firstTag = html.slice(0, gt + 1);
-  const safeCss = escHtml(css);
   const styleAttrMatch = firstTag.match(/style="([^"]*)"/);
   if (styleAttrMatch) {
-    const replaced = firstTag.replace(/style="([^"]*)"/, (m, inner) => `style="${inner}${safeCss}"`);
+    const inner = styleAttrMatch[1];
+    const separator = inner && !inner.trim().endsWith(';') ? ';' : '';
+    const replaced = firstTag.replace(/style="([^"]*)"/, `style="${inner}${separator}${css}"`);
     return replaced + html.slice(gt + 1);
   }
   const selfClosing = firstTag.endsWith('/>');
   const openTag = selfClosing ? firstTag.slice(0, gt - 1) : firstTag.slice(0, gt);
-  return `${openTag} style="${safeCss}"${selfClosing ? '/>' : '>'}` + html.slice(gt + 1);
+  return `${openTag} style="${css}"${selfClosing ? '/>' : '>'}` + html.slice(gt + 1);
 }
 
 function renderBlockHtml(b) {
@@ -3271,6 +3272,70 @@ function renderPublishedPage(page, blocks, tags) {
       background: #f1f5f9;
       border-color: #e2e8f0;
       color: #475569;
+    }
+
+    @media (max-width: 768px) {
+      [style*="background-attachment:fixed"],
+      [style*="background-attachment: fixed"] {
+        background-attachment: scroll !important;
+      }
+      .wrap {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        padding: 16px 14px !important;
+        margin: 0 auto !important;
+        border-radius: 0 !important;
+      }
+      .cms-container[style*="grid-template-columns"] {
+        display: flex !important;
+        flex-direction: column !important;
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        padding: 12px 10px !important;
+      }
+      .cms-container[style*="flex-direction"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+        padding: 12px 10px !important;
+      }
+      .cms-bento-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+      }
+      .cms-bento-card {
+        grid-column: span 1 !important;
+        grid-row: auto !important;
+        width: 100% !important;
+        padding: 18px 16px !important;
+      }
+      .cms-footer-cols {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+      }
+      .cms-footer-top {
+        flex-direction: column !important;
+        gap: 16px !important;
+      }
+      .cms-footer-newsletter-form {
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 8px !important;
+      }
+      .cms-footer-newsletter-input {
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+      .cms-footer-newsletter-btn {
+        width: 100% !important;
+      }
+      .cms-footer-bottom {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+      }
     }
   </style>
 </head>

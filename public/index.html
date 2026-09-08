@@ -39,84 +39,85 @@
           </svg>
           <span>Site Builder</span>
         </button>
-      </nav>
 
-      <!-- Site Builder Sub-Tab Group (Pages Popup) -->
-      <div class="cms-sub-tabs-group hidden" data-tab-show="cms">
-        <button type="button" id="cmsPagesDropdownTrigger" class="tab cms-sub-tab" aria-expanded="false" title="Pages & Documents Explorer">
-          <svg class="tab-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>
-          </svg>
-          <span id="cmsCurrentPageLabel" class="cms-current-page-name">Pages</span>
-          <span id="cmsTopPagesCount" class="tab-badge">0</span>
-          <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.7;">
-            <path d="m6 9 6 6 6-6"/>
-          </svg>
-        </button>
+        <!-- Site Builder Sub-Tab Group (Pages Popup) -->
+        <div class="cms-sub-tabs-group hidden" data-tab-show="cms">
+          <span class="tabs-sub-divider" aria-hidden="true">/</span>
+          <button type="button" id="cmsPagesDropdownTrigger" class="cms-sub-tab" aria-expanded="false" title="Pages & Documents Explorer">
+            <svg class="tab-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span id="cmsCurrentPageLabel" class="cms-current-page-name">Pages</span>
+            <span id="cmsTopPagesCount" class="tab-badge">0</span>
+            <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.7;">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </button>
 
-        <!-- Pages Dropdown Popup -->
-        <div id="cmsPagesPopup" class="cms-pages-popup hidden">
-          <div class="cms-popup-header">
-            <div class="cms-popup-title">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>
-              </svg>
-              <span>Pages & Documents</span>
-            </div>
-            <button type="button" id="cmsClosePagesPopupBtn" class="cms-popup-close-btn" title="Close">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-
-          <div class="cms-popup-top-action">
-            <button id="newPageBtn" class="btn primary full">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              <span>Blank Page</span>
-            </button>
-            <button id="cmsPopupAiBtn" class="btn btn-ai-sparkle full" style="margin-top:6px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
-              <span>AI Generate Page</span>
-            </button>
-          </div>
-
-          <div class="cms-popup-scroll">
-            <div class="cms-search-box">
-              <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-              </svg>
-              <input id="cmsSearchInput" type="text" placeholder="Filter pages..." />
-            </div>
-
-            <div class="cms-filter-row">
-              <label class="section-eyebrow">Status</label>
-              <div class="select-wrapper">
-                <select id="cmsStatusFilter">
-                  <option value="">All Statuses</option>
-                  <option value="draft">Drafts Only</option>
-                  <option value="published">Published Only</option>
-                </select>
-                <svg class="chevron-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="m6 9 6 6 6-6"/>
+          <!-- Pages Dropdown Popup -->
+          <div id="cmsPagesPopup" class="cms-pages-popup hidden">
+            <div class="cms-popup-header">
+              <div class="cms-popup-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>
                 </svg>
+                <span>Pages & Documents</span>
               </div>
+              <button type="button" id="cmsClosePagesPopupBtn" class="cms-popup-close-btn" title="Close">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
 
-            <div class="cms-tags-wrap">
-              <label class="section-eyebrow">Tags</label>
-              <div id="cmsTags" class="cms-tags"></div>
+            <div class="cms-popup-top-action">
+              <button id="newPageBtn" class="btn primary full">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>Blank Page</span>
+              </button>
+              <button id="cmsPopupAiBtn" class="btn btn-ai-sparkle full" style="margin-top:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+                <span>AI Generate Page</span>
+              </button>
             </div>
 
-            <div class="cms-pages-list-wrap">
-              <div class="pages-header-row">
-                <label class="section-eyebrow">Documents</label>
+            <div class="cms-popup-scroll">
+              <div class="cms-search-box">
+                <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                </svg>
+                <input id="cmsSearchInput" type="text" placeholder="Filter pages..." />
               </div>
-              <div id="cmsPagesList" class="cms-pages-list"></div>
+
+              <div class="cms-filter-row">
+                <label class="section-eyebrow">Status</label>
+                <div class="select-wrapper">
+                  <select id="cmsStatusFilter">
+                    <option value="">All Statuses</option>
+                    <option value="draft">Drafts Only</option>
+                    <option value="published">Published Only</option>
+                  </select>
+                  <svg class="chevron-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m6 9 6 6 6-6"/>
+                  </svg>
+                </div>
+              </div>
+
+              <div class="cms-tags-wrap">
+                <label class="section-eyebrow">Tags</label>
+                <div id="cmsTags" class="cms-tags"></div>
+              </div>
+
+              <div class="cms-pages-list-wrap">
+                <div class="pages-header-row">
+                  <label class="section-eyebrow">Documents</label>
+                </div>
+                <div id="cmsPagesList" class="cms-pages-list"></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </nav>
     </div>
 
     <div class="topbar-actions">
@@ -658,27 +659,29 @@
             <div class="input-with-label">
               <input id="cmsTitle" class="cms-title" placeholder="Untitled Document" />
             </div>
-            <div class="slug-badge">
-              <span class="slug-prefix">/p/</span>
-              <input id="cmsSlug" class="cms-slug" placeholder="page-slug" />
-            </div>
-            <div class="status-pill-wrap">
-              <select id="cmsStatus" class="cms-status-select">
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-              </select>
-            </div>
-            <button id="cmsFirstPageToggleBtn" type="button" class="first-page-btn" title="Designate as site First Page (Homepage)">
-              <span class="first-page-icon">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              </span>
-              <span class="first-page-text">First Page</span>
-            </button>
-            <div class="tags-input-wrap">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/>
-              </svg>
-              <input id="cmsTagsInput" class="cms-tags-input" placeholder="Tags (comma separated)" />
+            <div class="cms-meta-controls-group" role="group" aria-label="Page Settings">
+              <div class="slug-badge" title="Page URL slug">
+                <span class="slug-prefix">/p/</span>
+                <input id="cmsSlug" class="cms-slug" placeholder="page-slug" />
+              </div>
+              <div class="status-pill-wrap" title="Publication status">
+                <select id="cmsStatus" class="cms-status-select">
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
+              <button id="cmsFirstPageToggleBtn" type="button" class="first-page-btn" title="Designate as site First Page (Homepage)">
+                <span class="first-page-icon">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                </span>
+                <span class="first-page-text">First Page</span>
+              </button>
+              <div class="tags-input-wrap" title="Tags (comma separated)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/>
+                </svg>
+                <input id="cmsTagsInput" class="cms-tags-input" placeholder="Tags..." />
+              </div>
             </div>
           </div>
 

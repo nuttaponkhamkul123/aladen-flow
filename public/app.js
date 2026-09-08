@@ -910,7 +910,7 @@ function updateCurrentPageTopbarLabel() {
 }
 
 function setupTabs() {
-  document.querySelectorAll('.main-tabs-group .tab').forEach(t => {
+  document.querySelectorAll('.main-tabs-group .tab[data-tab]').forEach(t => {
     t.onclick = () => switchTab(t.dataset.tab);
   });
 
@@ -947,7 +947,7 @@ function setupTabs() {
 
 function switchTab(name) {
   state.currentTab = name;
-  document.querySelectorAll('.main-tabs-group .tab').forEach(t => {
+  document.querySelectorAll('.main-tabs-group .tab[data-tab]').forEach(t => {
     t.classList.toggle('active', t.dataset.tab === name);
   });
   document.querySelectorAll('[data-tab-panel]').forEach(p => {
@@ -2237,18 +2237,52 @@ function applyCustomCssOverride(targetElement, customCssString) {
 function applyBlockAppearance(targetElement, props) {
   if (!targetElement || !props) return;
   const type = props.bgType || 'none';
-  if (type === 'color' && props.bgColor) {
-    targetElement.style.background = props.bgColor;
-  } else if (type === 'gradient' && props.bgGradient) {
-    targetElement.style.background = props.bgGradient;
-  } else if (type === 'image' && props.bgImage) {
-    targetElement.style.backgroundImage = `url("${props.bgImage}")`;
-    targetElement.style.backgroundSize = props.bgSize || 'cover';
-    targetElement.style.backgroundPosition = props.bgPosition || 'center';
-    targetElement.style.backgroundRepeat = props.bgRepeat || 'no-repeat';
+
+  // 1. Reset all background properties cleanly so switching types works flawlessly
+  targetElement.style.removeProperty('background');
+  targetElement.style.removeProperty('background-color');
+  targetElement.style.removeProperty('background-image');
+  targetElement.style.removeProperty('background-size');
+  targetElement.style.removeProperty('background-position');
+  targetElement.style.removeProperty('background-repeat');
+  targetElement.style.removeProperty('background-attachment');
+
+  if (type === 'none') {
+    return;
   }
-  if (props.parallax && type !== 'none') {
-    targetElement.style.backgroundAttachment = 'fixed';
+
+  if (type === 'color' && props.bgColor) {
+    targetElement.style.setProperty('background', props.bgColor, 'important');
+    targetElement.style.setProperty('background-color', props.bgColor, 'important');
+  } else if (type === 'gradient' && props.bgGradient) {
+    targetElement.style.setProperty('background', props.bgGradient, 'important');
+    targetElement.style.setProperty('background-image', props.bgGradient, 'important');
+  } else if (type === 'image' && props.bgImage) {
+    targetElement.style.setProperty('background-image', `url("${props.bgImage}")`, 'important');
+    targetElement.style.setProperty('background-size', props.bgSize || 'cover', 'important');
+    targetElement.style.setProperty('background-position', props.bgPosition || 'center', 'important');
+    targetElement.style.setProperty('background-repeat', props.bgRepeat || 'no-repeat', 'important');
+  }
+
+  // 2. Parallax Scrolling behavior:
+  // In the studio canvas (inside the iframe that doesn't scroll its own window on desktop,
+  // or inside a device frame with overflow-y: auto), background-attachment: fixed causes background images
+  // to be pinned to the iframe document coordinates (e.g. at the bottom of the 1500px iframe if bgPosition is 'bottom'),
+  // making it completely vanish or clip out of the component box!
+  // Therefore, in the editor iframe, we keep backgroundAttachment as 'scroll' (element-anchored) so the background
+  // image is always rendered accurately and reliably right inside the component box.
+  const isMobile = state?.cms?.viewportMode === 'mobile' || state?.cms?.viewportMode === 'tablet';
+  const isFramed = !!state?.cms?.deviceFrame;
+  const isStudioEditor = !state?.cms?.isPreviewMode;
+
+  if (props.parallax && type === 'image') {
+    if (isStudioEditor || isMobile || isFramed) {
+      targetElement.style.setProperty('background-attachment', 'scroll', 'important');
+    } else {
+      targetElement.style.setProperty('background-attachment', 'fixed', 'important');
+    }
+  } else {
+    targetElement.style.setProperty('background-attachment', 'scroll', 'important');
   }
 }
 
@@ -4066,23 +4100,19 @@ function getCanvasContentHeight() {
   const canvas = doc.getElementById('cmsCanvas');
   if (!canvas) return 560;
 
-  const rect = canvas.getBoundingClientRect();
-  const scrollH = canvas.scrollHeight || 0;
-  const offsetH = canvas.offsetHeight || 0;
-
   let maxChildBottom = 0;
   const children = canvas.children;
   for (let i = 0; i < children.length; i++) {
     const c = children[i];
-    if (c.classList.contains('drop-indicator') || c.classList.contains('container-insert-indicator')) continue;
-    const cBottom = c.offsetTop + c.offsetHeight;
+    if (c.classList?.contains('drop-indicator') || c.classList?.contains('container-insert-indicator') || c.classList?.contains('canvas-zone-grow')) continue;
+    const cBottom = (c.offsetTop || 0) + (c.offsetHeight || 0);
     if (cBottom > maxChildBottom) maxChildBottom = cBottom;
   }
 
   const computedPaddingBottom = parseFloat(doc.defaultView?.getComputedStyle(canvas).paddingBottom) || 44;
-  const childTotalH = maxChildBottom > 0 ? maxChildBottom + computedPaddingBottom : 0;
+  const childTotalH = maxChildBottom > 0 ? maxChildBottom + computedPaddingBottom : 540;
 
-  return Math.max(540, Math.ceil(Math.max(rect.height, scrollH, offsetH, childTotalH)));
+  return Math.max(540, Math.ceil(childTotalH));
 }
 
 function updateIframeHeight() {
@@ -4095,17 +4125,24 @@ function updateIframeHeight() {
 
   if (doc && doc.body) {
     doc.body.classList.toggle('is-device-frame', !!showFrame);
+    if (!showFrame) {
+      doc.documentElement.style.overflow = 'hidden';
+      doc.body.style.overflow = 'hidden';
+    } else {
+      doc.documentElement.style.overflow = 'hidden';
+      doc.body.style.overflow = '';
+    }
   }
 
   if (showFrame) {
-    iframe.style.height = isLandscape ? '360px' : '680px';
-  } else if (mode === 'mobile') {
-    iframe.style.height = isLandscape ? '375px' : '720px';
-  } else if (mode === 'tablet') {
-    iframe.style.height = isLandscape ? '768px' : '1024px';
+    if (mode === 'mobile') {
+      iframe.style.height = isLandscape ? '375px' : '680px';
+    } else if (mode === 'tablet') {
+      iframe.style.height = isLandscape ? '680px' : '960px';
+    }
   } else {
     const contentH = getCanvasContentHeight();
-    iframe.style.height = `${contentH + 8}px`;
+    iframe.style.height = `${contentH}px`;
   }
 }
 
@@ -4122,9 +4159,7 @@ function setupCanvasIframe(callback) {
     try {
       const doc = frame.contentDocument || frame.contentWindow?.document;
       if (!doc) return;
-      if (doc.getElementById('cmsCanvas')) {
-        attachCanvasIframeListeners(doc);
-        syncCanvasTheme();
+      if (doc.getElementById('cmsCanvas') && _canvasIframeInitialized) {
         if (callback) callback();
         return;
       }
@@ -4145,7 +4180,7 @@ function setupCanvasIframe(callback) {
       width: 100%;
       background: transparent;
       box-sizing: border-box;
-      overflow-x: hidden;
+      overflow: hidden;
     }
     *, *::before, *::after {
       box-sizing: inherit;
@@ -4157,24 +4192,26 @@ function setupCanvasIframe(callback) {
       background: transparent;
       color: var(--text-primary);
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
       box-sizing: border-box;
-      overflow-x: hidden;
-      overflow-y: visible;
+      overflow: hidden;
+      display: block;
     }
     body.is-device-frame {
       height: 100%;
-      overflow-y: auto;
+      min-height: 100%;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      -webkit-overflow-scrolling: touch;
     }
     #cmsCanvas {
       width: 100%;
       min-height: 520px;
-      height: auto;
+      height: auto !important;
+      max-height: none !important;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
+      flex-shrink: 0;
     }
     body.is-device-frame #cmsCanvas {
       min-height: 100%;
@@ -4255,11 +4292,14 @@ function attachCanvasIframeListeners(doc) {
     const ro = new doc.defaultView.ResizeObserver(() => {
       const mode = state.cms.viewportMode || 'desktop';
       const showFrame = state.cms.deviceFrame && (mode === 'mobile' || mode === 'tablet');
-      if (!showFrame && mode === 'desktop') {
+      if (!showFrame) {
         const h = getCanvasContentHeight();
         const iframe = document.getElementById('cmsCanvasFrame');
-        if (iframe && Math.abs(parseInt(iframe.style.height || '0') - (h + 8)) > 2) {
-          iframe.style.height = `${h + 8}px`;
+        if (iframe) {
+          const curH = parseInt(iframe.style.height || '0', 10);
+          if (Math.abs(curH - h) > 4) {
+            iframe.style.height = `${h}px`;
+          }
         }
       }
     });
@@ -4302,11 +4342,36 @@ function applyCanvasSettings() {
     targetWidth = settings.maxWidth || '820px';
   }
 
+  const isExplicitDevice = mode === 'mobile' || mode === 'tablet';
+  viewport.style.width = isExplicitDevice ? targetWidth : (state.cms.viewportWidth != null ? targetWidth : '100%');
   viewport.style.maxWidth = targetWidth;
 
-  const targetMinWidth = (!state.cms.isPreviewMode && settings.minWidth) ? settings.minWidth : '0px';
-  viewport.style.minWidth = targetMinWidth;
-  canvas.style.minWidth = targetMinWidth;
+  const targetMinWidth = (!state.cms.isPreviewMode && mode === 'desktop' && settings.minWidth) ? settings.minWidth : (isExplicitDevice ? targetWidth : '0px');
+  viewport.style.minWidth = isExplicitDevice ? targetWidth : targetMinWidth;
+  canvas.style.minWidth = isExplicitDevice ? targetWidth : targetMinWidth;
+
+  const doc = getCanvasDocument();
+  if (doc) {
+    if (doc.body) {
+      doc.body.style.minWidth = isExplicitDevice ? targetWidth : targetMinWidth;
+      doc.body.classList.toggle('is-mobile-viewport', mode === 'mobile');
+      doc.body.classList.toggle('is-tablet-viewport', mode === 'tablet');
+      doc.body.classList.toggle('is-landscape', isLandscape);
+    }
+    const canvasInDoc = doc.getElementById('cmsCanvas');
+    if (canvasInDoc) {
+      canvasInDoc.style.minWidth = isExplicitDevice ? targetWidth : targetMinWidth;
+      canvasInDoc.classList.toggle('is-mobile-viewport', mode === 'mobile');
+      canvasInDoc.classList.toggle('is-tablet-viewport', mode === 'tablet');
+      canvasInDoc.classList.toggle('is-landscape', isLandscape);
+    }
+  }
+
+  const iframe = document.getElementById('cmsCanvasFrame');
+  if (iframe) {
+    iframe.style.width = isExplicitDevice ? targetWidth : '100%';
+    iframe.style.maxWidth = isExplicitDevice ? targetWidth : '100%';
+  }
 
   const isFullWidth = targetWidth === '100%';
   const viewportContainer = document.getElementById('canvasViewportContainer');
@@ -4321,8 +4386,8 @@ function applyCanvasSettings() {
   if (frameTop) frameTop.classList.toggle('hidden', !showFrame);
   if (frameBottom) frameBottom.classList.toggle('hidden', !showFrame);
 
-  const paddingX = settings.paddingX != null ? Number(settings.paddingX) : (mode === 'mobile' ? 20 : 36);
-  const paddingY = settings.paddingY != null ? Number(settings.paddingY) : (mode === 'mobile' ? 28 : 44);
+  const paddingX = settings.paddingX != null && mode === 'desktop' ? Number(settings.paddingX) : (mode === 'mobile' ? 14 : (mode === 'tablet' ? 24 : 36));
+  const paddingY = settings.paddingY != null && mode === 'desktop' ? Number(settings.paddingY) : (mode === 'mobile' ? 18 : (mode === 'tablet' ? 28 : 44));
   const marginY = settings.marginY != null ? Number(settings.marginY) : 0;
   const marginX = settings.marginX != null ? Number(settings.marginX) : 0;
   const borderRadius = settings.borderRadius != null ? Number(settings.borderRadius) : (showFrame ? 24 : 16);
@@ -4370,14 +4435,34 @@ function applyCanvasSettings() {
   }
 
   canvas.style.background = bgCss;
+  canvas.style.color = textCss;
   canvas.style.border = borderCss;
   canvas.style.borderRadius = `${borderRadius}px`;
   canvas.style.padding = `${paddingY}px ${paddingX}px`;
 
+  if (doc && doc.body) {
+    doc.body.style.color = textCss;
+    if (bgType === 'light') {
+      doc.body.classList.add('theme-light');
+      doc.body.classList.remove('theme-dark');
+      canvas.classList.add('theme-light');
+      canvas.classList.remove('theme-dark');
+    } else {
+      doc.body.classList.remove('theme-light');
+      doc.body.classList.add('theme-dark');
+      canvas.classList.remove('theme-light');
+      canvas.classList.add('theme-dark');
+    }
+    if (isFullWidth || showFrame) {
+      doc.body.style.background = bgCss;
+    } else {
+      doc.body.style.background = 'transparent';
+    }
+  }
+
   const isCanvasActive = !state.cms.selectedBlockId && !!state.cms.openPage && !state.cms.isPreviewMode;
   canvas.classList.toggle('is-active', isCanvasActive);
   viewport.classList.remove('is-active');
-  const iframe = document.getElementById('cmsCanvasFrame');
   if (iframe) iframe.classList.remove('is-active');
 
   syncCanvasTheme();
@@ -5006,11 +5091,62 @@ function onBlockDragEnd(e) {
   hideDropIndicator();
 }
 
+function getDraggedBlockType() {
+  if (!state.cms.drag) return null;
+  if (state.cms.drag.kind === 'palette') return state.cms.drag.type;
+  if (state.cms.drag.kind === 'block') {
+    const b = findBlock(state.cms.drag.id);
+    return b ? b.type : null;
+  }
+  if (state.cms.drag.kind === 'reusable') {
+    const r = (state.cms.reusableBlocks || []).find(x => x.id === Number(state.cms.drag.reusableId));
+    return r && r.block_data ? r.block_data.type : null;
+  }
+  return null;
+}
+
 function getTopLevelInsertIndex(canvas, clientY) {
   const wraps = Array.from(canvas.querySelectorAll(':scope > .block-wrap'));
+  if (!wraps.length) return 0;
+
+  const dragType = getDraggedBlockType();
+  const footerIndex = wraps.findIndex(w => {
+    const b = findBlock(w.id);
+    return b && b.type === 'footer';
+  });
+  const headerIndex = wraps.findIndex(w => {
+    const b = findBlock(w.id);
+    return b && b.type === 'header';
+  });
+
+  const footerDivider = canvas.querySelector('.canvas-zone-divider.zone-footer');
+
+  // If hovering at or past the footer divider, or in the footer area with a content block:
+  // Non-footer items should always drop at the end of the content section (before the footer)
+  if (dragType !== 'footer' && footerIndex !== -1) {
+    if (footerDivider) {
+      const fRect = footerDivider.getBoundingClientRect();
+      if (clientY >= fRect.top - 15) {
+        return footerIndex;
+      }
+    }
+  }
+
   for (let i = 0; i < wraps.length; i++) {
     const rect = wraps[i].getBoundingClientRect();
-    if (clientY < rect.top + rect.height / 2) return i;
+    if (clientY < rect.top + rect.height / 2) {
+      if (dragType !== 'header' && headerIndex !== -1 && i <= headerIndex) {
+        return headerIndex + 1;
+      }
+      if (dragType !== 'footer' && footerIndex !== -1 && i >= footerIndex) {
+        return footerIndex;
+      }
+      return i;
+    }
+  }
+
+  if (dragType !== 'footer' && footerIndex !== -1) {
+    return footerIndex;
   }
   return wraps.length;
 }
@@ -5020,8 +5156,20 @@ function showTopLevelDropIndicator(canvas, idx) {
     state.cms.indicator = el('div', { class: 'drop-indicator' });
   }
   state.cms.indicator.className = 'drop-indicator';
-  const wraps = canvas.querySelectorAll(':scope > .block-wrap');
+  const wraps = Array.from(canvas.querySelectorAll(':scope > .block-wrap'));
   const empty = canvas.querySelector('.cms-empty-canvas');
+  const footerDivider = canvas.querySelector('.canvas-zone-divider.zone-footer');
+  const footerIndex = wraps.findIndex(w => {
+    const b = findBlock(w.id);
+    return b && b.type === 'footer';
+  });
+
+  // If dropping at or before the footer (end of content section)
+  if (footerIndex !== -1 && idx === footerIndex && footerDivider) {
+    canvas.insertBefore(state.cms.indicator, footerDivider);
+    return;
+  }
+
   if (idx >= wraps.length) {
     if (empty) canvas.insertBefore(state.cms.indicator, empty);
     else canvas.appendChild(state.cms.indicator);
@@ -5183,6 +5331,15 @@ function onCanvasDragOver(e) {
   e.dataTransfer.dropEffect = (state.cms.drag.kind === 'palette' || state.cms.drag.kind === 'reusable') ? 'copy' : 'move';
   const canvas = getCanvasElement();
   if (!canvas) return;
+
+  if (state.cms.containerIndicator && state.cms.containerIndicator.parentNode) {
+    state.cms.containerIndicator.parentNode.removeChild(state.cms.containerIndicator);
+  }
+  const canvasDoc = getCanvasDocument();
+  if (canvasDoc) {
+    canvasDoc.querySelectorAll('.block-container.drag-over').forEach(el => el.classList.remove('drag-over'));
+  }
+
   const idx = getTopLevelInsertIndex(canvas, e.clientY);
   showTopLevelDropIndicator(canvas, idx);
 }
@@ -5215,15 +5372,35 @@ function onContainerDragOver(e, containerBlock) {
   if (state.cms.drag.kind === 'block' && isDescendant(state.cms.drag.id, containerBlock.id)) {
     return;
   }
+
+  const containerEl = e.currentTarget;
+  const topWrap = containerEl.closest('#cmsCanvas > .block-wrap');
+
+  // If hovering near the top or bottom edges of a top-level container block,
+  // allow the drag event to bubble to onCanvasDragOver so the user can drop before/after the container.
+  if (topWrap) {
+    const wrapRect = topWrap.getBoundingClientRect();
+    if (e.clientY >= wrapRect.bottom - 22 || e.clientY <= wrapRect.top + 18) {
+      containerEl.classList.remove('drag-over');
+      if (state.cms.containerIndicator && state.cms.containerIndicator.parentNode) {
+        state.cms.containerIndicator.parentNode.removeChild(state.cms.containerIndicator);
+      }
+      return;
+    }
+  }
+
   e.preventDefault();
   e.stopPropagation();
   e.dataTransfer.dropEffect = (state.cms.drag.kind === 'palette' || state.cms.drag.kind === 'reusable') ? 'copy' : 'move';
 
-  const containerEl = e.currentTarget;
+  if (state.cms.indicator && state.cms.indicator.parentNode) {
+    state.cms.indicator.parentNode.removeChild(state.cms.indicator);
+  }
+
   containerEl.classList.add('drag-over');
 
   const p = containerBlock.props || {};
-  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || (containerBlock.type === 'header' && p.carouselLayout !== 'vertical');
+  const isGridOrWrap = (p.mode === 'grid' && (Number(p.columns) || 2) > 1) || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || (containerBlock.type === 'header' && p.carouselLayout !== 'vertical');
   const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isGridOrWrap);
   showContainerDropIndicator(containerEl, idx, isGridOrWrap);
 }
@@ -5236,19 +5413,28 @@ function onContainerDragLeave(e, containerBlock) {
 }
 
 function onContainerDrop(e, containerBlock) {
-  e.preventDefault();
-  e.stopPropagation();
-  const containerEl = e.currentTarget;
-  containerEl.classList.remove('drag-over');
-  hideDropIndicator();
-
   if (!state.cms.drag) return;
   if (state.cms.drag.kind === 'block' && isDescendant(state.cms.drag.id, containerBlock.id)) {
     return;
   }
 
+  const containerEl = e.currentTarget;
+  const topWrap = containerEl.closest('#cmsCanvas > .block-wrap');
+  if (topWrap) {
+    const wrapRect = topWrap.getBoundingClientRect();
+    if (e.clientY >= wrapRect.bottom - 22 || e.clientY <= wrapRect.top + 18) {
+      // Let it bubble to onCanvasDrop
+      return;
+    }
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+  containerEl.classList.remove('drag-over');
+  hideDropIndicator();
+
   const p = containerBlock.props || {};
-  const isGridOrWrap = (p.mode === 'grid') || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || (containerBlock.type === 'header' && p.carouselLayout !== 'vertical');
+  const isGridOrWrap = (p.mode === 'grid' && (Number(p.columns) || 2) > 1) || (p.mode === 'flex' && (!p.direction || p.direction.startsWith('row'))) || (containerBlock.type === 'header' && p.carouselLayout !== 'vertical');
   const idx = getContainerInsertIndex(containerEl, e.clientX, e.clientY, isGridOrWrap);
 
   if (state.cms.drag.kind === 'palette') {
