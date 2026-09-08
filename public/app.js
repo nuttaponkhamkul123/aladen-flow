@@ -878,6 +878,7 @@ function togglePagesPopup() {
       trigger.classList.add('open');
       trigger.setAttribute('aria-expanded', 'true');
     }
+    updateActivePageCard();
     renderCmsPages();
     const search = document.getElementById('cmsSearchInput');
     if (search) search.focus();
@@ -896,17 +897,66 @@ function closePagesPopup() {
   }
 }
 
+function updatePageStatusIndicators() {
+  const status = state.cms.openPage?.status || 'draft';
+  const isPublished = status === 'published';
+
+  const headerDot = document.getElementById('cmsHeaderStatusDot');
+  if (headerDot) {
+    headerDot.className = `header-status-dot ${status}`;
+    headerDot.title = `Page Status: ${isPublished ? 'Published' : 'Draft'}`;
+  }
+
+  const barDot = document.getElementById('cmsPageBarStatusDot');
+  if (barDot) {
+    barDot.className = `page-status-dot ${status}`;
+    barDot.title = `Page Status: ${isPublished ? 'Published' : 'Draft'}`;
+  }
+}
+
+function updateActivePageCard() {
+  const card = document.getElementById('cmsActivePageCard');
+  if (!card) return;
+  if (!state.cms.openPage) {
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+  const badge = document.getElementById('cmsActivePageTitleBadge');
+  if (badge) {
+    badge.textContent = state.cms.openPage.title || 'Untitled';
+  }
+  const slugInput = document.getElementById('cmsSlug');
+  if (slugInput && document.activeElement !== slugInput) {
+    slugInput.value = state.cms.openPage.slug || '';
+  }
+  const statusSelect = document.getElementById('cmsStatus');
+  if (statusSelect) {
+    statusSelect.value = state.cms.openPage.status || 'draft';
+  }
+  const tagsInput = document.getElementById('cmsTagsInput');
+  if (tagsInput && document.activeElement !== tagsInput) {
+    tagsInput.value = (state.cms.openPage.tags || []).join(', ');
+  }
+  updateFirstPageUI();
+  updatePageStatusIndicators();
+}
+
 function updateCurrentPageTopbarLabel() {
   const labelEl = document.getElementById('cmsCurrentPageLabel');
-  if (!labelEl) return;
-  if (state.cms.openPage) {
-    const title = (state.cms.openPage.title || '').trim();
-    labelEl.textContent = title ? title : 'Untitled';
-    labelEl.title = title ? `Current Page: ${title}` : 'Current Page: Untitled';
-  } else {
-    labelEl.textContent = 'Pages';
-    labelEl.title = 'Pages & Documents Explorer';
+  if (labelEl) {
+    if (state.cms.openPage) {
+      const title = (state.cms.openPage.title || '').trim();
+      labelEl.textContent = title ? title : 'Untitled';
+      labelEl.title = title ? `Current Page: ${title}` : 'Current Page: Untitled';
+    } else {
+      labelEl.textContent = 'Pages';
+      labelEl.title = 'Pages & Documents Explorer';
+    }
   }
+  updateFirstPageUI();
+  updatePageStatusIndicators();
+  updateActivePageCard();
 }
 
 function setupTabs() {
@@ -917,6 +967,15 @@ function setupTabs() {
   const trigger = document.getElementById('cmsPagesDropdownTrigger');
   if (trigger) {
     trigger.onclick = e => {
+      e.stopPropagation();
+      togglePagesPopup();
+    };
+  }
+
+  const quickSettingsBtn = document.getElementById('cmsQuickPageSettingsBtn');
+  if (quickSettingsBtn && !quickSettingsBtn._hasListener) {
+    quickSettingsBtn._hasListener = true;
+    quickSettingsBtn.onclick = e => {
       e.stopPropagation();
       togglePagesPopup();
     };
@@ -933,7 +992,7 @@ function setupTabs() {
   document.addEventListener('click', e => {
     const popup = document.getElementById('cmsPagesPopup');
     const group = document.querySelector('.cms-sub-tabs-group');
-    if (popup && !popup.classList.contains('hidden') && group && !group.contains(e.target)) {
+    if (popup && !popup.classList.contains('hidden') && group && !group.contains(e.target) && !e.target.closest('#cmsQuickPageSettingsBtn')) {
       closePagesPopup();
     }
   });
@@ -1925,22 +1984,34 @@ async function openCmsPage(id) {
 }
 
 function updateFirstPageUI() {
+  const isFirst = !!(state.cms.openPage && state.cms.openPage.is_first_page);
+
   const btn = document.getElementById('cmsFirstPageToggleBtn');
-  if (!btn) return;
-  if (!state.cms.openPage) {
-    btn.classList.add('hidden');
-    return;
+  if (btn) {
+    if (!state.cms.openPage) {
+      btn.classList.add('hidden');
+    } else {
+      btn.classList.remove('hidden');
+      btn.classList.toggle('is-first', isFirst);
+      const icon = btn.querySelector('.first-page-icon');
+      const text = btn.querySelector('.first-page-text');
+      if (icon) icon.textContent = isFirst ? '★' : '☆';
+      if (text) text.textContent = isFirst ? 'First Page' : 'Set First';
+      btn.title = isFirst
+        ? 'This is the First Page (Homepage) of your website (/p)'
+        : 'Click to set this page as the First Page (Homepage)';
+    }
   }
-  btn.classList.remove('hidden');
-  const isFirst = !!state.cms.openPage.is_first_page;
-  btn.classList.toggle('is-first', isFirst);
-  const icon = btn.querySelector('.first-page-icon');
-  const text = btn.querySelector('.first-page-text');
-  if (icon) icon.textContent = isFirst ? '★' : '☆';
-  if (text) text.textContent = isFirst ? 'First Page' : 'Set First';
-  btn.title = isFirst
-    ? 'This is the First Page (Homepage) of your website (/p)'
-    : 'Click to set this page as the First Page (Homepage)';
+
+  const headerStar = document.getElementById('cmsHeaderFirstPageStar');
+  if (headerStar) {
+    headerStar.classList.toggle('hidden', !isFirst);
+  }
+
+  const barStar = document.getElementById('cmsPageBarStar');
+  if (barStar) {
+    barStar.classList.toggle('hidden', !isFirst);
+  }
 }
 
 async function setFirstPage(pageId) {
@@ -4150,6 +4221,168 @@ function setupViewportBundleDropdown() {
       closeMenu();
     }
   });
+}
+
+function initBlockSearch() {
+  const searchInput = document.getElementById('cmsBlocksSearchInput');
+  const clearBtn = document.getElementById('cmsClearBlocksSearchBtn');
+  if (!searchInput || searchInput._hasListener) return;
+  searchInput._hasListener = true;
+
+  const performSearch = () => {
+    const q = searchInput.value.trim().toLowerCase();
+    if (clearBtn) {
+      clearBtn.classList.toggle('hidden', !q);
+    }
+
+    // 1. Filter standard predefined blocks
+    const stdView = document.getElementById('cmsStandardBlocksView');
+    if (stdView) {
+      const categories = stdView.querySelectorAll('.palette-category');
+      let totalVisible = 0;
+
+      categories.forEach(cat => {
+        const items = cat.querySelectorAll('.palette-item');
+        let catMatches = 0;
+
+        items.forEach(item => {
+          if (!q) {
+            item.style.display = '';
+            catMatches++;
+            return;
+          }
+          const label = (item.querySelector('.palette-label')?.textContent || '').toLowerCase();
+          const sub = (item.querySelector('.palette-sub')?.textContent || '').toLowerCase();
+          const blockType = (item.dataset.blockType || '').toLowerCase();
+
+          const matches = label.includes(q) || sub.includes(q) || blockType.includes(q);
+          item.style.display = matches ? '' : 'none';
+          if (matches) catMatches++;
+        });
+
+        if (!q) {
+          cat.style.display = '';
+        } else {
+          cat.style.display = catMatches > 0 ? '' : 'none';
+          if (catMatches > 0) {
+            cat.classList.remove('collapsed');
+          }
+        }
+        totalVisible += catMatches;
+      });
+
+      let noResultsMsg = stdView.querySelector('.cms-no-blocks-found');
+      if (q && totalVisible === 0) {
+        if (!noResultsMsg) {
+          noResultsMsg = document.createElement('div');
+          noResultsMsg.className = 'cms-no-blocks-found';
+          stdView.appendChild(noResultsMsg);
+        }
+        noResultsMsg.textContent = `No blocks matching "${searchInput.value.trim()}" found`;
+        noResultsMsg.style.display = 'block';
+      } else if (noResultsMsg) {
+        noResultsMsg.style.display = 'none';
+      }
+    }
+
+    // 2. Filter custom/reusable blocks
+    const customList = document.getElementById('cmsCustomBlocksList');
+    if (customList) {
+      customList.querySelectorAll('.palette-item').forEach(item => {
+        if (!q) {
+          item.style.display = '';
+          return;
+        }
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    // 3. Filter component tree rows
+    const treeRoot = document.getElementById('cmsTreeRoot');
+    if (treeRoot) {
+      treeRoot.querySelectorAll('.cms-tree-item').forEach(item => {
+        if (!q) {
+          item.style.display = '';
+          return;
+        }
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+  };
+
+  searchInput.addEventListener('input', performSearch);
+
+  searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      performSearch();
+      searchInput.blur();
+    }
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      performSearch();
+      searchInput.focus();
+    });
+  }
+}
+
+function initSidebarCollapse() {
+  const cmsMainEl = document.getElementById('cms');
+  const workspaceEl = document.querySelector('.cms-workspace');
+  const collapseLeftBtn = document.getElementById('cmsCollapseLeftSidebarBtn');
+  const expandLeftBtn = document.getElementById('cmsExpandLeftSidebarBtn');
+  const collapseRightBtn = document.getElementById('cmsCollapseRightSidebarBtn');
+  const expandRightBtn = document.getElementById('cmsExpandRightSidebarBtn');
+
+  // Load saved preferences
+  try {
+    const isLeftCollapsed = localStorage.getItem('cms_left_sidebar_collapsed') === 'true';
+    const isRightCollapsed = localStorage.getItem('cms_right_sidebar_collapsed') === 'true';
+
+    if (isLeftCollapsed && cmsMainEl) {
+      cmsMainEl.classList.add('left-collapsed');
+    }
+    if (isRightCollapsed && workspaceEl) {
+      workspaceEl.classList.add('right-collapsed');
+    }
+  } catch (e) {}
+
+  const triggerResizeSync = () => {
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 240);
+  };
+
+  const toggleLeftSidebar = (collapse) => {
+    if (!cmsMainEl) return;
+    const shouldCollapse = typeof collapse === 'boolean' ? collapse : !cmsMainEl.classList.contains('left-collapsed');
+    cmsMainEl.classList.toggle('left-collapsed', shouldCollapse);
+    try {
+      localStorage.setItem('cms_left_sidebar_collapsed', shouldCollapse);
+    } catch (e) {}
+    triggerResizeSync();
+  };
+
+  const toggleRightSidebar = (collapse) => {
+    if (!workspaceEl) return;
+    const shouldCollapse = typeof collapse === 'boolean' ? collapse : !workspaceEl.classList.contains('right-collapsed');
+    workspaceEl.classList.toggle('right-collapsed', shouldCollapse);
+    try {
+      localStorage.setItem('cms_right_sidebar_collapsed', shouldCollapse);
+    } catch (e) {}
+    triggerResizeSync();
+  };
+
+  collapseLeftBtn?.addEventListener('click', () => toggleLeftSidebar(true));
+  expandLeftBtn?.addEventListener('click', () => toggleLeftSidebar(false));
+
+  collapseRightBtn?.addEventListener('click', () => toggleRightSidebar(true));
+  expandRightBtn?.addEventListener('click', () => toggleRightSidebar(false));
 }
 
 function initViewportResizers() {
@@ -8643,9 +8876,20 @@ function setupCmsEvents() {
       triggerAutoSave(350);
     }
   };
+  const slugInput = document.getElementById('cmsSlug');
+  if (slugInput) {
+    slugInput.oninput = e => {
+      if (state.cms.openPage) {
+        state.cms.openPage.slug = e.target.value.trim();
+        triggerAutoSave(350);
+      }
+    };
+  }
   document.getElementById('cmsStatus').onchange = e => {
     if (state.cms.openPage) {
       state.cms.openPage.status = e.target.value;
+      updatePageStatusIndicators();
+      renderCmsPages();
       triggerAutoSave(50);
     }
     const link = document.getElementById('cmsPreviewLink');
@@ -8681,6 +8925,8 @@ function setupCmsEvents() {
   initViewportResizers();
   initPageBarResizeObserver();
   setupViewportBundleDropdown();
+  initBlockSearch();
+  initSidebarCollapse();
 
   document.addEventListener('keydown', e => {
     if (state.currentTab !== 'cms') return;
