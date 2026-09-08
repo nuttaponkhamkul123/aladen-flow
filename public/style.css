@@ -2482,6 +2482,212 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
+/* Viewport Bundled Trigger & Dropdown Menu */
+.viewport-bundle-wrap {
+  display: none;
+  position: relative;
+  align-items: center;
+}
+
+.viewport-bundle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm, 6px);
+  padding: 4px 8px;
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.viewport-bundle-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.viewport-bundle-dim {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.viewport-bundle-btn .chevron-down {
+  opacity: 0.6;
+  transition: transform 0.15s ease;
+}
+
+.viewport-bundle-wrap:has(.viewport-bundle-menu:not(.hidden)) .chevron-down {
+  transform: rotate(180deg);
+}
+
+.viewport-bundle-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-surface-elevated, #161f30);
+  border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  padding: 6px;
+  min-width: 190px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  backdrop-filter: blur(16px);
+}
+
+.viewport-bundle-menu.hidden {
+  display: none !important;
+}
+
+.bundle-menu-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  padding: 5px 8px 3px;
+}
+
+.bundle-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm, 6px);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.12s ease;
+}
+
+.bundle-menu-item:hover {
+  background: var(--bg-surface-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary);
+}
+
+.bundle-menu-item.active {
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--accent-primary, #818cf8);
+  font-weight: 600;
+}
+
+.bundle-menu-item .item-title {
+  flex: 1;
+}
+
+.bundle-menu-item .item-sub {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.bundle-menu-divider {
+  height: 1px;
+  background: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  margin: 4px 0;
+}
+
+/* ==========================================================================
+   BUNDLED MODE: Triggered dynamically when space is limited or scale > 100%
+   ========================================================================== */
+.cms-page-bar.is-bundled .viewport-segmented-control,
+.cms-page-bar.is-bundled #cmsViewportRotateBtn,
+.cms-page-bar.is-bundled #cmsViewportFrameToggle,
+.cms-page-bar.is-bundled #cmsViewportBadge {
+  display: none !important;
+}
+
+.cms-page-bar.is-bundled .viewport-bundle-wrap {
+  display: inline-flex !important;
+}
+
+.cms-page-bar.is-bundled .cms-viewport-toolbar {
+  padding: 2px 4px;
+  gap: 4px;
+}
+
+/* Mode switch bundling: Collapse into single active-toggle button */
+.cms-page-bar.is-bundled .cms-mode-switch {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.cms-page-bar.is-bundled #cmsEditModeBtn.active {
+  display: none !important;
+}
+
+.cms-page-bar.is-bundled #cmsPreviewModeBtn.active {
+  display: none !important;
+}
+
+.cms-page-bar.is-bundled .mode-switch-btn:not(.active) {
+  display: inline-flex !important;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Auto-save badge bundling */
+.cms-page-bar.is-bundled .auto-save-badge {
+  padding: 4px 7px;
+}
+
+.cms-page-bar.is-bundled .auto-save-badge .save-status-text {
+  display: none;
+}
+
+/* Meta inputs compacting in bundled mode */
+.cms-page-bar.is-bundled .cms-meta-inputs {
+  gap: 6px;
+  flex: 0 1 auto;
+}
+
+.cms-page-bar.is-bundled .cms-title {
+  max-width: 130px;
+  min-width: 80px;
+}
+
+.cms-page-bar.is-bundled .cms-meta-controls-group {
+  padding: 2px 4px;
+}
+
+.cms-page-bar.is-bundled .cms-meta-controls-group .cms-slug {
+  width: 75px;
+}
+
+.cms-page-bar.is-bundled .cms-meta-controls-group .tags-input-wrap {
+  display: none;
+}
+
+.cms-page-bar.is-bundled .first-page-btn .first-page-text {
+  display: none;
+}
+
+.cms-page-bar.is-bundled .first-page-btn {
+  padding: 0 6px;
+}
+
 /* Responsive screen zoom and compact viewport scaling rules */
 @media (max-width: 1440px) {
   .cms-page-bar {
@@ -2521,7 +2727,16 @@ body {
   }
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1260px) {
+  .cms-page-bar .viewport-segmented-control,
+  .cms-page-bar #cmsViewportRotateBtn,
+  .cms-page-bar #cmsViewportFrameToggle,
+  .cms-page-bar #cmsViewportBadge {
+    display: none !important;
+  }
+  .cms-page-bar .viewport-bundle-wrap {
+    display: inline-flex !important;
+  }
   .cms-meta-controls-group .tags-input-wrap {
     display: none;
   }
@@ -2540,12 +2755,6 @@ body {
 }
 
 @media (max-width: 1120px) {
-  .viewport-btn .viewport-btn-text {
-    display: none;
-  }
-  .viewport-btn {
-    padding: 4px 8px;
-  }
   .cms-page-actions .btn-ai-sparkle span,
   .cms-page-actions #cmsPreviewLink span {
     display: none;

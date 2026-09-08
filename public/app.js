@@ -3984,6 +3984,46 @@ function updateViewportUI() {
     dimText.textContent = getViewportWidthDisplay();
   }
 
+  // Sync bundled controls
+  const bundleIcon = document.getElementById('cmsViewportBundleIcon');
+  const bundleLabel = document.getElementById('cmsViewportBundleLabel');
+  const bundleDim = document.getElementById('cmsViewportBundleDim');
+  const bundleRotateState = document.getElementById('cmsBundleRotateState');
+  const bundleFrameState = document.getElementById('cmsBundleFrameState');
+  const bundleRotateBtn = document.getElementById('cmsBundleRotateBtn');
+
+  if (bundleLabel) {
+    bundleLabel.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+  }
+  if (bundleDim) {
+    bundleDim.textContent = getViewportWidthDisplay();
+  }
+  if (bundleIcon) {
+    const icons = {
+      desktop: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+      tablet: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>',
+      mobile: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>'
+    };
+    bundleIcon.innerHTML = icons[mode] || icons.desktop;
+  }
+
+  const bundleMenu = document.getElementById('cmsViewportBundleMenu');
+  if (bundleMenu) {
+    bundleMenu.querySelectorAll('[data-viewport]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.viewport === mode);
+    });
+  }
+  if (bundleRotateState) {
+    bundleRotateState.textContent = isLandscape ? 'Landscape' : 'Portrait';
+  }
+  if (bundleRotateBtn) {
+    bundleRotateBtn.style.opacity = mode === 'desktop' ? '0.4' : '1';
+    bundleRotateBtn.style.pointerEvents = mode === 'desktop' ? 'none' : 'auto';
+  }
+  if (bundleFrameState) {
+    bundleFrameState.textContent = state.cms.deviceFrame ? 'On' : 'Off';
+  }
+
   document.getElementById('cmsEditModeBtn')?.classList.toggle('active', !isPreview);
   document.getElementById('cmsPreviewModeBtn')?.classList.toggle('active', isPreview);
 
@@ -4008,6 +4048,65 @@ function updateViewportUI() {
       infoText.textContent = `${label} · ${getViewportWidthDisplay()}`;
     }
   }
+}
+
+function initPageBarResizeObserver() {
+  const bar = document.querySelector('.cms-page-bar');
+  if (!bar || bar._hasResizeObserver) return;
+  bar._hasResizeObserver = true;
+
+  const checkLayout = () => {
+    // When client width is under 1180px or scrollWidth exceeds clientWidth, bundle the buttons!
+    const needsBundle = bar.clientWidth < 1180 || bar.scrollWidth > bar.clientWidth + 2;
+    bar.classList.toggle('is-bundled', needsBundle);
+  };
+
+  const observer = new ResizeObserver(() => checkLayout());
+  observer.observe(bar);
+  window.addEventListener('resize', checkLayout);
+  setTimeout(checkLayout, 50);
+}
+
+function setupViewportBundleDropdown() {
+  const bundleBtn = document.getElementById('cmsViewportBundleBtn');
+  const menu = document.getElementById('cmsViewportBundleMenu');
+  if (!bundleBtn || !menu || bundleBtn._hasListener) return;
+  bundleBtn._hasListener = true;
+
+  bundleBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    menu.classList.toggle('hidden');
+  });
+
+  menu.querySelectorAll('[data-viewport]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      setViewportMode(btn.dataset.viewport);
+      menu.classList.add('hidden');
+    });
+  });
+
+  document.getElementById('cmsBundleRotateBtn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleViewportOrientation();
+  });
+
+  document.getElementById('cmsBundleFrameBtn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleDeviceFrame();
+  });
+
+  document.addEventListener('click', e => {
+    if (!menu.contains(e.target) && !bundleBtn.contains(e.target)) {
+      menu.classList.add('hidden');
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      menu.classList.add('hidden');
+    }
+  });
 }
 
 function initViewportResizers() {
@@ -8537,6 +8636,8 @@ function setupCmsEvents() {
   document.getElementById('cmsExitPreviewBtn')?.addEventListener('click', () => togglePreviewMode(false));
 
   initViewportResizers();
+  initPageBarResizeObserver();
+  setupViewportBundleDropdown();
 
   document.addEventListener('keydown', e => {
     if (state.currentTab !== 'cms') return;
