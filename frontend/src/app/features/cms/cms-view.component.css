@@ -1,0 +1,43 @@
+:host {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  height: calc(100vh - 56px);
+}
+
+.cms {
+  flex: 1;
+  height: 100%;
+}
+
+.cdk-drag-preview {
+  box-sizing: border-box;
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  opacity: 0.92;
+  z-index: 1000;
+  background: var(--bg-surface-elevated, #1e293b);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.25;
+  border: 2px dashed var(--accent-primary, #3b82f6);
+  border-radius: var(--radius-md, 8px);
+}
+
+.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.cms-canvas.cdk-drop-list-dragging .block-wrap:not(.cdk-drag-placeholder) {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.block-toolbar .drag-handle {
+  cursor: grab;
+}
+
+.block-toolbar .drag-handle:active {
+  cursor: grabbing;
+}

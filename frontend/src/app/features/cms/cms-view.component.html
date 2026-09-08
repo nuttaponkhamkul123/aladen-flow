@@ -1,0 +1,797 @@
+<main class="cms" [class.left-collapsed]="leftSidebarCollapsed()">
+  <!-- Left Sidebar (Blocks & Palette) -->
+  <aside id="cmsSidebar" class="cms-sidebar">
+    <div class="cms-sidebar-header-row">
+      <div class="cms-sidebar-tabs">
+        <button type="button" class="cms-sidebar-tab" [class.active]="sidebarTab() === 'blocks'"
+                (click)="sidebarTab.set('blocks')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" />
+          </svg>
+          <span>Blocks</span>
+        </button>
+        <button type="button" class="cms-sidebar-tab" [class.active]="sidebarTab() === 'reusable'"
+                (click)="sidebarTab.set('reusable')">
+          <span>Saved</span>
+          <span class="cms-tab-badge">{{ reusableBlocks().length }}</span>
+        </button>
+        <button type="button" class="cms-sidebar-tab" [class.active]="sidebarTab() === 'tree'"
+                (click)="sidebarTab.set('tree')">
+          <span>Layers</span>
+        </button>
+      </div>
+
+      <button type="button" id="cmsCollapseLeftSidebarBtn" class="sidebar-collapse-btn"
+              (click)="toggleLeftSidebar()" title="Collapse Left Sidebar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <path d="M9 3v18" /><path d="m14 9-3 3 3 3" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Component Search Bar -->
+    <div class="cms-blocks-search-wrap">
+      <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+      </svg>
+      <input id="cmsBlocksSearchInput" [(ngModel)]="blockSearchQuery" placeholder="Search components & blocks..." autocomplete="off" />
+      @if (blockSearchQuery) {
+        <button type="button" id="cmsClearBlocksSearchBtn" class="clear-search-btn" (click)="blockSearchQuery = ''" title="Clear search">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      }
+    </div>
+
+    <!-- Palette View Content -->
+    @if (sidebarTab() === 'blocks') {
+      <div id="cmsStandardBlocksView" class="palette-scroll-wrap" style="overflow-y:auto;flex:1;">
+        @for (cat of filteredBlockCategories(); track cat.id) {
+          <div class="palette-category" [attr.data-category]="cat.id">
+            <div class="category-title" role="button" tabindex="0">
+              <svg class="category-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              <span class="category-name">{{ cat.name }}</span>
+              <span class="category-count">{{ cat.items.length }}</span>
+            </div>
+
+            <div class="palette-list">
+              @for (item of cat.items; track item.type) {
+                <div class="palette-item" draggable="true"
+                     (click)="addBlock(item.type)"
+                     (dragstart)="onPaletteDragStart($event, item.type)"
+                     (dragend)="onDragEnd()">
+                  <div class="palette-icon-wrap" [class]="item.type + '-icon'" [innerHTML]="item.iconSvg"></div>
+                  <div class="palette-info">
+                    <span class="palette-label">{{ item.label }}</span>
+                    <span class="palette-sub">{{ item.sub }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        } @empty {
+          <div class="cms-no-blocks-found">No blocks match "{{ blockSearchQuery }}"</div>
+        }
+      </div>
+    } @else if (sidebarTab() === 'reusable') {
+      <div class="palette-list custom-blocks-list" style="overflow-y:auto;flex:1;padding:4px 0;">
+        @for (r of reusableBlocks(); track r.id) {
+          <div class="palette-item" draggable="true"
+               (click)="addReusableBlock(r)"
+               (dragstart)="onReusableDragStart($event, r)"
+               (dragend)="onDragEnd()">
+            <div class="palette-icon-wrap layout-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </div>
+            <div class="palette-info">
+              <span class="palette-label">{{ r.name }}</span>
+              <span class="palette-sub">Custom {{ r.block_data.type }}</span>
+            </div>
+            <button (click)="deleteReusableBlock(r.id, $event)" class="btn-icon ghost btn-xs" title="Delete">
+              &times;
+            </button>
+          </div>
+        } @empty {
+          <div class="cms-no-blocks-found">No saved components yet.</div>
+        }
+      </div>
+    } @else if (sidebarTab() === 'tree') {
+      <div class="cms-tree-list" style="overflow-y:auto;flex:1;padding:4px 0;">
+        @for (b of currentBlocks(); track b.id; let idx = $index) {
+          <div class="cms-page-item" [class.selected]="selectedBlock()?.id === b.id" (click)="selectBlock(b)">
+            <div class="page-node-info" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+              <span class="p-title">{{ idx + 1 }}. {{ getBlockLabel(b.type) }}</span>
+              <button (click)="deleteBlock(b.id, $event)" class="btn-icon ghost btn-xs" title="Delete">&times;</button>
+            </div>
+          </div>
+        } @empty {
+          <div class="cms-no-blocks-found">Canvas is empty</div>
+        }
+      </div>
+    }
+  </aside>
+
+  <!-- Right Section: Main Canvas & Editor -->
+  <section class="cms-main">
+    <!-- Edge Expand Trigger for Left Sidebar -->
+    <button type="button" id="cmsExpandLeftSidebarBtn" class="cms-edge-expand-btn left"
+            (click)="toggleLeftSidebar()" title="Expand Sidebar (Blocks & Layers)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="18" height="18" x="3" y="3" rx="2" />
+        <path d="M9 3v18" /><path d="m13 15 3-3-3-3" />
+      </svg>
+      <span class="edge-btn-text">Blocks</span>
+    </button>
+
+    <div id="cmsEditorWrap" class="cms-editor-wrap">
+      <!-- Editor Top Bar -->
+      <div class="cms-page-bar">
+        <div class="cms-meta-inputs">
+          <div class="input-with-label">
+            <input id="cmsTitle" class="cms-title" [value]="activePage()?.title || ''"
+                   (change)="updateActiveTitle($event)" placeholder="Untitled Document" />
+          </div>
+        </div>
+
+        <!-- Viewport Device Switcher Toolbar -->
+        <div class="cms-viewport-toolbar">
+          <div class="viewport-segmented-control" role="group" aria-label="Device viewport size">
+            <button id="cmsViewportDesktopBtn" class="viewport-btn" [class.active]="viewportMode() === 'desktop'"
+                    (click)="setViewport('desktop')" title="Desktop View (Press 1)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              <span class="viewport-btn-text">Desktop</span>
+            </button>
+
+            <button id="cmsViewportTabletBtn" class="viewport-btn" [class.active]="viewportMode() === 'tablet'"
+                    (click)="setViewport('tablet')" title="Tablet View (Press 2)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+              <span class="viewport-btn-text">Tablet</span>
+            </button>
+
+            <button id="cmsViewportMobileBtn" class="viewport-btn" [class.active]="viewportMode() === 'mobile'"
+                    (click)="setViewport('mobile')" title="Mobile View (Press 3)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+              <span class="viewport-btn-text">Mobile</span>
+            </button>
+          </div>
+
+          @if (viewportMode() !== 'desktop') {
+            <button id="cmsViewportRotateBtn" class="viewport-tool-btn" (click)="toggleOrientation()"
+                    title="Rotate Orientation (Portrait / Landscape)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6" /><path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+            </button>
+            <button id="cmsViewportFrameToggle" class="viewport-tool-btn" [class.active]="showDeviceFrame()"
+                    (click)="toggleDeviceFrame()" title="Toggle Device Bezel/Frame">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3" /><path d="M9 3v18" /><path d="M15 3v18" />
+              </svg>
+            </button>
+          }
+
+          <div id="cmsViewportBadge" class="viewport-dimension-badge">
+            <span id="cmsViewportDimText">{{ getViewportWidthDisplay() }}</span>
+          </div>
+        </div>
+
+        <!-- Page Actions -->
+        <div class="cms-page-actions">
+          <div class="cms-mode-switch" role="group" aria-label="Editor Mode">
+            <button id="cmsEditModeBtn" class="mode-switch-btn" [class.active]="!isPreviewMode()"
+                    (click)="isPreviewMode.set(false)" title="Editor Mode">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+              <span>Edit</span>
+            </button>
+            <button id="cmsPreviewModeBtn" class="mode-switch-btn" [class.active]="isPreviewMode()"
+                    (click)="isPreviewMode.set(true)" title="Interactive Preview">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+              <span>Preview</span>
+            </button>
+          </div>
+
+          <button id="cmsAiGenerateBtn" class="btn btn-sm btn-ai-sparkle" (click)="showAiModal = true"
+                  title="Generate Website or Components with AI">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+            </svg>
+            <span>AI Generate</span>
+          </button>
+
+          <a id="cmsPreviewLink" class="btn ghost btn-sm" [href]="'/p/' + (activePage()?.slug || '')" target="_blank">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            <span>Live Page</span>
+          </a>
+
+          <button id="cmsSaveBtn" class="btn primary btn-sm" (click)="savePageNow()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+            </svg>
+            <span>Save</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Workspace Area: Canvas + Inspector -->
+      <div class="cms-workspace" [class.right-collapsed]="rightSidebarCollapsed()">
+        <!-- Edge Expand Trigger for Right Sidebar -->
+        <button type="button" id="cmsExpandRightSidebarBtn" class="cms-edge-expand-btn right"
+                (click)="toggleRightSidebar()" title="Expand Inspector">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="M15 3v18" /><path d="m11 15-3-3 3-3" />
+          </svg>
+          <span class="edge-btn-text">Inspector</span>
+        </button>
+
+        <!-- Center Canvas Frame -->
+        <div class="cms-canvas-wrap">
+          <div id="canvasViewportContainer" class="canvas-viewport-container">
+            <div class="canvas-viewport"
+                 [class.has-device-frame]="showDeviceFrame() && viewportMode() !== 'desktop'"
+                 [class.is-mobile-viewport]="viewportMode() === 'mobile'"
+                 [class.is-tablet-viewport]="viewportMode() === 'tablet'"
+                 [class.is-landscape]="isLandscape()">
+
+              <!-- Rendered Blocks Container -->
+              <div id="cmsCanvasDropList" #cmsCanvas class="cms-canvas"
+                   [class.cms-drag-over]="draggingOver()"
+                   style="padding:24px;overflow-y:auto;height:100%;"
+                   (click)="deselectBlock()"
+                   (dragover)="onCanvasDragOver($event)"
+                   (dragleave)="onCanvasDragLeave($event)"
+                   (drop)="onCanvasDrop($event)"
+                   cdkDropList
+                   cdkDropListOrientation="vertical"
+                   [cdkDropListData]="currentBlocks()"
+                   (cdkDropListDropped)="onBlockDrop($event)">
+                @for (b of currentBlocks(); track b.id; let idx = $index) {
+                  @if (draggingOver() && dragInsertIndex() === idx) {
+                    <div class="drop-indicator"></div>
+                  }
+                  <div class="block-wrap" [class.selected]="selectedBlock()?.id === b.id"
+                       [cdkDragDisabled]="isPreviewMode()"
+                       cdkDrag
+                       (click)="selectBlock(b, $event)"
+                       style="position:relative;margin-bottom:12px;">
+
+                    @if (!isPreviewMode()) {
+                      <div class="block-toolbar" style="position:absolute;top:-14px;right:6px;gap:4px;background:#182032;border:1px solid #3b82f6;border-radius:4px;padding:2px 6px;z-index:30;">
+                        <span class="drag-handle" cdkDragHandle title="Drag to reorder">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="6" x2="19" y2="6" /><line x1="5" y1="12" x2="19" y2="12" /><line x1="5" y1="18" x2="19" y2="18" />
+                          </svg>
+                        </span>
+                        <span style="font-size:10px;font-weight:700;color:#93c5fd;align-self:center;">{{ getBlockLabel(b.type) }}</span>
+                        <button (click)="moveBlockUp(idx, $event)" class="btn-icon ghost btn-xs" title="Move Up" [disabled]="idx === 0">▲</button>
+                        <button (click)="moveBlockDown(idx, $event)" class="btn-icon ghost btn-xs" title="Move Down" [disabled]="idx === currentBlocks().length - 1">▼</button>
+                        <button (click)="duplicateBlock(b, $event)" class="btn-icon ghost btn-xs" title="Duplicate">⧉</button>
+                        <button (click)="deleteBlock(b.id, $event)" class="btn-icon ghost btn-xs" title="Delete">&times;</button>
+                      </div>
+                    }
+
+                    @switch (b.type) {
+                      @case ('header') {
+                        <header class="block-header-nav" [class.sticky]="b.props['sticky']">
+                          <div class="nav-brand-area">
+                            <span class="nav-brand-title">{{ b.props['brandName'] || 'Aladen Studio' }}</span>
+                          </div>
+                          <nav class="nav-links-area">
+                            @for (lnk of b.props['links'] || []; track lnk.label) {
+                              <a [href]="lnk.url || '#'" class="nav-link-item">{{ lnk.label }}</a>
+                            }
+                          </nav>
+                          @if (b.props['ctaLabel']) {
+                            <a [href]="b.props['ctaUrl'] || '#'" class="btn primary btn-sm">{{ b.props['ctaLabel'] }}</a>
+                          }
+                        </header>
+                      }
+
+                      @case ('heading') {
+                        <div [style.textAlign]="b.props['align'] || 'left'"
+                             [style.color]="b.props['color'] || 'inherit'"
+                             [style.marginBottom.px]="b.props['margin'] != null ? b.props['margin'] : 12">
+                          @switch (b.props['level'] || 2) {
+                            @case (1) { <h1 style="font-size:32px;font-weight:800;letter-spacing:-0.03em;">{{ b.props['text'] || 'Heading 1' }}</h1> }
+                            @case (2) { <h2 style="font-size:24px;font-weight:700;letter-spacing:-0.02em;">{{ b.props['text'] || 'Heading 2' }}</h2> }
+                            @case (3) { <h3 style="font-size:20px;font-weight:600;">{{ b.props['text'] || 'Heading 3' }}</h3> }
+                            @default { <h4 style="font-size:16px;font-weight:600;">{{ b.props['text'] || 'Heading 4' }}</h4> }
+                          }
+                        </div>
+                      }
+
+                      @case ('paragraph') {
+                        <p [style.textAlign]="b.props['align'] || 'left'"
+                           [style.color]="b.props['color'] || 'inherit'"
+                           [style.fontWeight]="b.props['bold'] ? '700' : '400'"
+                           [style.fontStyle]="b.props['italic'] ? 'italic' : 'normal'"
+                           style="line-height:1.6;font-size:15px;margin:0 0 12px;">
+                          {{ b.props['text'] || 'Paragraph content text goes here...' }}
+                        </p>
+                      }
+
+                      @case ('button') {
+                        <div [style.display]="'flex'" [style.justifyContent]="b.props['align'] === 'center' ? 'center' : b.props['align'] === 'right' ? 'flex-end' : 'flex-start'">
+                          <a [href]="b.props['url'] || '#'" class="btn"
+                             [style.background]="b.props['variant'] === 'filled' ? (b.props['color'] || '#3b82f6') : 'transparent'"
+                             [style.color]="b.props['variant'] === 'filled' ? (b.props['textColor'] || '#ffffff') : (b.props['color'] || '#3b82f6')"
+                             [style.borderColor]="b.props['color'] || '#3b82f6'"
+                             [style.borderRadius.px]="b.props['borderRadius'] != null ? b.props['borderRadius'] : 8">
+                            {{ b.props['label'] || 'Button Action' }}
+                          </a>
+                        </div>
+                      }
+
+                      @case ('image') {
+                        <div style="border-radius:8px;overflow:hidden;margin-bottom:12px;">
+                          <img [src]="b.props['url']" [alt]="b.props['alt'] || ''" style="width:100%;height:auto;display:block;" />
+                          @if (b.props['caption']) {
+                            <p style="font-size:11.5px;color:var(--text-tertiary);margin-top:6px;text-align:center;">{{ b.props['caption'] }}</p>
+                          }
+                        </div>
+                      }
+
+                      @case ('bento') {
+                        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;margin-bottom:12px;">
+                          @for (item of b.props['items'] || []; track item.title) {
+                            <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:14px;"
+                                 [style.gridColumn]="item.span === 2 ? 'span 2' : 'span 1'">
+                              <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="font-size:20px;">{{ item.icon }}</span>
+                                <span style="font-size:10px;background:rgba(59,130,246,0.15);color:#60a5fa;padding:2px 6px;border-radius:4px;">{{ item.tag }}</span>
+                              </div>
+                              <h4 style="margin:8px 0 4px;font-size:14px;">{{ item.title }}</h4>
+                              <p style="font-size:12px;color:var(--text-secondary);margin:0;">{{ item.subtitle }}</p>
+                              @if (item.metric) {
+                                <div style="font-size:20px;font-weight:800;color:#10b981;margin-top:8px;">{{ item.metric }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+
+                      @case ('pricing') {
+                        <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:20px;position:relative;margin-bottom:12px;"
+                             [style.borderColor]="b.props['isPopular'] ? 'var(--accent-primary)' : 'var(--border-subtle)'">
+                          @if (b.props['isPopular'] && b.props['badge']) {
+                            <span style="position:absolute;top:-10px;right:16px;background:#3b82f6;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;">{{ b.props['badge'] }}</span>
+                          }
+                          <h3 style="margin:0 0 6px;font-size:16px;">{{ b.props['plan'] }}</h3>
+                          <div style="margin:8px 0;">
+                            <span style="font-size:28px;font-weight:800;">{{ b.props['price'] }}</span>
+                            <span style="color:var(--text-secondary);font-size:12px;">{{ b.props['period'] }}</span>
+                          </div>
+                          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">{{ b.props['description'] }}</p>
+                          <ul style="list-style:none;padding:0;margin:0 0 16px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;">
+                            @for (f of b.props['features'] || []; track f) {
+                              <li>✓ {{ f }}</li>
+                            }
+                          </ul>
+                          <a [href]="b.props['ctaUrl'] || '#'" class="btn primary" style="width:100%;text-align:center;display:block;">
+                            {{ b.props['ctaLabel'] || 'Get Started' }}
+                          </a>
+                        </div>
+                      }
+
+                      @case ('stat') {
+                        <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:16px;margin-bottom:12px;">
+                          <span style="font-size:12px;color:var(--text-secondary);">{{ b.props['label'] }}</span>
+                          <div style="font-size:28px;font-weight:800;margin:4px 0;">{{ b.props['value'] }}</div>
+                          <div style="font-size:11px;color:var(--text-tertiary);display:flex;gap:6px;">
+                            <span style="color:#10b981;font-weight:700;">{{ b.props['trend'] }}</span>
+                            <span>{{ b.props['subtext'] }}</span>
+                          </div>
+                        </div>
+                      }
+
+                      @case ('testimonial') {
+                        <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:18px;margin-bottom:12px;">
+                          <p style="font-style:italic;font-size:13.5px;line-height:1.5;margin:0 0 12px;">"{{ b.props['quote'] }}"</p>
+                          <div style="display:flex;align-items:center;gap:10px;">
+                            @if (b.props['avatar']) {
+                              <img [src]="b.props['avatar']" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />
+                            }
+                            <div>
+                              <div style="font-weight:700;font-size:13px;">{{ b.props['author'] }}</div>
+                              <div style="font-size:11px;color:var(--text-secondary);">{{ b.props['role'] }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      }
+
+                      @case ('callout') {
+                        <div style="display:flex;gap:10px;padding:12px 14px;border-radius:8px;background:var(--bg-surface-elevated);border-left:4px solid #3b82f6;margin-bottom:12px;">
+                          <span style="font-size:18px;">{{ b.props['icon'] || '💡' }}</span>
+                          <div>
+                            <strong style="font-size:13px;display:block;margin-bottom:2px;">{{ b.props['title'] }}</strong>
+                            <p style="font-size:12px;color:var(--text-secondary);margin:0;">{{ b.props['text'] }}</p>
+                          </div>
+                        </div>
+                      }
+
+                      @case ('accordion') {
+                        <div style="margin-bottom:12px;">
+                          @for (item of b.props['items'] || []; track item.title) {
+                            <details style="border:1px solid var(--border-subtle);border-radius:6px;margin-bottom:6px;padding:8px 12px;background:var(--bg-surface-elevated);">
+                              <summary style="font-weight:600;font-size:13px;cursor:pointer;">{{ item.title }}</summary>
+                              <div style="padding-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.5;">{{ item.content }}</div>
+                            </details>
+                          }
+                        </div>
+                      }
+
+                      @case ('divider') {
+                        <hr style="border:none;border-top:1px solid var(--border-subtle);margin:16px 0;" />
+                      }
+
+                      @case ('spacer') {
+                        <div [style.height.px]="b.props['height'] || 24"></div>
+                      }
+
+                      @case ('table') {
+                        <div style="overflow-x:auto;margin-bottom:12px;">
+                          <table class="cms-table" style="width:100%;border-collapse:collapse;font-size:13px;line-height:1.5;">
+                            @if (b.props['hasHeader'] !== false && (b.props['headers'] || []).length) {
+                              <thead>
+                                <tr>
+                                  @for (h of b.props['headers']; track h) {
+                                    <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-subtle);font-weight:700;background:var(--bg-surface);">{{ h }}</th>
+                                  }
+                                </tr>
+                              </thead>
+                            }
+                            <tbody>
+                              @for (row of b.props['rows'] || []; track row) {
+                                <tr [style.background]="b.props['striped'] ? (($index % 2) ? 'rgba(255,255,255,0.02)' : 'transparent') : 'transparent'">
+                                  @for (cell of row; track $index) {
+                                    <td [style.borderBottom]="b.props['bordered'] ? '1px solid var(--border-subtle)' : 'none'" style="padding:8px 10px;font-size:12.5px;">{{ cell }}</td>
+                                  }
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                      }
+
+                      @case ('container') {
+                        <div [style.display]="b.props['mode'] === 'grid' ? 'grid' : 'flex'"
+                             [style.gap.px]="b.props['gap'] != null ? b.props['gap'] : 16"
+                             [style.padding.px]="b.props['padding'] != null ? b.props['padding'] : 16"
+                             [style.borderRadius.px]="b.props['borderRadius'] != null ? b.props['borderRadius'] : 8"
+                             [style.border]="b.props['border'] ? '1px solid var(--border-subtle)' : 'none'"
+                             [style.gridTemplateColumns]="b.props['mode'] === 'grid' ? 'repeat(' + (b.props['columns'] || 2) + ', minmax(0, 1fr))' : 'none'"
+                             [style.flexDirection]="b.props['mode'] !== 'grid' ? (b.props['direction'] || 'row') : 'row'"
+                             [style.justifyContent]="b.props['mode'] !== 'grid' ? (b.props['justify'] || 'flex-start') : 'stretch'"
+                             [style.alignItems]="b.props['mode'] !== 'grid' ? (b.props['align'] || 'stretch') : 'stretch'"
+                             [style.flexWrap]="b.props['mode'] !== 'grid' ? (b.props['wrap'] || 'wrap') : 'nowrap'"
+                             [style.background]="b.props['bg'] === 'surface' ? 'var(--bg-surface-elevated)' : b.props['bg'] === 'dark' ? '#0f172a' : 'transparent'"
+                             style="margin-bottom:12px;">
+                          @for (child of b.props['children'] || []; track child.id) {
+                            <div style="padding:10px;border:1px dashed var(--border-subtle);border-radius:6px;font-size:12px;color:var(--text-secondary);text-align:center;">
+                              {{ getBlockLabel(child.type) }} (child)
+                            </div>
+                          } @empty {
+                            <div style="padding:10px;font-size:11px;color:var(--text-tertiary);text-align:center;width:100%;">Empty container — children not editable in canvas</div>
+                          }
+                        </div>
+                      }
+
+                      @case ('carousel') {
+                        <div [style.aspectRatio]="b.props['aspectRatio'] || '16/9'" style="border-radius:10px;overflow:hidden;background:#0f172a;margin-bottom:12px;position:relative;">
+                          @for (s of b.props['slides'] || []; track $index) {
+                            <div style="width:100%;height:100%;position:absolute;top:0;left:0;" [style.display]="$index === 0 ? 'block' : 'none'">
+                              <img [src]="s.url" [alt]="s.caption || ''" style="width:100%;height:100%;object-fit:cover;display:block;" />
+                              @if (s.caption) {
+                                <span style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.65);color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;">{{ s.caption }}</span>
+                              }
+                            </div>
+                          } @empty {
+                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:12px;">Carousel — no slides yet</div>
+                          }
+                        </div>
+                      }
+
+                      @case ('video') {
+                        <div style="margin-bottom:12px;">
+                          <div [style.aspectRatio]="b.props['aspectRatio'] || '16/9'" style="border-radius:10px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12.5px;">
+                            @if (b.props['url']) {
+                              <div style="display:flex;align-items:center;gap:6px;color:#94a3b8;">▶ {{ b.props['url'] }}</div>
+                            } @else {
+                              Video — set a YouTube / Vimeo / mp4 URL
+                            }
+                          </div>
+                          @if (b.props['caption']) {
+                            <p style="font-size:11.5px;color:var(--text-tertiary);margin-top:6px;text-align:center;">{{ b.props['caption'] }}</p>
+                          }
+                        </div>
+                      }
+
+                      @case ('code') {
+                        <div style="border-radius:10px;border:1px solid var(--border-subtle);background:#0d1117;color:#c9d1d9;font-family:var(--font-mono);margin-bottom:12px;overflow:hidden;">
+                          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.08);font-size:11px;">
+                            <span>{{ b.props['filename'] || 'snippet.js' }}</span>
+                            <span style="opacity:0.6;text-transform:uppercase;">{{ b.props['language'] || 'javascript' }}</span>
+                          </div>
+                          <pre style="margin:0;padding:12px;overflow-x:auto;font-size:12px;line-height:1.6;"><code>{{ b.props['code'] }}</code></pre>
+                        </div>
+                      }
+
+                      @case ('comparison') {
+                        <div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;margin-bottom:12px;border:1px solid var(--border-subtle);">
+                          <img [src]="b.props['afterImage']" [alt]="b.props['afterLabel'] || 'After'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" />
+                          <div style="position:absolute;top:0;left:0;bottom:0;width:50%;overflow:hidden;">
+                            <img [src]="b.props['beforeImage']" [alt]="b.props['beforeLabel'] || 'Before'" style="position:absolute;top:0;left:0;height:100%;width:100%;object-fit:cover;" />
+                          </div>
+                          <div style="position:absolute;top:12px;left:16px;background:rgba(0,0,0,0.65);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;">{{ b.props['beforeLabel'] || 'Before' }}</div>
+                          <div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,0.65);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;">{{ b.props['afterLabel'] || 'After' }}</div>
+                          <div style="position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;transform:translateX(-50%);"></div>
+                        </div>
+                      }
+
+                      @case ('tilt-card') {
+                        <div style="position:relative;background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(255,255,255,0.03));border:1px solid var(--border-subtle);border-radius:20px;padding:28px 22px;margin-bottom:12px;">
+                          @if (b.props['badge']) {
+                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#38bdf8;background:rgba(56,189,248,0.15);padding:3px 9px;border-radius:999px;display:inline-block;margin-bottom:12px;">{{ b.props['badge'] }}</span>
+                          }
+                          <h3 style="margin:0 0 8px;font-size:20px;font-weight:800;">{{ b.props['title'] || 'Interactive 3D Card' }}</h3>
+                          <p style="margin:0;font-size:13.5px;color:var(--text-secondary);line-height:1.6;">{{ b.props['subtitle'] }}</p>
+                          @if (b.props['ctaLabel']) {
+                            <a [href]="b.props['ctaUrl'] || '#'" style="display:inline-flex;background:#6366f1;color:#fff;text-decoration:none;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:8px;margin-top:14px;">{{ b.props['ctaLabel'] }} →</a>
+                          }
+                        </div>
+                      }
+
+                      @case ('marquee') {
+                        <div style="overflow:hidden;margin:0 -24px 12px;padding:12px 0;">
+                          <div style="display:flex;gap:12px;white-space:nowrap;">
+                            @for (item of b.props['items'] || []; track $index) {
+                              <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:999px;font-size:12.5px;font-weight:600;">
+                                <span>{{ item.icon || '✦' }}</span> {{ item.text || 'Item' }}
+                              </span>
+                            }
+                          </div>
+                        </div>
+                      }
+
+                      @case ('countdown') {
+                        <div style="text-align:center;padding:24px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:16px;margin-bottom:12px;">
+                          <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">{{ b.props['title'] || 'Countdown' }}</h3>
+                          <p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px;">{{ b.props['subtitle'] }}</p>
+                          <div style="display:flex;justify-content:center;gap:8px;font-size:13px;color:var(--text-secondary);">
+                            <span style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-weight:800;">00</span><span style="align-self:center;">:</span>
+                            <span style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-weight:800;">00</span><span style="align-self:center;">:</span>
+                            <span style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-weight:800;">00</span><span style="align-self:center;">:</span>
+                            <span style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-weight:800;">00</span>
+                          </div>
+                          <div style="font-size:10.5px;color:var(--text-tertiary);margin-top:8px;">Target: {{ b.props['targetDate'] }}</div>
+                        </div>
+                      }
+
+                      @case ('timeline') {
+                        <div style="position:relative;padding-left:24px;margin-bottom:12px;">
+                          <div style="position:absolute;top:6px;bottom:6px;left:6px;width:2px;background:var(--border-subtle);"></div>
+                          @for (item of b.props['items'] || []; track item.title) {
+                            <div style="position:relative;padding-left:14px;margin-bottom:20px;">
+                              <div style="position:absolute;left:-22px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--bg-card);"
+                                 [style.border]="'3px solid ' + (item.status === 'completed' ? '#10b981' : item.status === 'current' ? '#6366f1' : '#94a3b8')"></div>
+                              <div style="font-size:10.5px;font-weight:700;color:var(--accent-primary);text-transform:uppercase;letter-spacing:0.4px;">{{ item.date }}</div>
+                              <h4 style="margin:2px 0 2px;font-size:14px;font-weight:700;">{{ item.title }}</h4>
+                              <p style="margin:0;font-size:12px;color:var(--text-secondary);line-height:1.5;">{{ item.description }}</p>
+                            </div>
+                          }
+                        </div>
+                      }
+
+                      @case ('form') {
+                        <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:16px;padding:24px 20px;margin-bottom:12px;">
+                          <h3 style="margin:0 0 4px;font-size:17px;font-weight:800;">{{ b.props['title'] || 'Get in Touch' }}</h3>
+                          <p style="margin:0 0 16px;font-size:12.5px;color:var(--text-secondary);line-height:1.5;">{{ b.props['description'] }}</p>
+                          <div style="display:flex;flex-direction:column;gap:10px;">
+                            <input placeholder="Your Name" style="padding:9px 12px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;font-size:12.5px;color:var(--text-primary);width:100%;box-sizing:border-box;" />
+                            <input placeholder="Email Address" style="padding:9px 12px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;font-size:12.5px;color:var(--text-primary);width:100%;box-sizing:border-box;" />
+                            <textarea rows="2" placeholder="Your message..." style="padding:9px 12px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;font-size:12.5px;color:var(--text-primary);resize:vertical;width:100%;box-sizing:border-box;"></textarea>
+                            <button style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:700;font-size:13px;">{{ b.props['buttonLabel'] || 'Send Message' }}</button>
+                          </div>
+                        </div>
+                      }
+
+                      @case ('audio') {
+                        <div style="display:flex;align-items:center;gap:14px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:14px 16px;margin-bottom:12px;">
+                          @if (b.props['cover']) {
+                            <img [src]="b.props['cover']" [alt]="b.props['title']" style="width:48px;height:48px;border-radius:10px;object-fit:cover;" />
+                          } @else {
+                            <div style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">🎵</div>
+                          }
+                          <div style="flex:1;overflow:hidden;">
+                            <h4 style="margin:0 0 3px;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ b.props['title'] }}</h4>
+                            <div style="font-size:11.5px;color:var(--text-secondary);">{{ b.props['artist'] }} <span style="color:var(--accent-primary);">• {{ b.props['duration'] }}</span></div>
+                          </div>
+                          <button style="width:38px;height:38px;border-radius:50%;background:#6366f1;border:none;color:#fff;font-size:14px;">▶</button>
+                        </div>
+                      }
+
+                      @case ('tabs') {
+                        <div style="margin-bottom:12px;">
+                          <div style="display:flex;gap:6px;border-bottom:1px solid var(--border-subtle);padding-bottom:8px;overflow-x:auto;">
+                            @for (tab of b.props['tabs'] || []; track $index) {
+                              <button style="padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);color:var(--text-primary);"> {{ tab.label || tab.title || ('Tab ' + ($index + 1)) }}</button>
+                            }
+                          </div>
+                          @for (tab of b.props['tabs'] || []; track $index) {
+                            <div style="padding:14px 2px;font-size:13px;color:var(--text-secondary);line-height:1.6;">{{ tab.content }}</div>
+                          }
+                        </div>
+                      }
+
+                      @case ('footer') {
+                        <footer style="background:var(--bg-surface-elevated);border-radius:8px;padding:20px;margin-top:24px;">
+                          <div style="display:flex;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:16px;">
+                            <div>
+                              <h4 style="margin:0 0 6px;font-size:14px;">{{ b.props['brandName'] || 'Aladen Studio' }}</h4>
+                              <p style="font-size:12px;color:var(--text-secondary);margin:0;max-width:260px;">{{ b.props['tagline'] }}</p>
+                            </div>
+                            <div style="display:flex;gap:28px;">
+                              @for (col of b.props['columns'] || []; track col.title) {
+                                <div>
+                                  <h5 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--text-tertiary);">{{ col.title }}</h5>
+                                  @for (lnk of col.links || []; track lnk.label) {
+                                    <a [href]="lnk.url || '#'" style="display:block;font-size:11.5px;color:var(--text-secondary);text-decoration:none;margin-bottom:4px;">{{ lnk.label }}</a>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          </div>
+                          <div style="border-top:1px solid var(--border-subtle);padding-top:12px;font-size:11px;color:var(--text-tertiary);">
+                            {{ b.props['copyright'] || '© 2026 Aladen Studio' }}
+                          </div>
+                        </footer>
+                      }
+
+                      @default {
+                        <div style="padding:16px;background:var(--bg-surface-elevated);border:1px dashed var(--border-subtle);border-radius:8px;text-align:center;">
+                          <strong>{{ getBlockLabel(b.type) }}</strong>
+                          <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0;">{{ b.type }} component</p>
+                        </div>
+                      }
+                    }
+                  </div>
+                } @empty {
+                  @if (draggingOver() && dragInsertIndex() === 0) {
+                    <div class="drop-indicator"></div>
+                  } @else {
+                    <div class="empty-canvas-state" style="text-align:center;padding:60px 20px;color:var(--text-secondary);">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.4;margin-bottom:12px;">
+                        <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+                      </svg>
+                      <h3 style="margin:0 0 6px;color:var(--text-primary);">Canvas is empty</h3>
+                      <p style="margin:0 0 12px;font-size:13px;">Click any block on the left sidebar to add it, drag a block onto the canvas, or generate with AI.</p>
+                      <button (click)="showAiModal = true" class="btn primary">Launch AI Generator</button>
+                    </div>
+                  }
+                }
+                @if (draggingOver() && dragInsertIndex() === currentBlocks().length) {
+                  <div class="drop-indicator"></div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Sidebar Inspector -->
+        <aside id="cmsPropsPanel" class="cms-props">
+          <div class="props-header">
+            <label class="section-eyebrow" style="margin:0;">Inspector</label>
+            <button type="button" id="cmsCollapseRightSidebarBtn" class="sidebar-collapse-btn"
+                    (click)="toggleRightSidebar()" title="Collapse Inspector">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <path d="M15 3v18" /><path d="m10 9 3 3-3 3" />
+              </svg>
+            </button>
+          </div>
+
+          <div id="cmsPropsBody" class="cms-props-body" style="padding:14px;overflow-y:auto;flex:1;">
+            @if (selectedBlock(); as b) {
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--border-subtle);margin-bottom:12px;">
+                <span style="font-size:12px;font-weight:700;color:var(--accent-primary);">{{ getBlockLabel(b.type) }}</span>
+                <div style="display:flex;gap:4px;">
+                  <button (click)="saveAsReusable(b)" class="btn ghost btn-xs" title="Save as reusable">Save Reusable</button>
+                  <button (click)="deleteBlock(b.id)" class="btn-icon ghost btn-xs" title="Delete block">&times;</button>
+                </div>
+              </div>
+
+              <!-- Property Fields -->
+              @if (b.type === 'heading') {
+                <div style="margin-bottom:12px;">
+                  <label class="section-eyebrow">Level</label>
+                  <select [(ngModel)]="b.props['level']" (change)="onPropChange()"
+                          style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;">
+                    <option [value]="1">H1 (Main Headline)</option>
+                    <option [value]="2">H2 (Section Header)</option>
+                    <option [value]="3">H3 (Sub-section)</option>
+                    <option [value]="4">H4 (Card Header)</option>
+                  </select>
+                </div>
+                <div style="margin-bottom:12px;">
+                  <label class="section-eyebrow">Text Content</label>
+                  <input [(ngModel)]="b.props['text']" (input)="onPropChange()"
+                         style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;" />
+                </div>
+                <div style="margin-bottom:12px;">
+                  <label class="section-eyebrow">Alignment</label>
+                  <select [(ngModel)]="b.props['align']" (change)="onPropChange()"
+                          style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;">
+                    <option value="left">Left Aligned</option>
+                    <option value="center">Centered</option>
+                    <option value="right">Right Aligned</option>
+                  </select>
+                </div>
+              } @else if (b.type === 'paragraph') {
+                <div style="margin-bottom:12px;">
+                  <label class="section-eyebrow">Body Text</label>
+                  <textarea [(ngModel)]="b.props['text']" (input)="onPropChange()" rows="4"
+                            style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;"></textarea>
+                </div>
+                <div style="margin-bottom:12px;">
+                  <label class="section-eyebrow">Alignment</label>
+                  <select [(ngModel)]="b.props['align']" (change)="onPropChange()"
+                          style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;">
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+              } @else if (b.type === 'button') {
+                <div style="margin-bottom:12px;">
+                  <label class="section-eyebrow">Label</label>
+                  <input [(ngModel)]="b.props['label']" (input)="onPropChange()"
+                         style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;" />
+                </div>
+                <div style="margin-bottom:12px;">
+                  <label class="section-eyebrow">Target URL</label>
+                  <input [(ngModel)]="b.props['url']" (input)="onPropChange()"
+                         style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;" />
+                </div>
+              } @else {
+                <div>
+                  <label class="section-eyebrow">Raw Properties</label>
+                  <pre style="background:var(--bg-surface);padding:10px;border-radius:6px;font-size:11px;overflow:auto;max-height:260px;font-family:var(--font-mono);border:1px solid var(--border-subtle);">{{ b.props | json }}</pre>
+                </div>
+              }
+            } @else {
+              <div class="no-selection-state" style="text-align:center;padding:40px 10px;color:var(--text-tertiary);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px;opacity:0.5;">
+                  <path d="M3 3h7v7H3z" /><path d="M14 3h7v7h-7z" /><path d="M14 14h7v7h-7z" /><path d="M3 14h7v7H3z" />
+                </svg>
+                <p style="font-size:12px;line-height:1.4;">Click any canvas block to configure its layout, styles and properties.</p>
+              </div>
+            }
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI Modal -->
+  @if (showAiModal) {
+    <app-ai-modal (close)="showAiModal = false" (pageGenerated)="onAiPageGenerated($event)"></app-ai-modal>
+  }
+</main>

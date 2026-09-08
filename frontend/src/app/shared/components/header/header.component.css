@@ -1,0 +1,4 @@
+/* Component specific overrides if needed. Global styles are in styles.css */
+:host {
+  display: contents;
+}

@@ -481,7 +481,13 @@ app.patch('/api/pages/:id', (req, res) => {
     }
   });
   tx();
-  res.json({ ok: true });
+  const updated = db.prepare('SELECT * FROM pages WHERE id = ?').get(id);
+  updated.tags = db.prepare('SELECT tag FROM page_tags WHERE page_id = ?').all(id).map(r => r.tag);
+  try { updated.blocks = JSON.parse(updated.blocks || '[]'); }
+  catch { updated.blocks = []; }
+  try { updated.settings = JSON.parse(updated.settings || '{}'); }
+  catch { updated.settings = {}; }
+  res.json(updated);
 });
 
 app.post('/api/pages/:id/set-first', (req, res) => {

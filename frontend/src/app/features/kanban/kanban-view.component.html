@@ -1,0 +1,124 @@
+<main class="board"
+      [class]="'board-theme-' + themeService.ambientTheme()"
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      (cdkDropListDropped)="onColumnDrop($event)">
+
+  @for (col of filteredColumns(); track col.id) {
+    <div class="column" cdkDrag>
+      <!-- Column Header -->
+      <div class="column-header" cdkDragHandle>
+        <div class="column-header-left">
+          <div class="column-dot"></div>
+          <input class="column-title" [value]="col.name" (blur)="onColumnTitleBlur(col, $event)"
+                 (keydown.enter)="$any($event.target).blur()" title="Click to rename" />
+          <span class="column-count">{{ (col.cards || []).length }}</span>
+        </div>
+        <button (click)="deleteColumn(col.id)" class="column-menu" title="Delete column">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Cards List (CDK drop list) -->
+      <div class="card-list"
+           [id]="'col-' + col.id"
+           cdkDropList
+           [cdkDropListData]="col.cards || []"
+           [cdkDropListConnectedTo]="connectedDropLists()"
+           (cdkDropListDropped)="onCardDrop($event, col.id)">
+        @for (card of col.cards || []; track card.id) {
+          <div class="card" cdkDrag (click)="selectCard(card)">
+            @if (card.cover) {
+              <div class="card-cover-banner"
+                   [style.backgroundImage]="card.cover.startsWith('http') || card.cover.startsWith('data:') ? 'url(' + card.cover + ')' : null"
+                   [style.background]="!card.cover.startsWith('http') && !card.cover.startsWith('data:') ? card.cover : null">
+              </div>
+            }
+
+            @if (card.labels && card.labels.length) {
+              <div class="card-labels">
+                @for (lbl of card.labels; track lbl.id) {
+                  <span class="card-label" [style.background]="lbl.color">
+                    {{ lbl.name }}
+                  </span>
+                }
+              </div>
+            }
+
+            <div class="card-title-text">{{ card.title }}</div>
+
+            <div class="card-meta">
+              <span class="badge" [class]="'priority-' + card.priority">
+                <span style="font-size:9px">●</span>
+                {{ card.priority }}
+              </span>
+
+              @if (card.checklist && card.checklist.length) {
+                <div class="checklist-progress">
+                  <div class="bar">
+                    <div [style.width.%]="(getChecklistDone(card) / card.checklist.length) * 100"></div>
+                  </div>
+                  <span>{{ getChecklistDone(card) }}/{{ card.checklist.length }}</span>
+                </div>
+              }
+
+              @if (card.due_date) {
+                <span class="due">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:2px">
+                    <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  {{ card.due_date }}
+                </span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Add Card Trigger Button -->
+      @if (addingCardColumnId !== col.id) {
+        <button (click)="openAddCardInput(col.id)" class="add-card-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <span>Add a card</span>
+        </button>
+      }
+
+      <!-- Add Card Form -->
+      @if (addingCardColumnId === col.id) {
+        <div class="add-card-form open">
+          <textarea [(ngModel)]="newCardTitle" (keydown.enter)="createCard(col.id)" (keydown.escape)="cancelAddCard()"
+                    placeholder="Enter a card title..." autofocus></textarea>
+          <div class="form-actions">
+            <button (click)="createCard(col.id)" class="btn primary btn-sm">Add Card</button>
+            <button (click)="cancelAddCard()" class="btn ghost btn-sm">Cancel</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Interactive Ghost Add Column Card -->
+  <div class="add-column-ghost" (click)="openAddColumnPrompt()" title="Add new column">
+    <div class="ghost-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    </div>
+    <span>Add New Column</span>
+  </div>
+
+  <!-- Card Detail Modal -->
+  @if (selectedCard) {
+    <app-card-detail-modal
+      [card]="selectedCard"
+      [boardLabels]="activeBoard()?.labels || []"
+      (close)="selectedCard = null"
+      (cardUpdated)="onCardUpdated($event)"
+      (cardDeleted)="onCardDeleted($event)">
+    </app-card-detail-modal>
+  }
+</main>
