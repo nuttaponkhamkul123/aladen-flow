@@ -1532,16 +1532,17 @@ body {
 
 /* CMS Page Action Bar */
 .cms-page-bar {
-  padding: 8px 18px;
+  padding: 6px 14px;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: var(--bg-surface);
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
   min-height: 48px;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 
@@ -1552,9 +1553,9 @@ body {
 .cms-meta-inputs {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: nowrap;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
 }
 
@@ -1740,6 +1741,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .auto-save-badge {
@@ -1755,6 +1758,12 @@ body {
   border: 1px solid var(--border-subtle);
   transition: all 0.2s ease;
   user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.save-status-text {
+  white-space: nowrap;
 }
 
 .save-status-dot {
@@ -2341,6 +2350,8 @@ body {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .viewport-segmented-control {
@@ -2351,6 +2362,8 @@ body {
   padding: 2px;
   gap: 2px;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .viewport-btn {
@@ -2368,6 +2381,12 @@ body {
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.viewport-btn-text {
+  white-space: nowrap;
 }
 
 .viewport-btn:hover {
@@ -2393,6 +2412,7 @@ body {
   color: var(--text-tertiary);
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .viewport-tool-btn:hover {
@@ -2417,6 +2437,7 @@ body {
   border-radius: var(--radius-sm);
   letter-spacing: 0.2px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* CMS Mode Switch (Edit vs Preview) */
@@ -2428,6 +2449,8 @@ body {
   border-radius: var(--radius-md);
   padding: 2px;
   gap: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .mode-switch-btn {
@@ -2444,6 +2467,8 @@ body {
   font-family: var(--font-sans);
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .mode-switch-btn:hover {
@@ -2455,6 +2480,76 @@ body {
   color: var(--text-primary);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-subtle);
+}
+
+/* Responsive screen zoom and compact viewport scaling rules */
+@media (max-width: 1440px) {
+  .cms-page-bar {
+    gap: 8px;
+    padding: 5px 10px;
+  }
+  .cms-meta-inputs {
+    gap: 6px;
+  }
+  .cms-title {
+    min-width: 90px;
+    max-width: 160px;
+    font-size: 13.5px;
+  }
+  .cms-meta-controls-group {
+    padding: 2px 4px;
+    gap: 3px;
+  }
+  .cms-meta-controls-group .cms-slug {
+    width: 85px;
+  }
+  .cms-viewport-toolbar {
+    gap: 5px;
+    padding: 2px 5px;
+  }
+  .viewport-btn {
+    padding: 4px 7px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  .cms-page-actions {
+    gap: 6px;
+  }
+  .mode-switch-btn {
+    padding: 4px 8px;
+    font-size: 11.5px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .cms-meta-controls-group .tags-input-wrap {
+    display: none;
+  }
+  .first-page-btn .first-page-text {
+    display: none;
+  }
+  .first-page-btn {
+    padding: 0 6px;
+  }
+  .auto-save-badge {
+    padding: 4px 7px;
+  }
+  .auto-save-badge .save-status-text {
+    display: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .viewport-btn .viewport-btn-text {
+    display: none;
+  }
+  .viewport-btn {
+    padding: 4px 8px;
+  }
+  .cms-page-actions .btn-ai-sparkle span,
+  .cms-page-actions #cmsPreviewLink span {
+    display: none;
+  }
 }
 
 /* Floating Preview Mode Banner */
