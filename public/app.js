@@ -5728,15 +5728,15 @@ function renderProps() {
     renderCanvasSettings(body);
     return;
   }
-  const headerActions = el('div', { class: 'props-header-actions', style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;' }, [
-    el('div', { class: 'block-type-label', style: 'margin-bottom:0;' }, [
-      'Type: ',
-      el('span', { class: 'type-name' }, BLOCK_LABELS[block.type] || block.type)
-    ]),
-    el('div', { style: 'display:flex;gap:5px;' }, [
+  const headerActions = el('div', { class: 'props-header-card' }, [
+    el('div', { class: 'props-header-top' }, [
+      el('div', { class: 'block-type-label' }, [
+        el('span', { class: 'block-type-prefix' }, 'Type: '),
+        el('span', { class: 'type-name' }, BLOCK_LABELS[block.type] || block.type)
+      ]),
       el('button', {
         type: 'button',
-        class: 'btn-sm-ghost',
+        class: 'btn-sm-ghost props-canvas-btn',
         title: 'Open Canvas / Page Settings',
         onclick: () => {
           state.cms.selectedBlockId = null;
@@ -5745,8 +5745,10 @@ function renderProps() {
         }
       }, [
         createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>'),
-        el('span', { style: 'margin-left:3px;font-size:11px;' }, 'Canvas')
-      ]),
+        el('span', {}, 'Canvas')
+      ])
+    ]),
+    el('div', { class: 'props-header-tools' }, [
       el('button', {
         type: 'button',
         class: 'btn-sm-ghost',
@@ -5754,7 +5756,7 @@ function renderProps() {
         onclick: () => saveSelectedAsReusableBlock(block.id)
       }, [
         createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'),
-        el('span', { style: 'margin-left:3px;font-size:11px;' }, 'Save Reusable')
+        el('span', {}, 'Save Reusable')
       ]),
       el('button', {
         type: 'button',
@@ -5763,7 +5765,7 @@ function renderProps() {
         onclick: () => copySelectedBlock(block.id)
       }, [
         createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'),
-        el('span', { style: 'margin-left:3px;font-size:11px;' }, 'Copy')
+        el('span', {}, 'Copy')
       ]),
       el('button', {
         type: 'button',
@@ -5771,7 +5773,8 @@ function renderProps() {
         title: 'Delete component',
         onclick: () => deleteBlock(block.id)
       }, [
-        createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>')
+        createSvg('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'),
+        el('span', {}, 'Delete')
       ])
     ])
   ]);

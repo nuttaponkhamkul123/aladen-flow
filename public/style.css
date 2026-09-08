@@ -3851,6 +3851,61 @@ body {
   cursor: pointer;
 }
 
+/* Props Header Card & Quick Actions */
+.props-header-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.props-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.props-header-top .block-type-label {
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.props-header-top .block-type-label .type-name {
+  color: var(--accent-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 145px;
+}
+
+.props-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.props-header-tools .btn-sm-ghost,
+.props-header-tools .btn-sm-danger {
+  flex: 1;
+  justify-content: center;
+  padding: 5px 6px;
+  font-size: 11px;
+}
+
 .block-type-label {
   font-size: 11px;
   font-weight: 700;
@@ -3877,6 +3932,9 @@ body {
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.12s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .btn-sm-ghost:hover {
@@ -3888,13 +3946,19 @@ body {
 .btn-sm-danger {
   display: inline-flex;
   align-items: center;
-  padding: 4px 7px;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
   border-radius: var(--radius-sm);
   background: transparent;
   border: 1px solid transparent;
   color: var(--color-danger);
   cursor: pointer;
   transition: all 0.12s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .btn-sm-danger:hover {
