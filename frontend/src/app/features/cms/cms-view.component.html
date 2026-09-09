@@ -64,7 +64,7 @@
                      (click)="addBlock(item.type)"
                      (dragstart)="onPaletteDragStart($event, item.type)"
                      (dragend)="onDragEnd()">
-                  <div class="palette-icon-wrap" [class]="item.type + '-icon'" [innerHTML]="item.iconSvg"></div>
+                  <div class="palette-icon-wrap" [class]="item.type + '-icon'" [innerHTML]="iconSafe(item.iconSvg)"></div>
                   <div class="palette-info">
                     <span class="palette-label">{{ item.label }}</span>
                     <span class="palette-sub">{{ item.sub }}</span>
@@ -321,30 +321,54 @@
                       @case ('paragraph') {
                         <p [style.textAlign]="b.props['align'] || 'left'"
                            [style.color]="b.props['color'] || 'inherit'"
-                           [style.fontWeight]="b.props['bold'] ? '700' : '400'"
+                           [style.fontWeight]="b.props['bold'] ? '600' : '400'"
                            [style.fontStyle]="b.props['italic'] ? 'italic' : 'normal'"
-                           style="line-height:1.6;font-size:15px;margin:0 0 12px;">
+                           [style.fontSize]="b.props['size'] === 'small' ? '13px' : b.props['size'] === 'large' ? '18px' : b.props['size'] === 'lead' ? '20px' : '15px'"
+                           style="line-height:1.7;margin:0 0 14px;">
                           {{ b.props['text'] || 'Paragraph content text goes here...' }}
                         </p>
                       }
 
                       @case ('button') {
-                        <div [style.display]="'flex'" [style.justifyContent]="b.props['align'] === 'center' ? 'center' : b.props['align'] === 'right' ? 'flex-end' : 'flex-start'">
-                          <a [href]="b.props['url'] || '#'" class="btn"
-                             [style.background]="b.props['variant'] === 'filled' ? (b.props['color'] || '#3b82f6') : 'transparent'"
-                             [style.color]="b.props['variant'] === 'filled' ? (b.props['textColor'] || '#ffffff') : (b.props['color'] || '#3b82f6')"
-                             [style.borderColor]="b.props['color'] || '#3b82f6'"
-                             [style.borderRadius.px]="b.props['borderRadius'] != null ? b.props['borderRadius'] : 8">
+                        <div style="margin:14px 0;"
+                             [style.textAlign]="b.props['align'] === 'center' ? 'center' : b.props['align'] === 'right' ? 'right' : 'left'">
+                          <a [href]="b.props['url'] || '#'"
+                             class="btn"
+                             [style.display]="b.props['align'] === 'full' ? 'block' : 'inline-block'"
+                             [style.textAlign]="'center'"
+                             [style.background]="b.props['variant'] === 'filled' ? (b.props['color'] || '#6366f1') : b.props['variant'] === 'soft' ? (b.props['color'] || '#6366f1') + '22' : 'transparent'"
+                             [style.color]="b.props['variant'] === 'filled' ? (b.props['textColor'] || '#ffffff') : (b.props['color'] || '#6366f1')"
+                             [style.border]="b.props['variant'] === 'outline' ? '1.5px solid ' + (b.props['color'] || '#6366f1') : b.props['variant'] === 'soft' ? '1px solid ' + (b.props['color'] || '#6366f1') + '44' : '1px solid transparent'"
+                             [style.borderRadius.px]="b.props['borderRadius'] != null ? b.props['borderRadius'] : 8"
+                             [style.padding]="b.props['size'] === 'small' ? '7px 14px' : b.props['size'] === 'large' ? '13px 26px' : '10px 20px'"
+                             [style.fontSize]="b.props['size'] === 'small' ? '12.5px' : b.props['size'] === 'large' ? '16px' : '14px'"
+                             [style.fontWeight]="'600'"
+                             [style.textDecoration]="'none'"
+                             [style.boxSizing]="b.props['align'] === 'full' ? 'border-box' : 'border-box'">
                             {{ b.props['label'] || 'Button Action' }}
                           </a>
                         </div>
                       }
 
                       @case ('image') {
-                        <div style="border-radius:8px;overflow:hidden;margin-bottom:12px;">
-                          <img [src]="b.props['url']" [alt]="b.props['alt'] || ''" style="width:100%;height:auto;display:block;" />
-                          @if (b.props['caption']) {
-                            <p style="font-size:11.5px;color:var(--text-tertiary);margin-top:6px;text-align:center;">{{ b.props['caption'] }}</p>
+                        <div style="margin:14px 0;"
+                             [style.textAlign]="b.props['align'] || 'center'">
+                          @if (b.props['url']) {
+                            <img [src]="b.props['url']" [alt]="b.props['alt'] || ''"
+                                 [style.width]="b.props['width'] || '100%'"
+                                 [style.maxWidth]="'100%'"
+                                 [style.objectFit]="b.props['objectFit'] || 'cover'"
+                                 [style.borderRadius.px]="b.props['borderRadius'] != null ? b.props['borderRadius'] : 8"
+                                 [style.boxShadow]="b.props['shadow'] ? '0 10px 25px -5px rgba(0,0,0,0.15)' : 'none'"
+                                 [style.border]="b.props['border'] ? '1px solid #e2e8f0' : 'none'"
+                                 style="display:inline-block;" />
+                            @if (b.props['caption']) {
+                              <p style="font-size:12.5px;color:var(--text-secondary);margin-top:6px;">{{ b.props['caption'] }}</p>
+                            }
+                          } @else {
+                            <div style="padding:36px 20px;border:1px dashed var(--border-subtle);border-radius:8px;color:var(--text-tertiary);font-size:12.5px;text-align:center;">
+                              Image — set an image URL in the inspector
+                            </div>
                           }
                         </div>
                       }
@@ -369,36 +393,45 @@
                       }
 
                       @case ('pricing') {
-                        <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:20px;position:relative;margin-bottom:12px;"
-                             [style.borderColor]="b.props['isPopular'] ? 'var(--accent-primary)' : 'var(--border-subtle)'">
-                          @if (b.props['isPopular'] && b.props['badge']) {
-                            <span style="position:absolute;top:-10px;right:16px;background:#3b82f6;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;">{{ b.props['badge'] }}</span>
+                        <div style="background:var(--bg-surface-elevated);border-radius:14px;padding:20px;position:relative;margin-bottom:12px;"
+                             [style.border]="b.props['highlight'] ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)'">
+                          @if (b.props['highlight'] && b.props['badge']) {
+                            <span style="position:absolute;top:-10px;right:16px;background:linear-gradient(135deg,#6366f1,#ec4899);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;">{{ b.props['badge'] }}</span>
                           }
-                          <h3 style="margin:0 0 6px;font-size:16px;">{{ b.props['plan'] }}</h3>
-                          <div style="margin:8px 0;">
-                            <span style="font-size:28px;font-weight:800;">{{ b.props['price'] }}</span>
-                            <span style="color:var(--text-secondary);font-size:12px;">{{ b.props['period'] }}</span>
+                          <h3 style="margin:0 0 6px;font-size:17px;">{{ b.props['planName'] || 'Pro Plan' }}</h3>
+                          <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px;">
+                            <span style="font-size:30px;font-weight:800;letter-spacing:-0.5px;">{{ b.props['price'] || '$29' }}</span>
+                            <span style="color:var(--text-secondary);font-size:13px;">{{ b.props['period'] || '/month' }}</span>
                           </div>
-                          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">{{ b.props['description'] }}</p>
-                          <ul style="list-style:none;padding:0;margin:0 0 16px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;">
-                            @for (f of b.props['features'] || []; track f) {
-                              <li>✓ {{ f }}</li>
+                          <p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px;">{{ b.props['description'] }}</p>
+                          <ul style="list-style:none;padding:0;margin:0 0 16px;display:flex;flex-direction:column;gap:7px;font-size:12.5px;">
+                            @for (f of b.props['features'] || []; track $index) {
+                              <li><span style="color:#10b981;font-weight:700;margin-right:6px;">✓</span>{{ f }}</li>
                             }
                           </ul>
-                          <a [href]="b.props['ctaUrl'] || '#'" class="btn primary" style="width:100%;text-align:center;display:block;">
-                            {{ b.props['ctaLabel'] || 'Get Started' }}
+                          <a [href]="b.props['buttonUrl'] || '#'" class="btn primary" style="width:100%;text-align:center;display:block;box-sizing:border-box;">
+                            {{ b.props['buttonLabel'] || 'Get Started' }}
                           </a>
                         </div>
                       }
 
                       @case ('stat') {
-                        <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:16px;margin-bottom:12px;">
-                          <span style="font-size:12px;color:var(--text-secondary);">{{ b.props['label'] }}</span>
-                          <div style="font-size:28px;font-weight:800;margin:4px 0;">{{ b.props['value'] }}</div>
-                          <div style="font-size:11px;color:var(--text-tertiary);display:flex;gap:6px;">
-                            <span style="color:#10b981;font-weight:700;">{{ b.props['trend'] }}</span>
-                            <span>{{ b.props['subtext'] }}</span>
+                        <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:20px;margin-bottom:12px;">
+                          @if (b.props['icon']) {
+                            <div style="font-size:22px;margin-bottom:8px;">{{ b.props['icon'] }}</div>
+                          }
+                          <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1.1;margin-bottom:6px;">{{ b.props['value'] || '99.9%' }}</div>
+                          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                            <span style="font-size:13px;font-weight:500;color:var(--text-secondary);">{{ b.props['label'] || 'Metric Label' }}</span>
+                            @if (b.props['trend']) {
+                              <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;"
+                                    [style.background]="b.props['trendType'] === 'down' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'"
+                                    [style.color]="b.props['trendType'] === 'down' ? '#f87171' : '#34d399'">{{ b.props['trend'] }}</span>
+                            }
                           </div>
+                          @if (b.props['subtext']) {
+                            <div style="font-size:11px;color:var(--text-tertiary);margin-top:5px;">{{ b.props['subtext'] }}</div>
+                          }
                         </div>
                       }
 
@@ -418,11 +451,18 @@
                       }
 
                       @case ('callout') {
-                        <div style="display:flex;gap:10px;padding:12px 14px;border-radius:8px;background:var(--bg-surface-elevated);border-left:4px solid #3b82f6;margin-bottom:12px;">
-                          <span style="font-size:18px;">{{ b.props['icon'] || '💡' }}</span>
-                          <div>
-                            <strong style="font-size:13px;display:block;margin-bottom:2px;">{{ b.props['title'] }}</strong>
-                            <p style="font-size:12px;color:var(--text-secondary);margin:0;">{{ b.props['text'] }}</p>
+                        @let theme = calloutTheme(b.props['type'] || 'info');
+                        <div [style.borderLeft]="'4px solid ' + theme.border" [style.background]="theme.bg"
+                             [style.borderRadius]="'0 10px 10px 0'"
+                             style="display:flex;gap:14px;padding:14px 18px;margin-bottom:12px;align-items:flex-start;">
+                          <span style="font-size:20px;line-height:1;">{{ b.props['icon'] || theme.icon }}</span>
+                          <div style="flex:1;">
+                            @if (b.props['title']) {
+                              <strong style="font-size:15px;display:block;margin-bottom:4px;" [style.color]="theme.titleColor">{{ b.props['title'] }}</strong>
+                            }
+                            @if (b.props['text']) {
+                              <p style="font-size:14px;line-height:1.6;color:var(--text-primary);opacity:0.95;margin:0;">{{ b.props['text'] }}</p>
+                            }
                           </div>
                         </div>
                       }
@@ -489,37 +529,59 @@
                               {{ getBlockLabel(child.type) }} (child)
                             </div>
                           } @empty {
-                            <div style="padding:10px;font-size:11px;color:var(--text-tertiary);text-align:center;width:100%;">Empty container — children not editable in canvas</div>
+                            <div style="padding:10px;font-size:11px;color:var(--text-tertiary);text-align:center;width:100%;">Empty container — add child blocks from the inspector</div>
                           }
                         </div>
                       }
 
                       @case ('carousel') {
+                        @let slides = b.props['slides'] || [];
                         <div [style.aspectRatio]="b.props['aspectRatio'] || '16/9'" style="border-radius:10px;overflow:hidden;background:#0f172a;margin-bottom:12px;position:relative;">
-                          @for (s of b.props['slides'] || []; track $index) {
-                            <div style="width:100%;height:100%;position:absolute;top:0;left:0;" [style.display]="$index === 0 ? 'block' : 'none'">
+                          @for (s of slides; track $index; let si = $index) {
+                            <div style="width:100%;height:100%;position:absolute;top:0;left:0;"
+                                 [style.display]="carouselCurrent(b) === si ? 'block' : 'none'">
                               <img [src]="s.url" [alt]="s.caption || ''" style="width:100%;height:100%;object-fit:cover;display:block;" />
-                              @if (s.caption) {
+                              @if (s.caption && b.props['showCaptions'] !== false) {
                                 <span style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.65);color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;">{{ s.caption }}</span>
                               }
                             </div>
                           } @empty {
                             <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:12px;">Carousel — no slides yet</div>
                           }
+                          @if (slides.length > 1) {
+                            @if (b.props['showArrows'] !== false) {
+                              <button (click)="carouselMove(b, -1, $event)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);z-index:5;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:13px;cursor:pointer;">&#10094;</button>
+                              <button (click)="carouselMove(b, 1, $event)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:5;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:13px;cursor:pointer;">&#10095;</button>
+                            }
+                            @if (b.props['showDots'] !== false) {
+                              <div style="position:absolute;bottom:8px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:6px;">
+                                @for (s of slides; track $index; let si = $index) {
+                                  <button (click)="carouselGo(b, si, $event)" [style.background]="carouselCurrent(b) === si ? '#fff' : 'rgba(255,255,255,0.4)'"
+                                          style="width:8px;height:8px;border-radius:50%;border:none;cursor:pointer;padding:0;"></button>
+                                }
+                              </div>
+                            }
+                          }
                         </div>
                       }
 
                       @case ('video') {
                         <div style="margin-bottom:12px;">
-                          <div [style.aspectRatio]="b.props['aspectRatio'] || '16/9'" style="border-radius:10px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12.5px;">
-                            @if (b.props['url']) {
-                              <div style="display:flex;align-items:center;gap:6px;color:#94a3b8;">▶ {{ b.props['url'] }}</div>
-                            } @else {
-                              Video — set a YouTube / Vimeo / mp4 URL
-                            }
-                          </div>
+                          @if (b.props['url']) {
+                            <div [style.aspectRatio]="b.props['aspectRatio'] || '16/9'" style="border-radius:10px;overflow:hidden;background:#000;">
+                              @if (videoEmbedSrc(b.props['url']); as embedSrc) {
+                                <iframe [src]="embedSrc" style="width:100%;height:100%;border:none;" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
+                              } @else {
+                                <video [src]="b.props['url']" controls style="width:100%;height:100%;object-fit:cover;"></video>
+                              }
+                            </div>
+                          } @else {
+                            <div [style.aspectRatio]="b.props['aspectRatio'] || '16/9'" style="border-radius:10px;border:1px dashed var(--border-subtle);display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12.5px;">
+                              Video — set a YouTube / Vimeo / MP4 URL
+                            </div>
+                          }
                           @if (b.props['caption']) {
-                            <p style="font-size:11.5px;color:var(--text-tertiary);margin-top:6px;text-align:center;">{{ b.props['caption'] }}</p>
+                            <p style="font-size:11.5px;color:var(--text-secondary);margin-top:6px;text-align:center;">{{ b.props['caption'] }}</p>
                           }
                         </div>
                       }
@@ -572,16 +634,34 @@
                       }
 
                       @case ('countdown') {
+                        @let cd = countdownParts(b.props['targetDate']);
                         <div style="text-align:center;padding:24px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:16px;margin-bottom:12px;">
-                          <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">{{ b.props['title'] || 'Countdown' }}</h3>
-                          <p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px;">{{ b.props['subtitle'] }}</p>
-                          <div style="display:flex;justify-content:center;gap:8px;font-size:13px;color:var(--text-secondary);">
-                            <span style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-weight:800;">00</span><span style="align-self:center;">:</span>
-                            <span style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-weight:800;">00</span><span style="align-self:center;">:</span>
-                            <span style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-weight:800;">00</span><span style="align-self:center;">:</span>
-                            <span style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-weight:800;">00</span>
+                          <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;">{{ b.props['title'] || 'Countdown' }}</h3>
+                          @if (b.props['subtitle']) {
+                            <p style="font-size:12px;color:var(--text-secondary);margin:0 0 16px;">{{ b.props['subtitle'] }}</p>
+                          }
+                          <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
+                            <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:10px;padding:10px 12px;min-width:54px;">
+                              <div style="font-size:24px;font-weight:800;color:var(--accent-primary);line-height:1;">{{ cd.d }}</div>
+                              <div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;margin-top:3px;font-weight:700;">Days</div>
+                            </div>
+                            <span style="font-size:20px;font-weight:700;color:var(--accent-primary);opacity:0.6;">:</span>
+                            <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:10px;padding:10px 12px;min-width:54px;">
+                              <div style="font-size:24px;font-weight:800;color:var(--accent-primary);line-height:1;">{{ cd.h }}</div>
+                              <div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;margin-top:3px;font-weight:700;">Hours</div>
+                            </div>
+                            <span style="font-size:20px;font-weight:700;color:var(--accent-primary);opacity:0.6;">:</span>
+                            <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:10px;padding:10px 12px;min-width:54px;">
+                              <div style="font-size:24px;font-weight:800;color:var(--accent-primary);line-height:1;">{{ cd.m }}</div>
+                              <div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;margin-top:3px;font-weight:700;">Mins</div>
+                            </div>
+                            <span style="font-size:20px;font-weight:700;color:var(--accent-primary);opacity:0.6;">:</span>
+                            <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:10px;padding:10px 12px;min-width:54px;">
+                              <div style="font-size:24px;font-weight:800;color:var(--accent-primary);line-height:1;">{{ cd.s }}</div>
+                              <div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;margin-top:3px;font-weight:700;">Secs</div>
+                            </div>
                           </div>
-                          <div style="font-size:10.5px;color:var(--text-tertiary);margin-top:8px;">Target: {{ b.props['targetDate'] }}</div>
+                          <div style="font-size:10.5px;color:var(--text-tertiary);margin-top:10px;">Target: {{ b.props['targetDate'] || '2026-12-31T23:59:59' }}</div>
                         </div>
                       }
 
@@ -629,14 +709,23 @@
                       }
 
                       @case ('tabs') {
+                        @let tabs = b.props['tabs'] || [];
                         <div style="margin-bottom:12px;">
                           <div style="display:flex;gap:6px;border-bottom:1px solid var(--border-subtle);padding-bottom:8px;overflow-x:auto;">
-                            @for (tab of b.props['tabs'] || []; track $index) {
-                              <button style="padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);color:var(--text-primary);"> {{ tab.label || tab.title || ('Tab ' + ($index + 1)) }}</button>
+                            @for (tab of tabs; track $index; let ti = $index) {
+                              <button (click)="setTab(b, ti, $event)"
+                                      [style.background]="b.props['variant'] === 'underline' ? 'transparent' : (tabCurrent(b) === ti ? 'var(--accent-primary)' : 'var(--bg-surface-elevated)')"
+                                      [style.color]="tabCurrent(b) === ti ? '#fff' : 'var(--text-primary)'"
+                                      [style.borderBottom]="b.props['variant'] === 'underline' ? (tabCurrent(b) === ti ? '2px solid var(--accent-primary)' : '2px solid transparent') : '1px solid var(--border-subtle)'"
+                                      style="padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;border-top:none;border-left:none;border-right:none;">
+                                {{ tab.label || tab.title || ('Tab ' + (ti + 1)) }}
+                              </button>
                             }
                           </div>
-                          @for (tab of b.props['tabs'] || []; track $index) {
-                            <div style="padding:14px 2px;font-size:13px;color:var(--text-secondary);line-height:1.6;">{{ tab.content }}</div>
+                          @for (tab of tabs; track $index; let ti = $index) {
+                            @if (tabCurrent(b) === ti) {
+                              <div style="padding:14px 2px;font-size:13px;color:var(--text-primary);line-height:1.6;">{{ tab.content }}</div>
+                            }
                           }
                         </div>
                       }
@@ -719,57 +808,178 @@
               </div>
 
               <!-- Property Fields -->
-              @if (b.type === 'heading') {
-                <div style="margin-bottom:12px;">
-                  <label class="section-eyebrow">Level</label>
-                  <select [(ngModel)]="b.props['level']" (change)="onPropChange()"
-                          style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;">
-                    <option [value]="1">H1 (Main Headline)</option>
-                    <option [value]="2">H2 (Section Header)</option>
-                    <option [value]="3">H3 (Sub-section)</option>
-                    <option [value]="4">H4 (Card Header)</option>
-                  </select>
-                </div>
-                <div style="margin-bottom:12px;">
-                  <label class="section-eyebrow">Text Content</label>
-                  <input [(ngModel)]="b.props['text']" (input)="onPropChange()"
-                         style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;" />
-                </div>
-                <div style="margin-bottom:12px;">
-                  <label class="section-eyebrow">Alignment</label>
-                  <select [(ngModel)]="b.props['align']" (change)="onPropChange()"
-                          style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;">
-                    <option value="left">Left Aligned</option>
-                    <option value="center">Centered</option>
-                    <option value="right">Right Aligned</option>
-                  </select>
-                </div>
-              } @else if (b.type === 'paragraph') {
-                <div style="margin-bottom:12px;">
-                  <label class="section-eyebrow">Body Text</label>
-                  <textarea [(ngModel)]="b.props['text']" (input)="onPropChange()" rows="4"
-                            style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;"></textarea>
-                </div>
-                <div style="margin-bottom:12px;">
-                  <label class="section-eyebrow">Alignment</label>
-                  <select [(ngModel)]="b.props['align']" (change)="onPropChange()"
-                          style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;">
-                    <option value="left">Left</option>
-                    <option value="center">Center</option>
-                    <option value="right">Right</option>
-                  </select>
-                </div>
-              } @else if (b.type === 'button') {
-                <div style="margin-bottom:12px;">
-                  <label class="section-eyebrow">Label</label>
-                  <input [(ngModel)]="b.props['label']" (input)="onPropChange()"
-                         style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;" />
-                </div>
-                <div style="margin-bottom:12px;">
-                  <label class="section-eyebrow">Target URL</label>
-                  <input [(ngModel)]="b.props['url']" (input)="onPropChange()"
-                         style="width:100%;padding:6px 8px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:12px;" />
-                </div>
+              @if (getBlockSchema(b.type).length > 0) {
+                @for (field of getBlockSchema(b.type); track field.key) {
+                  <div style="margin-bottom:14px;">
+                    <label class="section-eyebrow" style="margin-bottom:4px;display:block;">{{ field.label }}</label>
+                    @switch (field.type) {
+                      @case ('text') {
+                        <input [ngModel]="b.props[field.key]" (ngModelChange)="setProp(b, field.key, $event)"
+                               class="prop-input" [placeholder]="field.placeholder || ''" />
+                      }
+                      @case ('textarea') {
+                        <textarea rows="3" [ngModel]="b.props[field.key]" (ngModelChange)="setProp(b, field.key, $event)"
+                                  class="prop-input" [placeholder]="field.placeholder || ''"></textarea>
+                      }
+                      @case ('select') {
+                        <select [ngModel]="selectValue(b, field.key)" (ngModelChange)="setProp(b, field.key, $event)" class="prop-input">
+                          @for (o of field.options || []; track o.value) {
+                            <option [value]="o.value">{{ o.label }}</option>
+                          }
+                        </select>
+                      }
+                      @case ('toggle') {
+                        <label class="prop-toggle">
+                          <input type="checkbox" [checked]="!!b.props[field.key]" (change)="setProp(b, field.key, $event.target.checked)" />
+                          <span>{{ field.onLabel || 'Enabled' }}</span>
+                        </label>
+                      }
+                      @case ('color') {
+                        <div class="prop-color-row">
+                          <input type="color" [value]="b.props[field.key] || '#6366f1'" (input)="setProp(b, field.key, $event.target.value)" />
+                          <input [ngModel]="b.props[field.key]" (ngModelChange)="setProp(b, field.key, $event)"
+                                 class="prop-input" [placeholder]="field.placeholder || '#6366f1'" />
+                        </div>
+                      }
+                      @case ('number') {
+                        <input type="number" [ngModel]="b.props[field.key]"
+                               (ngModelChange)="setProp(b, field.key, toNumber($event))"
+                               class="prop-input" [min]="field.min ?? null" [max]="field.max ?? null" />
+                      }
+                      @case ('stringlist') {
+                        <div>
+                          @for (it of b.props[field.key] || []; track $index; let ix = $index) {
+                            <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">
+                              <input [ngModel]="it" (ngModelChange)="setListString(b, field.key, ix, $event)"
+                                     class="prop-input" style="flex:1;min-width:0;" />
+                              <button class="btn-icon ghost btn-xs" title="Remove" (click)="removeFromArray(b.props[field.key], ix)">&times;</button>
+                            </div>
+                          }
+                          <button class="props-add-btn" (click)="addStringItem(b, field.key)">+ {{ field.addLabel || 'Add Item' }}</button>
+                        </div>
+                      }
+                      @case ('objectlist') {
+                        <div>
+                          @for (item of b.props[field.key] || []; track $index; let ix = $index) {
+                            <div class="props-list-card">
+                              <div class="props-list-card-head">
+                                <span style="font-size:11px;font-weight:700;color:var(--accent-primary);">{{ field.itemLabel || ('Item ' + (ix + 1)) }}</span>
+                                <button class="btn-icon ghost btn-xs" title="Remove" (click)="removeFromArray(b.props[field.key], ix)">&times;</button>
+                              </div>
+                              @for (sf of field.subFields || []; track sf.key) {
+                                <label style="display:block;margin-bottom:6px;">
+                                  <span class="prop-var-label">{{ sf.label }}</span>
+                                  @switch (sf.type) {
+                                    @case ('text') {
+                                      <input [ngModel]="item[sf.key]" (ngModelChange)="setNestedProp(b, field.key, ix, sf.key, $event)"
+                                             class="prop-input" [placeholder]="sf.placeholder || ''" />
+                                    }
+                                    @case ('textarea') {
+                                      <textarea rows="2" [ngModel]="item[sf.key]" (ngModelChange)="setNestedProp(b, field.key, ix, sf.key, $event)"
+                                                class="prop-input" [placeholder]="sf.placeholder || ''"></textarea>
+                                    }
+                                    @case ('select') {
+                                      <select [ngModel]="selectSubValue(item, sf.key)" (ngModelChange)="setNestedProp(b, field.key, ix, sf.key, $event)" class="prop-input">
+                                        @for (o of sf.options || []; track o.value) {
+                                          <option [value]="o.value">{{ o.label }}</option>
+                                        }
+                                      </select>
+                                    }
+                                    @case ('toggle') {
+                                      <label class="prop-toggle">
+                                        <input type="checkbox" [checked]="!!item[sf.key]" (change)="setNestedProp(b, field.key, ix, sf.key, $event.target.checked)" />
+                                        <span>{{ sf.onLabel || 'Enabled' }}</span>
+                                      </label>
+                                    }
+                                    @case ('color') {
+                                      <div class="prop-color-row">
+                                        <input type="color" [value]="item[sf.key] || '#6366f1'" (input)="setNestedProp(b, field.key, ix, sf.key, $event.target.value)" />
+                                        <input [ngModel]="item[sf.key]" (ngModelChange)="setNestedProp(b, field.key, ix, sf.key, $event)"
+                                               class="prop-input" placeholder="#6366f1" />
+                                      </div>
+                                    }
+                                    @case ('number') {
+                                      <input type="number" [ngModel]="item[sf.key]"
+                                             (ngModelChange)="setNestedProp(b, field.key, ix, sf.key, toNumber($event))"
+                                             class="prop-input" />
+                                    }
+                                    @case ('links') {
+                                      <div>
+                                        @for (l of item[sf.key] || []; track $index; let lx = $index) {
+                                          <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">
+                                            <input placeholder="Label" [ngModel]="l.label" (ngModelChange)="setLink(item[sf.key], lx, 'label', $event)"
+                                                   class="prop-input" style="flex:1;min-width:0;" />
+                                            <input placeholder="URL" [ngModel]="l.url" (ngModelChange)="setLink(item[sf.key], lx, 'url', $event)"
+                                                   class="prop-input" style="flex:1;min-width:0;" />
+                                            <button class="btn-icon ghost btn-xs" title="Remove" (click)="removeFromArray(item[sf.key], lx)">&times;</button>
+                                          </div>
+                                        }
+                                        <button class="props-add-btn" (click)="addLink(item[sf.key])">+ Add Link</button>
+                                      </div>
+                                    }
+                                    @default {
+                                      <input [ngModel]="item[sf.key]" (ngModelChange)="setNestedProp(b, field.key, ix, sf.key, $event)" class="prop-input" />
+                                    }
+                                  }
+                                </label>
+                              }
+                            </div>
+                          }
+                          <button class="props-add-btn" (click)="addListItem(b, field.key, field.itemDefault)">+ {{ field.addLabel || 'Add Item' }}</button>
+                        </div>
+                      }
+@case ('matrix') {
+                          <div>
+                            <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">
+                              @for (ci of colRange(b); track $index) {
+                                <span style="flex:1;font-size:10px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                  {{ (b.props['headers'] || [])[ci] || ('Col ' + (ci + 1)) }}
+                                </span>
+                              }
+                              <span style="width:18px;"></span>
+                            </div>
+                            @for (ri of tableRowIndexes(b); track $index) {
+                              <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;">
+                                @for (ci of colRange(b); track $index) {
+                                  <input [ngModel]="(b.props['rows'][ri] || [])[ci] || ''"
+                                         (ngModelChange)="setTableCell(b, ri, ci, $event)"
+                                         class="prop-input" style="flex:1;min-width:0;" />
+                                }
+                                <button class="btn-icon ghost btn-xs" title="Remove row" (click)="removeFromArray(b.props['rows'], ri)">&times;</button>
+                              </div>
+                            }
+                            <button class="props-add-btn" (click)="addTableRow(b)">+ {{ field.addLabel || 'Add Row' }}</button>
+                          </div>
+                        }
+                        @case ('children') {
+                          <div>
+                            @for (child of b.props[field.key] || []; track child.id; let ci = $index) {
+                              <div class="props-list-card">
+                                <div class="props-list-card-head">
+                                  <span style="font-weight:600;font-size:12px;">{{ childLabel(child) }}</span>
+                                  <button class="btn-icon ghost btn-xs" title="Remove child" (click)="removeFromArray(b.props[field.key], ci)">&times;</button>
+                                </div>
+                                <div style="font-size:10px;color:var(--text-tertiary);">Renders as a nested block on the published page.</div>
+                              </div>
+                            }
+                            <div style="display:flex;gap:4px;margin-top:6px;">
+                              <select [ngModel]="childTypeOf(b)" (ngModelChange)="setChildType(b, $event)" class="prop-input" style="flex:1;min-width:0;">
+                                @for (cat of blockCategories; track cat.id) {
+                                  @for (item of cat.items; track item.type) {
+                                    <option [value]="item.type">{{ item.label }}</option>
+                                  }
+                                }
+                              </select>
+                              <button class="props-add-btn" style="width:auto;white-space:nowrap;" (click)="addChild(b, field.key, childTypeOf(b))">+ {{ field.addLabel || 'Add' }}</button>
+                            </div>
+                          </div>
+                        }
+                    }
+                    @if (field.note) {
+                      <div class="prop-field-note">{{ field.note }}</div>
+                    }
+                  </div>
+                }
               } @else {
                 <div>
                   <label class="section-eyebrow">Raw Properties</label>

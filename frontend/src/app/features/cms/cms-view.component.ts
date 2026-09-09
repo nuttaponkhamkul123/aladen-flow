@@ -1,10 +1,12 @@
-import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { DomSanitizer, SafeResourceUrl, SafeHtml } from '@angular/platform-browser';
 import { CmsService } from '../../core/services/cms.service';
 import { CmsPage, ReusableBlock, Block, BlockCategory, BLOCK_DEFAULTS } from '../../core/models/cms.model';
 import { AiModalComponent } from './components/ai-modal/ai-modal.component';
+import { PROP_SCHEMAS, PropField } from './cms-prop-schema';
 
 @Component({
   selector: 'app-cms-view',
@@ -13,8 +15,9 @@ import { AiModalComponent } from './components/ai-modal/ai-modal.component';
   templateUrl: './cms-view.component.html',
   styleUrls: ['./cms-view.component.css']
 })
-export class CmsViewComponent implements OnInit {
+export class CmsViewComponent implements OnInit, OnDestroy {
   cmsService = inject(CmsService);
+  private sanitizer = inject(DomSanitizer);
 
   pages = this.cmsService.pages;
   activePage = this.cmsService.activePage;
@@ -39,6 +42,11 @@ export class CmsViewComponent implements OnInit {
   blockSearchQuery = '';
 
   private lastLoadedPageId: number | null = null;
+  private nowTick = signal(Date.now());
+  private tickTimer: any = null;
+  private carouselIdx = new Map<string, number>();
+  private tabIdx = new Map<string, number>();
+  private pendingChildType = new Map<string, string>();
 
   constructor() {
     effect(() => {
@@ -51,8 +59,16 @@ export class CmsViewComponent implements OnInit {
         }
         this.currentBlocks.set(blocks);
         this.selectedBlock.set(null);
+        this.carouselIdx.clear();
+        this.tabIdx.clear();
+        this.pendingChildType.clear();
       }
     });
+    this.tickTimer = setInterval(() => this.nowTick.set(Date.now()), 1000);
+  }
+
+  ngOnDestroy() {
+    if (this.tickTimer) clearInterval(this.tickTimer);
   }
 
   blockCategories: BlockCategory[] = [
@@ -531,6 +547,204 @@ export class CmsViewComponent implements OnInit {
 
   onPropChange() {
     this.savePageDebounced();
+  }
+
+  iconSafe(s: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(s);
+  }
+
+  getBlockSchema(type: string): PropField[] {
+    return PROP_SCHEMAS[type] || [];
+  }
+
+  private mutateAndSave(fn: () => void) {
+    fn();
+    this.currentBlocks.set([...this.currentBlocks()]);
+    this.savePageDebounced();
+  }
+
+  setProp(b: Block, key: string, value: any) {
+    this.mutateAndSave(() => { b.props[key] = value; });
+  }
+
+  selectValue(b: Block, key: string): string {
+    const v = b.props[key];
+    return v == null ? '' : String(v);
+  }
+
+  selectSubValue(item: any, key: string): string {
+    const v = item == null ? undefined : item[key];
+    return v == null ? '' : String(v);
+  }
+
+  toNumber(v: any): number | null {
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  setNestedProp(b: Block, listKey: string, itemIdx: number, subKey: string, value: any) {
+    this.mutateAndSave(() => {
+      const item = (b.props[listKey] || [])[itemIdx];
+      if (item) item[subKey] = value;
+    });
+  }
+
+  addListItem(b: Block, key: string, itemDefault?: Record<string, any>) {
+    this.mutateAndSave(() => {
+      if (!Array.isArray(b.props[key])) b.props[key] = [];
+      b.props[key].push(itemDefault ? JSON.parse(JSON.stringify(itemDefault)) : {});
+    });
+  }
+
+  addStringItem(b: Block, key: string) {
+    this.mutateAndSave(() => {
+      if (!Array.isArray(b.props[key])) b.props[key] = [];
+      b.props[key].push('');
+    });
+  }
+
+  setListString(b: Block, key: string, itemIdx: number, value: string) {
+    this.mutateAndSave(() => {
+      if (Array.isArray(b.props[key])) b.props[key][itemIdx] = value;
+    });
+  }
+
+  removeFromArray(arr: any[] | undefined, idx: number) {
+    if (!Array.isArray(arr)) return;
+    this.mutateAndSave(() => arr.splice(idx, 1));
+  }
+
+  setLink(links: any[] | undefined, idx: number, key: 'label' | 'url', value: string) {
+    if (!Array.isArray(links)) return;
+    this.mutateAndSave(() => { links[idx][key] = value; });
+  }
+
+  addLink(links: any[] | undefined) {
+    if (!Array.isArray(links)) return;
+    this.mutateAndSave(() => links.push({ label: 'New Link', url: '#' }));
+  }
+
+  childTypeOf(b: Block): string {
+    return this.pendingChildType.get(b.id) || 'heading';
+  }
+
+  setChildType(b: Block, t: string) {
+    this.pendingChildType.set(b.id, t);
+  }
+
+  addChild(b: Block, containerKey: string, type: string) {
+    this.mutateAndSave(() => {
+      if (!Array.isArray(b.props[containerKey])) b.props[containerKey] = [];
+      const defaults = BLOCK_DEFAULTS[type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[type])) : {};
+      b.props[containerKey].push({
+        id: 'b' + Math.random().toString(36).slice(2, 12),
+        type,
+        props: defaults
+      });
+    });
+  }
+
+  childLabel(child: any): string {
+    return child && typeof child === 'object' ? this.getBlockLabel(child.type) : 'Child';
+  }
+
+  tableCols(b: Block): number {
+    const headers = b.props['headers'] || [];
+    let maxCells = 0;
+    for (const row of b.props['rows'] || []) {
+      if (Array.isArray(row)) maxCells = Math.max(maxCells, row.length);
+    }
+    return Math.max(headers.length, maxCells, 1);
+  }
+
+  tableRowIndexes(b: Block): number[] {
+    return (b.props['rows'] || []).map((_: any, i: number) => i);
+  }
+
+  colRange(b: Block): number[] {
+    const n = this.tableCols(b);
+    return Array.from({ length: n }, (_, i) => i);
+  }
+
+  setTableCell(b: Block, rowIdx: number, colIdx: number, value: any) {
+    this.mutateAndSave(() => {
+      if (!Array.isArray(b.props['rows'])) b.props['rows'] = [];
+      if (!Array.isArray(b.props['rows'][rowIdx])) b.props['rows'][rowIdx] = [];
+      b.props['rows'][rowIdx][colIdx] = value;
+    });
+  }
+
+  addTableRow(b: Block) {
+    this.mutateAndSave(() => {
+      if (!Array.isArray(b.props['rows'])) b.props['rows'] = [];
+      const cells: string[] = [];
+      for (let i = 0; i < this.tableCols(b); i++) cells.push('');
+      b.props['rows'].push(cells);
+    });
+  }
+
+  calloutTheme(type: string): { bg: string; border: string; titleColor: string; icon: string } {
+    const themes: Record<string, { bg: string; border: string; titleColor: string; icon: string }> = {
+      tip: { bg: 'rgba(139, 92, 246, 0.12)', border: '#8b5cf6', titleColor: '#a78bfa', icon: '💡' },
+      info: { bg: 'rgba(59, 130, 246, 0.12)', border: '#3b82f6', titleColor: '#60a5fa', icon: 'ℹ️' },
+      success: { bg: 'rgba(16, 185, 129, 0.12)', border: '#10b981', titleColor: '#34d399', icon: '✅' },
+      warning: { bg: 'rgba(245, 158, 11, 0.12)', border: '#f59e0b', titleColor: '#fbbf24', icon: '⚠️' },
+      danger: { bg: 'rgba(239, 68, 68, 0.12)', border: '#ef4444', titleColor: '#f87171', icon: '🛑' }
+    };
+    return themes[type] || themes['info'];
+  }
+
+  videoEmbedSrc(url: string | undefined): SafeResourceUrl | null {
+    if (!url) return null;
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const m = url.match(/(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#&?]*)/);
+      if (m && m[1]) return this.sanitizer.bypassSecurityTrustResourceUrl(`https://www.youtube.com/embed/${m[1]}`);
+    }
+    if (url.includes('vimeo.com')) {
+      const m = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|)(\d+)/);
+      if (m && m[3]) return this.sanitizer.bypassSecurityTrustResourceUrl(`https://player.vimeo.com/video/${m[3]}`);
+    }
+    return null;
+  }
+
+  countdownParts(raw?: string | undefined): { d: string; h: string; m: string; s: string } {
+    const target = new Date(raw || '2026-12-31T23:59:59').getTime();
+    const diff = Math.max(0, target - this.nowTick());
+    const secs = Math.floor(diff / 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return {
+      d: pad(Math.floor(secs / 86400)),
+      h: pad(Math.floor((secs % 86400) / 3600)),
+      m: pad(Math.floor((secs % 3600) / 60)),
+      s: pad(secs % 60)
+    };
+  }
+
+  carouselCurrent(b: Block): number {
+    return this.carouselIdx.get(b.id) || 0;
+  }
+
+  carouselMove(b: Block, dir: number, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    const n = (b.props['slides'] || []).length;
+    if (!n) return;
+    const next = (this.carouselCurrent(b) + dir + n) % n;
+    this.carouselIdx.set(b.id, next);
+  }
+
+  carouselGo(b: Block, idx: number, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    this.carouselIdx.set(b.id, idx);
+  }
+
+  tabCurrent(b: Block): number {
+    return this.tabIdx.get(b.id) || 0;
+  }
+
+  setTab(b: Block, idx: number, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    this.tabIdx.set(b.id, idx);
   }
 
   savePageNow() {
