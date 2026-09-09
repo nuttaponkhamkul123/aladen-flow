@@ -37,24 +37,9 @@
               </div>
             }
 
-            @if (card.labels && card.labels.length) {
-              <div class="card-labels">
-                @for (lbl of card.labels; track lbl.id) {
-                  <span class="card-label" [style.background]="lbl.color">
-                    {{ lbl.name }}
-                  </span>
-                }
-              </div>
-            }
-
             <div class="card-title-text">{{ card.title }}</div>
 
             <div class="card-meta">
-              <span class="badge" [class]="'priority-' + card.priority">
-                <span style="font-size:9px">●</span>
-                {{ card.priority }}
-              </span>
-
               @if (card.checklist && card.checklist.length) {
                 <div class="checklist-progress">
                   <div class="bar">
