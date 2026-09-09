@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Board, Column, Card } from '../../core/models/board.model';
 import { BoardService } from '../../core/services/board.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -17,6 +18,7 @@ import { CardDetailModalComponent } from './card-detail-modal/card-detail-modal.
 export class KanbanViewComponent implements OnInit {
   boardService = inject(BoardService);
   themeService = inject(ThemeService);
+  private destroyRef = inject(DestroyRef);
 
   activeBoard = signal<Board | null>(null);
   addingCardColumnId: number | null = null;
@@ -55,7 +57,7 @@ export class KanbanViewComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.boardService.getBoards().subscribe({
+    this.boardService.getBoards().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (list) => {
         this.boardService.boards.set(list);
         if (list.length > 0) {
@@ -69,7 +71,7 @@ export class KanbanViewComponent implements OnInit {
   }
 
   selectBoard(id: number) {
-    this.boardService.getBoard(id).subscribe({
+    this.boardService.getBoard(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (fullBoard) => {
         if (fullBoard.columns) {
           fullBoard.columns.sort((a, b) => a.position - b.position);
@@ -89,7 +91,7 @@ export class KanbanViewComponent implements OnInit {
     if (!b) return;
     const name = prompt('Column name:');
     if (name && name.trim()) {
-      this.boardService.createColumn(b.id, name.trim()).subscribe({
+      this.boardService.createColumn(b.id, name.trim()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => this.selectBoard(b.id),
         error: (err) => console.error('Failed to create column:', err)
       });
@@ -100,7 +102,7 @@ export class KanbanViewComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     const newName = input.value.trim() || col.name;
     if (newName !== col.name) {
-      this.boardService.updateColumn(col.id, newName).subscribe({
+      this.boardService.updateColumn(col.id, newName).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => { col.name = newName; },
         error: (err) => console.error('Failed to rename column:', err)
       });
@@ -109,7 +111,7 @@ export class KanbanViewComponent implements OnInit {
 
   deleteColumn(columnId: number) {
     if (!confirm('Delete this column and all its cards?')) return;
-    this.boardService.deleteColumn(columnId).subscribe({
+    this.boardService.deleteColumn(columnId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         const b = this.activeBoard();
         if (b) this.selectBoard(b.id);
@@ -132,7 +134,7 @@ export class KanbanViewComponent implements OnInit {
     const title = this.newCardTitle.trim();
     if (!title) return;
 
-    this.boardService.createCard(columnId, { title }).subscribe({
+    this.boardService.createCard(columnId, { title }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.cancelAddCard();
         const b = this.activeBoard();
@@ -164,7 +166,7 @@ export class KanbanViewComponent implements OnInit {
     moveItemInArray(b.columns, event.previousIndex, event.currentIndex);
     const orderedIds = b.columns.map(c => c.id);
     const movedColId = b.columns[event.currentIndex].id;
-    this.boardService.moveColumns(movedColId, b.id, orderedIds).subscribe();
+    this.boardService.moveColumns(movedColId, b.id, orderedIds).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
   }
 
   onCardDrop(event: CdkDragDrop<Card[]>, targetColumnId: number) {
@@ -172,7 +174,7 @@ export class KanbanViewComponent implements OnInit {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
       const card = event.container.data[event.currentIndex];
       const orderedIds = event.container.data.map(c => c.id);
-      this.boardService.moveCards(card.id, targetColumnId, orderedIds).subscribe();
+      this.boardService.moveCards(card.id, targetColumnId, orderedIds).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     } else {
       transferArrayItem(
         event.previousContainer.data,
@@ -183,7 +185,7 @@ export class KanbanViewComponent implements OnInit {
       const card = event.container.data[event.currentIndex];
       card.column_id = targetColumnId;
       const orderedIds = event.container.data.map(c => c.id);
-      this.boardService.moveCards(card.id, targetColumnId, orderedIds).subscribe();
+      this.boardService.moveCards(card.id, targetColumnId, orderedIds).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     }
   }
 

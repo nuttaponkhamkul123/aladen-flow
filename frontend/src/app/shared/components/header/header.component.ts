@@ -1,8 +1,8 @@
-import { Component, inject, computed, signal } from '@angular/core';
+import { Component, inject, computed, signal, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs/operators';
 import { ThemeService, AmbientTheme } from '../../../core/services/theme.service';
 import { BoardService } from '../../../core/services/board.service';
@@ -21,6 +21,7 @@ export class HeaderComponent {
   boardService = inject(BoardService);
   cmsService = inject(CmsService);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   showPagesPopup = false;
 
@@ -47,9 +48,9 @@ export class HeaderComponent {
   createBoard() {
     const name = prompt('Enter new board name:');
     if (!name || !name.trim()) return;
-    this.boardService.createBoard(name.trim()).subscribe({
+    this.boardService.createBoard(name.trim()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (b) => {
-        this.boardService.getBoards().subscribe(list => {
+        this.boardService.getBoards().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(list => {
           this.boardService.boards.set(list);
           this.boardService.activeBoardId.set(b.id);
         });
@@ -62,9 +63,9 @@ export class HeaderComponent {
     const currentId = this.boardService.activeBoardId();
     if (!currentId) return;
     if (!confirm('Delete this board and all its data?')) return;
-    this.boardService.deleteBoard(currentId).subscribe({
+    this.boardService.deleteBoard(currentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.boardService.getBoards().subscribe(list => {
+        this.boardService.getBoards().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(list => {
           this.boardService.boards.set(list);
           if (list.length > 0) this.boardService.activeBoardId.set(list[0].id);
         });
@@ -88,7 +89,7 @@ export class HeaderComponent {
   }
 
   switchPage(id: number) {
-    this.cmsService.getPage(id).subscribe({
+    this.cmsService.getPage(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (page) => {
         this.cmsService.activePage.set(page);
         this.showPagesPopup = false;
@@ -98,9 +99,9 @@ export class HeaderComponent {
   }
 
   toggleFirstPage(page: CmsPage) {
-    this.cmsService.setFirstPage(page.id).subscribe({
+    this.cmsService.setFirstPage(page.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.cmsService.getPages().subscribe(list => {
+        this.cmsService.getPages().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(list => {
           this.cmsService.pages.set(list);
           const updated = list.find(p => p.id === page.id);
           if (updated) this.cmsService.activePage.set(updated);
@@ -114,10 +115,10 @@ export class HeaderComponent {
     const input = event.target as HTMLInputElement;
     const slug = input.value.trim();
     if (!slug) return;
-    this.cmsService.updatePage(page.id, { slug }).subscribe({
+    this.cmsService.updatePage(page.id, { slug }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {
         this.cmsService.activePage.set(updated);
-        this.cmsService.getPages().subscribe(list => this.cmsService.pages.set(list));
+        this.cmsService.getPages().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(list => this.cmsService.pages.set(list));
       },
       error: (err) => console.error(err)
     });
@@ -126,10 +127,10 @@ export class HeaderComponent {
   updatePageStatus(page: CmsPage, event: Event) {
     const select = event.target as HTMLSelectElement;
     const status = select.value as 'draft' | 'published';
-    this.cmsService.updatePage(page.id, { status }).subscribe({
+    this.cmsService.updatePage(page.id, { status }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {
         this.cmsService.activePage.set(updated);
-        this.cmsService.getPages().subscribe(list => this.cmsService.pages.set(list));
+        this.cmsService.getPages().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(list => this.cmsService.pages.set(list));
       },
       error: (err) => console.error(err)
     });
@@ -140,11 +141,11 @@ export class HeaderComponent {
     if (!title || !title.trim()) return;
     const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    this.cmsService.createPage({ title: title.trim(), slug }).subscribe({
+    this.cmsService.createPage({ title: title.trim(), slug }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (newPage) => {
-        this.cmsService.getPages().subscribe(list => {
+        this.cmsService.getPages().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(list => {
           this.cmsService.pages.set(list);
-          this.cmsService.getPage(newPage.id).subscribe({
+          this.cmsService.getPage(newPage.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
             next: (fullPage) => {
               this.cmsService.activePage.set(fullPage);
               this.showPagesPopup = false;

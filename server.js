@@ -328,10 +328,24 @@ app.delete('/api/cards/:id', (req, res) => {
 
 app.post('/api/cards/:id/move', (req, res) => {
   const id = Number(req.params.id);
-  const { column_id, position } = req.body;
-  const newCol = Number(column_id);
-  const newPos = Number(position);
+  const targetCol = req.body.column_id ?? req.body.target_column_id;
+  if (targetCol == null || isNaN(Number(targetCol))) {
+    return res.status(400).json({ error: 'valid column_id or target_column_id required' });
+  }
+  const newCol = Number(targetCol);
 
+  if (Array.isArray(req.body.orderedIds)) {
+    const tx = db.transaction(() => {
+      req.body.orderedIds.forEach((cId, idx) => {
+        db.prepare('UPDATE cards SET position = ?, column_id = ? WHERE id = ?').run(idx, newCol, Number(cId));
+      });
+      db.prepare("UPDATE cards SET updated_at = datetime('now') WHERE id = ?").run(id);
+    });
+    tx();
+    return res.json({ ok: true });
+  }
+
+  const newPos = isNaN(Number(req.body.position)) ? 0 : Number(req.body.position);
   const tx = db.transaction(() => {
     const all = db
       .prepare('SELECT id, position FROM cards WHERE column_id = ? AND id != ? AND archived = 0 ORDER BY position ASC')
@@ -1887,6 +1901,10 @@ function makeBlockBgCss(p) {
       css += `background-image:url('${p.bgImage}');`;
     }
     css += `background-size:${p.bgSize || 'cover'};background-position:${p.bgPosition || 'center'};background-repeat:${p.bgRepeat || 'no-repeat'};`;
+  } else if (type === 'video') {
+    if (p.bgColor) {
+      css += `background:${p.bgColor};background-color:${p.bgColor};`;
+    }
   }
   if (p.parallax && type === 'image') css += 'background-attachment:fixed;';
   return css;
@@ -1911,7 +1929,25 @@ function injectBgStyleIntoFirstTag(html, css) {
 }
 
 function renderBlockHtml(b) {
-  const bgCss = makeBlockBgCss(b.props || {});
+  const p = b.props || {};
+  const bgCss = makeBlockBgCss(p);
+  if (p.bgType === 'video') {
+    const inner = renderBlockInnerHtml(b);
+    const videoUrl = p.bgVideo ? escHtml(p.bgVideo) : '';
+    const parallaxCls = p.parallax ? ' cms-video-bg-parallax' : '';
+    const speedAttr = p.parallaxSpeed ? ` data-parallax-speed="${Number(p.parallaxSpeed)}"` : '';
+    let bgLayer;
+    if (videoUrl) {
+      bgLayer = `<video class="cms-video-bg" src="${videoUrl}" autoplay muted loop playsinline style="position:absolute;top:-15%;left:-15%;width:130%;height:130%;object-fit:cover;pointer-events:none;z-index:0;transform:translateY(0px);"></video>`;
+    } else {
+      bgLayer = `<div style="position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:12px;font-weight:600;">Video background — set a bgVideo URL</div>`;
+    }
+    const overlay = (p.bgOverlay && p.bgOverlay !== 'none')
+      ? `<div style="position:absolute;inset:0;z-index:1;background:${escHtml(p.bgOverlay)};pointer-events:none;"></div>`
+      : '';
+    const fallbackBg = bgCss ? `background:${p.bgColor};` : '';
+    return `<div class="cms-block-video-wrap${parallaxCls}"${speedAttr} style="position:relative;overflow:hidden;${fallbackBg}">${bgLayer}${overlay}<div style="position:relative;z-index:2;">${inner}</div></div>`;
+  }
   return injectBgStyleIntoFirstTag(renderBlockInnerHtml(b), bgCss);
 }
 
@@ -3810,6 +3846,44 @@ function renderPublishedPage(page, blocks, tags) {
           }
         }
       });
+    });
+
+    // Video Background Parallax
+    document.querySelectorAll('video.cms-video-bg').forEach(v => {
+      v.muted = true;
+      v.defaultMuted = true;
+      v.play().catch(() => {});
+    });
+    document.querySelectorAll('.cms-block-video-wrap.cms-video-bg-parallax').forEach(wrap => {
+      const video = wrap.querySelector('video.cms-video-bg');
+      if (!video) return;
+      let ticking = false;
+      const update = () => {
+        const r = wrap.getBoundingClientRect();
+        if (r.bottom < -80 || r.top > window.innerHeight + 80) return;
+        if (video.paused) {
+          video.muted = true;
+          video.defaultMuted = true;
+          video.play().catch(() => {});
+        }
+        const delta = (r.top + r.height / 2) - window.innerHeight / 2;
+        const speed = parseFloat(wrap.dataset.parallaxSpeed || '0.15') || 0.15;
+        const maxShift = r.height * 0.15;
+        let y = -delta * speed;
+        y = Math.max(-maxShift, Math.min(maxShift, y));
+        video.style.transform = 'translateY(' + y.toFixed(1) + 'px)';
+      };
+      const onScroll = () => {
+        if (ticking) return;
+        requestAnimationFrame(() => {
+          update();
+          ticking = false;
+        });
+        ticking = true;
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+      update();
     });
   </script>
 </body>

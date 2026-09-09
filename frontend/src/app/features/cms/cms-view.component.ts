@@ -1,8 +1,9 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, effect, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { DomSanitizer, SafeResourceUrl, SafeHtml } from '@angular/platform-browser';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CmsService } from '../../core/services/cms.service';
 import { ToastService } from '../../core/services/toast.service';
 import { ThemeService, ThemeMode } from '../../core/services/theme.service';
@@ -21,6 +22,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   cmsService = inject(CmsService);
   toastService = inject(ToastService);
   themeService = inject(ThemeService);
+  private destroyRef = inject(DestroyRef);
   private sanitizer = inject(DomSanitizer);
 
   pages = this.cmsService.pages;
@@ -35,6 +37,8 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   draggingOver = signal<boolean>(false);
   dragInsertIndex = signal<number | null>(null);
+  containerDropTarget = signal<{ containerId: string; index: number } | null>(null);
+  containerDropOffset = signal<{ offset: number; horizontal: boolean } | null>(null);
 
   isSaving = signal<boolean>(false);
   isSaved = signal<boolean>(false);
@@ -218,6 +222,14 @@ export class CmsViewComponent implements OnInit, OnDestroy {
         if (!b.props['bgSize']) b.props['bgSize'] = 'cover';
         if (!b.props['bgPosition']) b.props['bgPosition'] = 'center';
         if (!b.props['bgRepeat']) b.props['bgRepeat'] = 'no-repeat';
+      } else if (type === 'video') {
+        if (!b.props['bgVideo']) {
+          b.props['bgVideo'] = 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/1080/Jellyfish_1080_10s_2MB.mp4';
+        }
+        if (b.props['parallax'] == null) {
+          b.props['parallax'] = true;
+        }
+        if (!b.props['parallaxSpeed']) b.props['parallaxSpeed'] = 0.15;
       } else if (type === 'gradient' && !b.props['bgGradient']) {
         b.props['bgGradient'] = 'linear-gradient(135deg, #0f172a, #312e81)';
       } else if (type === 'color' && !b.props['bgColor']) {
@@ -251,9 +263,82 @@ export class CmsViewComponent implements OnInit, OnDestroy {
       if (p['parallax']) {
         s['background-attachment'] = 'fixed';
       }
+    } else if (type === 'video') {
+      s['overflow'] = 'hidden';
+      if (p['bgColor']) {
+        s['background'] = p['bgColor'];
+        s['background-color'] = p['bgColor'];
+      }
     }
 
     return s;
+  }
+
+  videoPresets = [
+    { label: 'Jellyfish', url: 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/1080/Jellyfish_1080_10s_2MB.mp4' },
+    { label: 'Big Buck Bunny', url: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_2MB.mp4' },
+    { label: 'Bunny Short (360p)', url: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4' },
+    { label: 'MDN Flower', url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4' },
+    { label: 'MDN Friday', url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4' }
+  ];
+
+  private videoParallaxBound = false;
+  private videoParallaxCanvas: HTMLElement | null = null;
+  private videoParallaxRaf = 0;
+
+  private onParallaxScroll = () => {
+    if (this.videoParallaxRaf) return;
+    this.videoParallaxRaf = requestAnimationFrame(() => {
+      this.videoParallaxRaf = 0;
+      this.updateParallaxVideos();
+    });
+  };
+
+  private setupParallaxVideo() {
+    if (this.videoParallaxBound) return;
+    const canvas = document.getElementById('cmsCanvasDropList');
+    if (!canvas) return;
+    this.videoParallaxBound = true;
+    this.videoParallaxCanvas = canvas;
+    canvas.addEventListener('scroll', this.onParallaxScroll, { passive: true });
+    window.addEventListener('resize', this.onParallaxScroll);
+    this.onParallaxScroll();
+  }
+
+  private updateParallaxVideos() {
+    const canvas = this.videoParallaxCanvas;
+    if (!canvas) return;
+    const cRect = canvas.getBoundingClientRect();
+    const cTop = cRect.top - 80;
+    const cBottom = cRect.bottom + 80;
+    const cCenter = cRect.top + cRect.height / 2;
+    canvas.querySelectorAll<HTMLElement>('.block-video-bg.parallax').forEach((bg) => {
+      const video = bg.querySelector('video');
+      if (!video) return;
+      const r = bg.getBoundingClientRect();
+      if (r.bottom < cTop || r.top > cBottom) return;
+      if (video.paused) {
+        video.muted = true;
+        video.defaultMuted = true;
+        video.play().catch(() => {});
+      }
+      const delta = (r.top + r.height / 2) - cCenter;
+      const speed = parseFloat(bg.dataset['parallaxSpeed'] || '0.15') || 0.15;
+      const maxShift = r.height * 0.15;
+      let y = -delta * speed;
+      y = Math.max(-maxShift, Math.min(maxShift, y));
+      video.style.transform = `translateY(${y.toFixed(1)}px)`;
+    });
+  }
+
+  playBgVideo(e: Event) {
+    const video = e.target as HTMLVideoElement | null;
+    if (!video) return;
+    video.defaultMuted = true;
+    video.muted = true;
+    if (video.paused) {
+      video.play().catch(() => {});
+    }
   }
 
   private lastLoadedPageId: number | null = null;
@@ -300,6 +385,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
         this.tabIdx.clear();
         this.pendingChildType.clear();
         this.dragOverContainers.set(new Set());
+        this.setupParallaxVideo();
       }
     });
     this.tickTimer = setInterval(() => this.nowTick.set(Date.now()), 1000);
@@ -307,6 +393,11 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     if (this.tickTimer) clearInterval(this.tickTimer);
+    if (this.videoParallaxCanvas) {
+      this.videoParallaxCanvas.removeEventListener('scroll', this.onParallaxScroll);
+      window.removeEventListener('resize', this.onParallaxScroll);
+    }
+    if (this.videoParallaxRaf) cancelAnimationFrame(this.videoParallaxRaf);
   }
 
   blockCategories: BlockCategory[] = [
@@ -619,7 +710,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   loadPages() {
-    this.cmsService.getPages().subscribe({
+    this.cmsService.getPages().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (list) => {
         this.pages.set(list);
         if (list.length > 0) {
@@ -633,14 +724,14 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   loadReusableBlocks() {
-    this.cmsService.getReusableBlocks().subscribe({
+    this.cmsService.getReusableBlocks().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (list) => this.reusableBlocks.set(list),
       error: (err) => console.error('Failed to load reusable blocks:', err)
     });
   }
 
   switchPage(id: number) {
-    this.cmsService.getPage(id).subscribe({
+    this.cmsService.getPage(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (page) => {
         this.activePage.set(page);
         this.showPagesPopup = false;
@@ -746,6 +837,8 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   onDragEnd() {
     this.draggingOver.set(false);
     this.dragInsertIndex.set(null);
+    this.containerDropTarget.set(null);
+    this.containerDropOffset.set(null);
     this.dragPayload = null;
     this.dragOverContainers.set(new Set());
     this.treeDragTarget.set(null);
@@ -758,6 +851,8 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     event.dataTransfer!.dropEffect = this.dragPayload.includes('"block"') ? 'move' : 'copy';
     this.draggingOver.set(true);
     this.dragInsertIndex.set(this.computeInsertIndex(event));
+    this.containerDropTarget.set(null);
+    this.containerDropOffset.set(null);
   }
 
   onCanvasDragLeave(event: DragEvent) {
@@ -767,6 +862,8 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     if (event.relatedTarget && canvas.contains(event.relatedTarget as Node)) return;
     this.draggingOver.set(false);
     this.dragInsertIndex.set(null);
+    this.containerDropTarget.set(null);
+    this.containerDropOffset.set(null);
   }
 
   onCanvasDrop(event: DragEvent) {
@@ -1204,7 +1301,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     const category = this.reusableCategoryInput().trim() || b.type || 'custom';
     const blockCopy = JSON.parse(JSON.stringify(b));
 
-    this.cmsService.createReusableBlock(name, blockCopy, category).subscribe({
+    this.cmsService.createReusableBlock(name, blockCopy, category).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.closeSaveReusableModal();
         this.loadReusableBlocks();
@@ -1226,7 +1323,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   deleteReusableBlock(id: number, event: MouseEvent) {
     event.stopPropagation();
     if (!confirm('Delete this saved reusable block?')) return;
-    this.cmsService.deleteReusableBlock(id).subscribe({
+    this.cmsService.deleteReusableBlock(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.loadReusableBlocks();
         this.toastService.info('Deleted reusable component');
@@ -1395,12 +1492,44 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     event.dataTransfer!.dropEffect = payload.kind === 'block' ? 'move' : 'copy';
     this.dragInsertIndex.set(null);
+    const containerEl = event.currentTarget as HTMLElement;
+    const idx = this.getContainerInsertIndex(containerEl, event.clientX, event.clientY);
+    this.containerDropTarget.set({ containerId: b.id, index: idx });
+    this.containerDropOffset.set(this.computeContainerDropOffset(containerEl, b, idx));
     this.dragOverContainers.set(new Set([b.id]));
+  }
+
+  containerIsHorizontal(b: Block): boolean {
+    return b.props['mode'] === 'grid' ||
+      (b.props['direction'] || 'row') === 'row' ||
+      (b.props['direction'] || 'row') === 'row-reverse';
+  }
+
+  private computeContainerDropOffset(containerEl: HTMLElement, b: Block, index: number): { offset: number; horizontal: boolean } | null {
+    const children = Array.from(containerEl.querySelectorAll<HTMLElement>(':scope > .container-child, :scope > .block-wrap'));
+    if (!children.length) return null;
+    const horizontal = this.containerIsHorizontal(b);
+    const containerRect = containerEl.getBoundingClientRect();
+    const clamp = (n: number) => Math.max(0, Math.min(n, horizontal ? containerRect.width : containerRect.height));
+    if (index >= children.length) {
+      const r = children[children.length - 1].getBoundingClientRect();
+      return { offset: clamp((horizontal ? r.right : r.bottom) - (horizontal ? containerRect.left : containerRect.top)), horizontal };
+    }
+    if (index === 0) {
+      const r = children[0].getBoundingClientRect();
+      return { offset: clamp((horizontal ? r.left : r.top) - (horizontal ? containerRect.left : containerRect.top)), horizontal };
+    }
+    const a = children[index - 1].getBoundingClientRect();
+    const c = children[index].getBoundingClientRect();
+    const mid = horizontal ? (a.right + c.left) / 2 : (a.bottom + c.top) / 2;
+    return { offset: clamp(mid - (horizontal ? containerRect.left : containerRect.top)), horizontal };
   }
 
   onContainerDragLeave(b: Block, event: DragEvent) {
     const containerEl = event.currentTarget as HTMLElement;
     if (event.relatedTarget && containerEl.contains(event.relatedTarget as Node)) return;
+    this.containerDropTarget.set(null);
+    this.containerDropOffset.set(null);
     this.dragOverContainers.update(s => {
       if (!s.has(b.id)) return s;
       const n = new Set(s);
@@ -1420,15 +1549,10 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
 
-    this.dragOverContainers.update(s => {
-      const n = new Set(s);
-      n.delete(b.id);
-      return n;
-    });
-
     const containerEl = event.currentTarget as HTMLElement;
     try {
-      const targetIdx = this.getContainerInsertIndex(containerEl, event.clientX, event.clientY);
+      const target = this.containerDropTarget();
+      const targetIdx = (target && target.containerId === b.id) ? target.index : this.getContainerInsertIndex(containerEl, event.clientX, event.clientY);
       if (payload.kind === 'type') {
         if (payload.value === 'header' || payload.value === 'footer') {
           this.toastService.warning(`${this.getBlockLabel(payload.value)} cannot be placed inside a container`);
@@ -1457,10 +1581,14 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   getContainerInsertIndex(containerEl: HTMLElement, clientX: number, clientY: number): number {
     const children = Array.from(containerEl.querySelectorAll<HTMLElement>(':scope > .container-child, :scope > .block-wrap'));
     if (!children.length) return 0;
+    const style = window.getComputedStyle(containerEl);
+    const horizontal = style.display === 'grid' || style.flexDirection === 'row' || style.flexDirection === 'row-reverse';
     for (let i = 0; i < children.length; i++) {
       const rect = children[i].getBoundingClientRect();
-      if (clientY < rect.top + rect.height / 2 || (clientY < rect.bottom && clientX < rect.left + rect.width / 2)) {
-        return i;
+      if (horizontal) {
+        if (clientX < rect.left + rect.width / 2) return i;
+      } else {
+        if (clientY < rect.top + rect.height / 2) return i;
       }
     }
     return children.length;
@@ -1615,7 +1743,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
       status: page.status,
       blocks: this.currentBlocks(),
       settings: this.pageSettings()
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         this.isSaving.set(false);
         this.isSaved.set(true);
@@ -1633,7 +1761,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
             return list;
           });
         } else {
-          this.cmsService.getPage(page.id).subscribe(p => this.activePage.set(p));
+          this.cmsService.getPage(page.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => this.activePage.set(p));
         }
       },
       error: (err) => {
@@ -1741,7 +1869,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   toggleFirstPage() {
     const page = this.activePage();
     if (!page) return;
-    this.cmsService.setFirstPage(page.id).subscribe({
+    this.cmsService.setFirstPage(page.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.loadPages(),
       error: (err) => console.error('Failed to set homepage:', err)
     });
@@ -1776,7 +1904,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     if (!title || !title.trim()) return;
     const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    this.cmsService.createPage({ title: title.trim(), slug }).subscribe({
+    this.cmsService.createPage({ title: title.trim(), slug }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (newPage) => {
         this.loadPages();
         this.switchPage(newPage.id);
@@ -1788,14 +1916,14 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   deletePage(id: number, event: MouseEvent) {
     event.stopPropagation();
     if (!confirm('Are you sure you want to delete this page?')) return;
-    this.cmsService.deletePage(id).subscribe({
+    this.cmsService.deletePage(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.loadPages(),
       error: (err) => console.error('Failed to delete page:', err)
     });
   }
 
   onAiPageGenerated(res: { page: CmsPage }) {
-    this.cmsService.getPages().subscribe(list => {
+    this.cmsService.getPages().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(list => {
       this.pages.set(list);
       if (res.page?.id) {
         this.switchPage(res.page.id);

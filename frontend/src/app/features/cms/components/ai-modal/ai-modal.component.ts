@@ -1,6 +1,7 @@
-import { Component, Output, EventEmitter, OnInit, inject } from '@angular/core';
+import { Component, Output, EventEmitter, OnInit, inject, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AiService, OllamaModelInfo } from '../../../../core/services/ai.service';
 
 @Component({
@@ -15,6 +16,7 @@ export class AiModalComponent implements OnInit {
   @Output() pageGenerated = new EventEmitter<{ page: any }>();
 
   private aiService = inject(AiService);
+  private destroyRef = inject(DestroyRef);
 
   prompt = '';
   theme = 'dark-card';
@@ -54,7 +56,7 @@ export class AiModalComponent implements OnInit {
   loadOllamaModels() {
     this.ollamaLoading = true;
     this.errorMessage = '';
-    this.aiService.getOllamaModels().subscribe({
+    this.aiService.getOllamaModels().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         this.ollamaLoading = false;
         if (res.ok && res.models) {
@@ -85,7 +87,7 @@ export class AiModalComponent implements OnInit {
       model: this.provider === 'ollama' ? this.selectedOllamaModel : undefined
     };
 
-    this.aiService.generatePage(payload).subscribe({
+    this.aiService.generatePage(payload).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         this.generating = false;
         if (res.page) {

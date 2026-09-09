@@ -1,6 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BoardService } from '../../core/services/board.service';
 
 @Component({
@@ -12,12 +13,13 @@ import { BoardService } from '../../core/services/board.service';
 })
 export class DashboardViewComponent implements OnInit {
   boardService = inject(BoardService);
+  private destroyRef = inject(DestroyRef);
 
   overview = signal<any>(null);
   loading = signal(true);
 
   ngOnInit() {
-    this.boardService.getOverview().subscribe({
+    this.boardService.getOverview().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.overview.set(data);
         this.loading.set(false);
