@@ -489,36 +489,50 @@
 
                     @if (!isPreviewMode()) {
                       @if (!isChild) {
-                        <div class="block-toolbar" (click)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()" draggable="false" style="position:absolute;top:-14px;right:6px;gap:4px;background:#182032;border:1px solid #3b82f6;border-radius:4px;padding:2px 6px;z-index:30;">
+                        <div class="block-toolbar" (click)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()" draggable="false">
                           <span class="drag-handle" title="Drag to reorder">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                              <line x1="5" y1="6" x2="19" y2="6" /><line x1="5" y1="12" x2="19" y2="12" /><line x1="5" y1="18" x2="19" y2="18" />
+                              <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
                             </svg>
                           </span>
-                          <span style="font-size:10px;font-weight:700;color:#93c5fd;align-self:center;">{{ getBlockLabel(b.type) }}</span>
-                          <button (click)="moveBlockUp(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Move Up" [disabled]="idx === 0">▲</button>
-                          <button (click)="moveBlockDown(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Move Down" [disabled]="idx === currentBlocks().length - 1">▼</button>
-                          <button (click)="duplicateBlock(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Duplicate">⧉</button>
-                          <button (click)="openSaveReusableModal(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Save as Reusable Component" style="color:#f59e0b;">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                            </svg>
+                          <button (click)="moveBlockUp(b, $event)" (mousedown)="$event.stopPropagation()" title="Move up" [disabled]="idx === 0">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
                           </button>
-                          <button (click)="deleteBlock(b.id, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Delete">&times;</button>
+                          <button (click)="moveBlockDown(b, $event)" (mousedown)="$event.stopPropagation()" title="Move down" [disabled]="idx === currentBlocks().length - 1">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                          </button>
+                          <button (click)="duplicateBlock(b, $event)" (mousedown)="$event.stopPropagation()" title="Duplicate">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                          </button>
+                          <button (click)="openSaveReusableModal(b, $event)" (mousedown)="$event.stopPropagation()" title="Save as Reusable Component">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                          </button>
+                          <button (click)="deleteBlock(b.id, $event)" (mousedown)="$event.stopPropagation()" class="delete-btn" title="Delete">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
                         </div>
                       } @else {
                         <div class="container-child-bar" (click)="$event.stopPropagation()">
-                          <span class="container-child-handle" title="Drag to reorder">⠿</span>
-                          <span class="container-child-label">{{ getBlockLabel(b.type) }}</span>
-                          <button (click)="moveBlockUp(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Move Up" [disabled]="idx === 0">▲</button>
-                          <button (click)="moveBlockDown(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Move Down" [disabled]="idx === (parent ? (parent.props['children'] || []).length - 1 : 0)">▼</button>
-                          <button (click)="duplicateBlock(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Duplicate">⧉</button>
-                          <button (click)="openSaveReusableModal(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Save as Reusable Component" style="color:#f59e0b;">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          <span class="container-child-handle" title="Drag to reorder">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
                             </svg>
+                          </span>
+                          <button (click)="moveBlockUp(b, $event)" (mousedown)="$event.stopPropagation()" title="Move Up" [disabled]="idx === 0">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
                           </button>
-                          <button class="btn-icon ghost btn-xs" title="Remove child" (click)="deleteBlock(b.id, $event)" (mousedown)="$event.stopPropagation()">&times;</button>
+                          <button (click)="moveBlockDown(b, $event)" (mousedown)="$event.stopPropagation()" title="Move Down" [disabled]="idx === (parent ? (parent.props['children'] || []).length - 1 : 0)">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                          </button>
+                          <button (click)="duplicateBlock(b, $event)" (mousedown)="$event.stopPropagation()" title="Duplicate">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                          </button>
+                          <button (click)="openSaveReusableModal(b, $event)" (mousedown)="$event.stopPropagation()" title="Save as Reusable Component">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                          </button>
+                          <button title="Remove child" (click)="deleteBlock(b.id, $event)" (mousedown)="$event.stopPropagation()" class="delete-btn">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
                         </div>
                       }
                     }
