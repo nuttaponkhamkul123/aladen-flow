@@ -99,4 +99,8 @@ export class BoardService {
   search(q: string): Observable<Card[]> {
     return this.http.get<Card[]>(`${this.baseUrl}/search?q=${encodeURIComponent(q)}`);
   }
+
+  getOverview(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/overview`);
+  }
 }

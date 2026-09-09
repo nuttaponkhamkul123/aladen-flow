@@ -1,44 +1,39 @@
 <header class="topbar">
   <div class="topbar-left">
-    <div class="brand">
-      <div class="logo-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="5.5" height="18" rx="2" fill="currentColor" fill-opacity="0.2" />
-          <rect x="10.5" y="3" width="5.5" height="12" rx="2" fill="currentColor" fill-opacity="0.4" />
-          <rect x="18" y="3" width="5.5" height="15" rx="2" fill="currentColor" fill-opacity="0.6" />
-        </svg>
-      </div>
-      <div class="brand-text">
-        <span class="title">Aladenflow</span>
-        <span class="version-badge">STUDIO</span>
-      </div>
-    </div>
-
-    <!-- Main App Segmented Tabs -->
-    <nav class="tabs main-tabs-group">
-      <a routerLink="/kanban" class="tab" routerLinkActive="active">
-        <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    @if (currentRoute() === '/kanban') {
+      <div class="topbar-context-badge">
+        <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <path d="M9 3v18" />
           <path d="M15 3v18" />
         </svg>
-        <span>Boards</span>
-      </a>
-      <a routerLink="/cms" class="tab" routerLinkActive="active">
-        <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        <span class="context-label">Boards</span>
+      </div>
+    } @else if (currentRoute() === '/dashboard') {
+      <div class="topbar-context-badge">
+        <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        <span class="context-label">Dashboard</span>
+      </div>
+    } @else {
+      <div class="topbar-context-badge">
+        <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
           <path d="M12 4v16" />
           <path d="M4 12h8" />
         </svg>
-        <span>Site Builder</span>
-      </a>
+        <span class="context-label">Site Builder</span>
+      </div>
 
       <!-- Site Builder Sub-Tab Group (Pages Dropdown Trigger) -->
-      @if (currentRoute() === '/cms') {
-        <div class="cms-sub-tabs-group">
+      <div class="cms-sub-tabs-group">
           <span class="tabs-sub-divider" aria-hidden="true">/</span>
           <button type="button" id="cmsPagesDropdownTrigger" class="cms-sub-tab" [class.open]="showPagesPopup"
                   (click)="togglePagesPopup()" title="Pages & Documents Explorer">
@@ -148,7 +143,6 @@
           }
         </div>
       }
-    </nav>
   </div>
 
   <div class="topbar-actions">
@@ -222,20 +216,26 @@
       </div>
     }
 
-    <button (click)="themeService.toggleDark()" class="btn-icon" title="Toggle color theme">
-      @if (themeService.isDark()) {
+    <button (click)="themeService.toggleThemeMode()" class="btn-icon theme-mode-btn"
+            [title]="'Theme: ' + (themeService.themeMode() === 'auto' ? 'Auto (System: ' + (themeService.systemIsDark() ? 'Dark' : 'Light') + ')' : (themeService.themeMode() === 'dark' ? 'Dark' : 'Light')) + ' — Click to switch'">
+      @if (themeService.themeMode() === 'auto') {
+        <svg class="auto-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      } @else if (themeService.themeMode() === 'dark') {
+        <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        </svg>
+      } @else {
         <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="4" />
           <path d="M12 2v2" /><path d="M12 20v2" />
           <path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" />
           <path d="M2 12h2" /><path d="M20 12h2" />
           <path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
-        </svg>
-      } @else {
-        <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
         </svg>
       }
     </button>

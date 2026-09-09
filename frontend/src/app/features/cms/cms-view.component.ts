@@ -1,9 +1,11 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 import { DomSanitizer, SafeResourceUrl, SafeHtml } from '@angular/platform-browser';
 import { CmsService } from '../../core/services/cms.service';
+import { ToastService } from '../../core/services/toast.service';
+import { ThemeService, ThemeMode } from '../../core/services/theme.service';
 import { CmsPage, ReusableBlock, Block, BlockCategory, BLOCK_DEFAULTS } from '../../core/models/cms.model';
 import { AiModalComponent } from './components/ai-modal/ai-modal.component';
 import { PROP_SCHEMAS, PropField } from './cms-prop-schema';
@@ -17,6 +19,8 @@ import { PROP_SCHEMAS, PropField } from './cms-prop-schema';
 })
 export class CmsViewComponent implements OnInit, OnDestroy {
   cmsService = inject(CmsService);
+  toastService = inject(ToastService);
+  themeService = inject(ThemeService);
   private sanitizer = inject(DomSanitizer);
 
   pages = this.cmsService.pages;
@@ -32,6 +36,38 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   draggingOver = signal<boolean>(false);
   dragInsertIndex = signal<number | null>(null);
 
+  isSaving = signal<boolean>(false);
+  isSaved = signal<boolean>(false);
+  collapsedTreeNodes = signal<Set<string>>(new Set());
+  treeDragTarget = signal<{ id: string; pos: 'before' | 'after' | 'inside' } | null>(null);
+
+  showLayersPanel = signal<boolean>(this.loadStoredLayersPanelState());
+  isLayersPanelMinimized = signal<boolean>(false);
+  layersSearchQuery = signal<string>('');
+
+  private loadStoredLayersPanelState(): boolean {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return localStorage.getItem('cms_show_layers_panel') !== 'false';
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  toggleLayersPanel() {
+    this.showLayersPanel.update(v => {
+      const next = !v;
+      try {
+        localStorage.setItem('cms_show_layers_panel', String(next));
+      } catch (_) {}
+      return next;
+    });
+  }
+
+  toggleLayersPanelMinimized() {
+    this.isLayersPanelMinimized.update(v => !v);
+  }
+
   viewportMode = signal<'desktop' | 'tablet' | 'mobile'>('desktop');
   isLandscape = signal<boolean>(false);
   showDeviceFrame = signal<boolean>(true);
@@ -39,7 +75,186 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   showPagesPopup = false;
   showAiModal = false;
-  blockSearchQuery = '';
+  showSaveReusableModal = signal<boolean>(false);
+  targetReusableBlock = signal<Block | null>(null);
+  reusableNameInput = signal<string>('');
+  reusableCategoryInput = signal<string>('custom');
+  blockSearchQuery = signal<string>('');
+  pageSettings = signal<Record<string, any>>({
+    maxWidth: '820px',
+    minWidth: '0px',
+    align: 'center',
+    bg: 'default',
+    customBg: '#0f172a',
+    fontFamily: 'system',
+    borderRadius: 16,
+    paddingX: 36,
+    paddingY: 44,
+    editorTheme: 'dark',
+    previewTheme: 'light'
+  });
+
+  storedEditorTheme = signal<ThemeMode>(this.loadStoredTheme('cms_editor_theme', 'dark'));
+  storedPreviewTheme = signal<ThemeMode>(this.loadStoredTheme('cms_preview_theme', 'light'));
+
+  private loadStoredTheme(key: string, fallback: ThemeMode): ThemeMode {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const val = localStorage.getItem(key);
+        if (val === 'dark' || val === 'light' || val === 'auto') return val as ThemeMode;
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  editorTheme = computed<ThemeMode>(() => {
+    const setting = this.pageSettings()['editorTheme'];
+    if (setting === 'dark' || setting === 'light' || setting === 'auto') return setting;
+    return this.storedEditorTheme();
+  });
+
+  previewTheme = computed<ThemeMode>(() => {
+    const setting = this.pageSettings()['previewTheme'];
+    if (setting === 'dark' || setting === 'light' || setting === 'auto') return setting;
+    return this.storedPreviewTheme();
+  });
+
+  effectiveCanvasTheme = computed<'dark' | 'light'>(() => {
+    const mode = this.isPreviewMode() ? this.previewTheme() : this.editorTheme();
+    if (mode === 'dark') return 'dark';
+    if (mode === 'light') return 'light';
+    return this.themeService.systemIsDark() ? 'dark' : 'light';
+  });
+
+  currentModeTheme = computed<ThemeMode>(() => {
+    return this.isPreviewMode() ? this.previewTheme() : this.editorTheme();
+  });
+
+  toggleActiveModeTheme() {
+    const current = this.currentModeTheme();
+    const next: ThemeMode = current === 'dark' ? 'light' : current === 'light' ? 'auto' : 'dark';
+    if (this.isPreviewMode()) {
+      this.setPreviewTheme(next);
+    } else {
+      this.setEditorTheme(next);
+    }
+  }
+
+  setEditorTheme(theme: ThemeMode) {
+    this.storedEditorTheme.set(theme);
+    try {
+      localStorage.setItem('cms_editor_theme', theme);
+    } catch (_) {}
+    this.updateSetting('editorTheme', theme);
+  }
+
+  setPreviewTheme(theme: ThemeMode) {
+    this.storedPreviewTheme.set(theme);
+    try {
+      localStorage.setItem('cms_preview_theme', theme);
+    } catch (_) {}
+    this.updateSetting('previewTheme', theme);
+  }
+
+  collapsedSettingsSections = signal<Set<string>>(new Set());
+  collapsedBlockSections = signal<Set<string>>(new Set());
+
+  isSettingsSectionCollapsed(id: string): boolean {
+    return this.collapsedSettingsSections().has(id);
+  }
+
+  toggleSettingsSection(id: string) {
+    this.collapsedSettingsSections.update(set => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  isBlockSectionCollapsed(blockId: string, sectionKey: string): boolean {
+    return this.collapsedBlockSections().has(`${blockId}_${sectionKey}`);
+  }
+
+  toggleBlockSection(blockId: string, sectionKey: string) {
+    const key = `${blockId}_${sectionKey}`;
+    this.collapsedBlockSections.update(set => {
+      const next = new Set(set);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  bgColorsList = ['#0b0f19', '#0f172a', '#1e293b', '#111827', '#1e1b4b', '#0f766e', '#831843', '#ffffff'];
+
+  gradientPresets = [
+    { label: 'Navy → Indigo', css: 'linear-gradient(135deg, #0f172a, #312e81)' },
+    { label: 'Deep Purple', css: 'linear-gradient(135deg, #1e1b4b, #4c1d95, #be185d)' },
+    { label: 'Sky → Indigo', css: 'linear-gradient(135deg, #0ea5e9, #6366f1)' },
+    { label: 'Teal & Cyan', css: 'linear-gradient(135deg, #0f766e, #06b6d4)' },
+    { label: 'Slate Dark', css: 'linear-gradient(135deg, #1f2937, #0b0f17)' },
+    { label: 'Sunset Glow', css: 'linear-gradient(135deg, #f97316, #ec4899)' }
+  ];
+
+  imagePresets = [
+    { label: 'Mountain Parallax', url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1600&q=80' },
+    { label: 'Night City', url: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1600&q=80' },
+    { label: 'Architecture', url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80' },
+    { label: 'Deep Space', url: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1600&q=80' },
+    { label: 'Gradient Mesh', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80' }
+  ];
+
+  setBlockBgType(b: Block, type: string) {
+    this.mutateAndSave(() => {
+      b.props['bgType'] = type;
+      if (type === 'image') {
+        if (!b.props['bgImage']) {
+          b.props['bgImage'] = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1600&q=80';
+        }
+        if (b.props['parallax'] == null) {
+          b.props['parallax'] = true;
+        }
+        if (!b.props['bgSize']) b.props['bgSize'] = 'cover';
+        if (!b.props['bgPosition']) b.props['bgPosition'] = 'center';
+        if (!b.props['bgRepeat']) b.props['bgRepeat'] = 'no-repeat';
+      } else if (type === 'gradient' && !b.props['bgGradient']) {
+        b.props['bgGradient'] = 'linear-gradient(135deg, #0f172a, #312e81)';
+      } else if (type === 'color' && !b.props['bgColor']) {
+        b.props['bgColor'] = '#0f172a';
+      }
+    });
+  }
+
+  getBlockWrapStyle(b: Block): Record<string, string> {
+    if (!b || !b.props) return {};
+    const p = b.props;
+    const type = p['bgType'] || 'none';
+    const s: Record<string, string> = {};
+
+    if (type === 'color' && p['bgColor']) {
+      s['background'] = p['bgColor'];
+      s['background-color'] = p['bgColor'];
+    } else if (type === 'gradient' && p['bgGradient']) {
+      s['background-image'] = p['bgGradient'];
+      s['background-size'] = 'cover';
+    } else if (type === 'image' && p['bgImage']) {
+      const overlay = p['bgOverlay'] && p['bgOverlay'] !== 'none' ? p['bgOverlay'] : null;
+      if (overlay) {
+        s['background-image'] = `linear-gradient(${overlay}, ${overlay}), url('${p['bgImage']}')`;
+      } else {
+        s['background-image'] = `url('${p['bgImage']}')`;
+      }
+      s['background-size'] = p['bgSize'] || 'cover';
+      s['background-position'] = p['bgPosition'] || 'center';
+      s['background-repeat'] = p['bgRepeat'] || 'no-repeat';
+      if (p['parallax']) {
+        s['background-attachment'] = 'fixed';
+      }
+    }
+
+    return s;
+  }
 
   private lastLoadedPageId: number | null = null;
   private nowTick = signal(Date.now());
@@ -60,6 +275,27 @@ export class CmsViewComponent implements OnInit, OnDestroy {
         }
         this.currentBlocks.set(blocks);
         this.selectedBlock.set(null);
+
+        let settings = page.settings || {};
+        if (typeof settings === 'string') {
+          try { settings = JSON.parse(settings); } catch (_) { settings = {}; }
+        }
+        const pX = settings['paddingX'] != null ? Number(settings['paddingX']) : 36;
+        const pY = settings['paddingY'] != null ? Number(settings['paddingY']) : 44;
+        const bRad = settings['borderRadius'] != null ? Number(settings['borderRadius']) : 16;
+        this.pageSettings.set({
+          maxWidth: settings['maxWidth'] || '820px',
+          minWidth: settings['minWidth'] || '0px',
+          align: settings['align'] || 'center',
+          bg: settings['bg'] || 'default',
+          customBg: settings['customBg'] || '#0f172a',
+          fontFamily: settings['fontFamily'] || 'system',
+          borderRadius: isNaN(bRad) ? 16 : bRad,
+          paddingX: isNaN(pX) ? 36 : pX,
+          paddingY: isNaN(pY) ? 44 : pY,
+          ...settings
+        });
+
         this.carouselIdx.clear();
         this.tabIdx.clear();
         this.pendingChildType.clear();
@@ -266,8 +502,80 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     }
   ];
 
+  collapsedCategories = signal<Set<string>>(this.loadCollapsedCategories());
+
+  private loadCollapsedCategories(): Set<string> {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const saved = localStorage.getItem('aladen_collapsed_categories');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return new Set<string>(parsed);
+          }
+        }
+      }
+    } catch (_) {}
+    return new Set<string>();
+  }
+
+  private saveCollapsedCategories(set: Set<string>): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('aladen_collapsed_categories', JSON.stringify(Array.from(set)));
+      }
+    } catch (_) {}
+  }
+
+  isCategoryCollapsed(catId: string): boolean {
+    if (this.blockSearchQuery().trim()) {
+      return false; // auto-expand when actively searching
+    }
+    return this.collapsedCategories().has(catId);
+  }
+
+  toggleCategory(catId: string, event?: Event): void {
+    if (event) {
+      event.preventDefault();
+    }
+    const current = new Set(this.collapsedCategories());
+    if (current.has(catId)) {
+      current.delete(catId);
+    } else {
+      current.add(catId);
+    }
+    this.collapsedCategories.set(current);
+    this.saveCollapsedCategories(current);
+  }
+
+  allCategoriesCollapsed = computed(() => {
+    const cats = this.filteredBlockCategories();
+    if (cats.length === 0) return false;
+    const collapsed = this.collapsedCategories();
+    return cats.every(cat => collapsed.has(cat.id));
+  });
+
+  toggleAllCategories(): void {
+    const cats = this.filteredBlockCategories();
+    if (cats.length === 0) return;
+    const current = new Set(this.collapsedCategories());
+    const isAllCollapsed = cats.every(cat => current.has(cat.id));
+
+    if (isAllCollapsed) {
+      for (const cat of cats) {
+        current.delete(cat.id);
+      }
+    } else {
+      for (const cat of cats) {
+        current.add(cat.id);
+      }
+    }
+    this.collapsedCategories.set(current);
+    this.saveCollapsedCategories(current);
+  }
+
   filteredBlockCategories = computed(() => {
-    const q = this.blockSearchQuery.trim().toLowerCase();
+    const q = this.blockSearchQuery().trim().toLowerCase();
     if (!q) return this.blockCategories;
 
     return this.blockCategories
@@ -281,6 +589,29 @@ export class CmsViewComponent implements OnInit, OnDestroy {
       }))
       .filter(cat => cat.items.length > 0);
   });
+
+  filteredReusableBlocks = computed(() => {
+    const q = this.blockSearchQuery().trim().toLowerCase();
+    const list = this.reusableBlocks();
+    if (!q) return list;
+    return list.filter(r =>
+      r.name.toLowerCase().includes(q) ||
+      (r.category && r.category.toLowerCase().includes(q))
+    );
+  });
+
+  isNodeMatch(block: Block): boolean {
+    const q = (this.layersSearchQuery() || this.blockSearchQuery()).trim().toLowerCase();
+    if (!q) return true;
+    const label = this.getBlockLabel(block.type).toLowerCase();
+    const snippet = this.getBlockSnippet(block).toLowerCase();
+    const type = block.type.toLowerCase();
+    if (label.includes(q) || snippet.includes(q) || type.includes(q)) return true;
+    if (Array.isArray(block.props && block.props['children'])) {
+      return block.props['children'].some((c: any) => this.isNodeMatch(c));
+    }
+    return false;
+  }
 
   ngOnInit() {
     this.loadPages();
@@ -366,8 +697,12 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   addReusableBlock(r: ReusableBlock, index?: number) {
+    if (!r || !r.block_data) {
+      this.toastService.error('Invalid reusable component data');
+      return;
+    }
     const cloned = JSON.parse(JSON.stringify(r.block_data));
-    cloned.id = 'b' + Math.random().toString(36).slice(2, 10);
+    this.reassignIds(cloned);
 
     const blocks = [...this.currentBlocks()];
     if (index == null || index < 0) index = blocks.length;
@@ -375,14 +710,16 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     this.currentBlocks.set(blocks);
     this.selectedBlock.set(cloned);
     this.savePageDebounced();
+    this.toastService.success(`Added reusable component "${r.name}"`);
   }
 
-  private dragPayload: string | null = null;
+  dragPayload: string | null = null;
   private dragFormat = 'application/x-cms-block';
 
   onPaletteDragStart(event: DragEvent, type: string) {
     this.dragPayload = JSON.stringify({ kind: 'type', value: type });
     event.dataTransfer!.setData(this.dragFormat, this.dragPayload);
+    event.dataTransfer!.setData('text/plain', type);
     event.dataTransfer!.effectAllowed = 'copy';
     this.draggingOver.set(true);
   }
@@ -390,33 +727,46 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   onReusableDragStart(event: DragEvent, r: ReusableBlock) {
     this.dragPayload = JSON.stringify({ kind: 'reusable', value: r.id });
     event.dataTransfer!.setData(this.dragFormat, this.dragPayload);
+    event.dataTransfer!.setData('text/plain', String(r.id));
     event.dataTransfer!.effectAllowed = 'copy';
     this.draggingOver.set(true);
+  }
+
+  onBlockDragStart(event: DragEvent, b: Block) {
+    event.stopPropagation();
+    this.dragPayload = JSON.stringify({ kind: 'block', id: b.id });
+    event.dataTransfer!.setData(this.dragFormat, this.dragPayload);
+    event.dataTransfer!.setData('text/plain', b.id);
+    event.dataTransfer!.effectAllowed = 'move';
+    this.draggingOver.set(true);
+    const target = event.currentTarget as HTMLElement;
+    if (target) target.classList.add('dragging');
   }
 
   onDragEnd() {
     this.draggingOver.set(false);
     this.dragInsertIndex.set(null);
     this.dragPayload = null;
+    this.dragOverContainers.set(new Set());
+    this.treeDragTarget.set(null);
+    document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
   }
 
   onCanvasDragOver(event: DragEvent) {
     if (!this.dragPayload) return;
     event.preventDefault();
-    event.dataTransfer!.dropEffect = 'copy';
+    event.dataTransfer!.dropEffect = this.dragPayload.includes('"block"') ? 'move' : 'copy';
     this.draggingOver.set(true);
     this.dragInsertIndex.set(this.computeInsertIndex(event));
   }
 
   onCanvasDragLeave(event: DragEvent) {
     if (!this.dragPayload) return;
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
-                   event.clientY >= rect.top && event.clientY <= rect.bottom;
-    if (!inside) {
-      this.draggingOver.set(false);
-      this.dragInsertIndex.set(null);
-    }
+    const canvas = document.getElementById('cmsCanvasDropList');
+    if (!canvas) return;
+    if (event.relatedTarget && canvas.contains(event.relatedTarget as Node)) return;
+    this.draggingOver.set(false);
+    this.dragInsertIndex.set(null);
   }
 
   onCanvasDrop(event: DragEvent) {
@@ -425,24 +775,26 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     const index = this.dragInsertIndex() ?? this.dragPayloadGetIndex();
     try {
       const payload = JSON.parse(this.dragPayload);
-      if (payload.kind === 'type') this.addBlock(payload.value, index ?? undefined);
-      else if (payload.kind === 'reusable') {
+      if (payload.kind === 'type') {
+        this.addBlock(payload.value, index ?? undefined);
+        this.toastService.success(`Added ${this.getBlockLabel(payload.value)}`);
+      } else if (payload.kind === 'reusable') {
         const r = this.reusableBlocks().find(x => x.id === payload.value);
-        if (r) this.addReusableBlock(r, index ?? undefined);
+        if (r) {
+          this.addReusableBlock(r, index ?? undefined);
+          this.toastService.success('Added reusable component');
+        }
+      } else if (payload.kind === 'block') {
+        const blk = this.findBlock(payload.id);
+        const label = blk ? this.getBlockLabel(blk.type) : 'Component';
+        this.moveBlockTo(payload.id, null, index ?? this.currentBlocks().length);
+        this.toastService.success(`Moved ${label}`);
       }
     } catch (_) {}
     this.onDragEnd();
   }
 
-  onBlockDrop(event: CdkDragDrop<Block[]>) {
-    if (event.previousIndex === event.currentIndex) return;
-    const blocks = [...this.currentBlocks()];
-    moveItemInArray(blocks, event.previousIndex, event.currentIndex);
-    this.currentBlocks.set(blocks);
-    this.savePageDebounced();
-  }
-
-  selectBlock(b: Block, event?: MouseEvent) {
+  selectBlock(b: Block, event?: Event) {
     if (event) event.stopPropagation();
     this.selectedBlock.set(b);
   }
@@ -451,66 +803,438 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     this.selectedBlock.set(null);
   }
 
-  deleteBlock(id: string, event?: MouseEvent) {
-    if (event) event.stopPropagation();
-    const updated = this.currentBlocks().filter(b => b.id !== id);
-    this.currentBlocks.set(updated);
-    if (this.selectedBlock()?.id === id) {
-      this.selectedBlock.set(null);
+  findBlock(id: string, list: Block[] = this.currentBlocks()): Block | null {
+    for (const b of list) {
+      if (b.id === id) return b;
+      if (Array.isArray(b.props && b.props['children'])) {
+        const found = this.findBlock(id, b.props['children']);
+        if (found) return found;
+      }
     }
+    return null;
+  }
+
+  findBlockLocation(id: string, list: Block[] = this.currentBlocks(), parentBlock: Block | null = null): {
+    parentArray: Block[];
+    index: number;
+    parentBlock: Block | null;
+    parentContainerId: string | null;
+  } | null {
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].id === id) {
+        return {
+          parentArray: list,
+          index: i,
+          parentBlock,
+          parentContainerId: parentBlock ? parentBlock.id : null
+        };
+      }
+      if (Array.isArray(list[i].props && list[i].props['children'])) {
+        const loc = this.findBlockLocation(id, list[i].props['children'], list[i]);
+        if (loc) return loc;
+      }
+    }
+    return null;
+  }
+
+  isDescendant(parentId: string, potentialChildId: string): boolean {
+    const parent = this.findBlock(parentId);
+    if (!parent || !Array.isArray(parent.props && parent.props['children'])) return false;
+    for (const c of parent.props['children']) {
+      if (c.id === potentialChildId) return true;
+      if (this.isDescendant(c.id, potentialChildId)) return true;
+    }
+    return false;
+  }
+
+  moveBlockTo(blockId: string, targetContainerId: string | null, targetIndex: number) {
+    if (targetContainerId && (blockId === targetContainerId || this.isDescendant(blockId, targetContainerId))) {
+      return;
+    }
+    const loc = this.findBlockLocation(blockId);
+    if (!loc) return;
+
+    const [block] = loc.parentArray.splice(loc.index, 1);
+    if (!block) return;
+
+    if (targetContainerId) {
+      const target = this.findBlock(targetContainerId);
+      if (target) {
+        if (!Array.isArray(target.props['children'])) target.props['children'] = [];
+        let idx = targetIndex;
+        if (loc.parentArray === target.props['children'] && loc.index < targetIndex) {
+          idx--;
+        }
+        idx = Math.max(0, Math.min(idx, target.props['children'].length));
+        target.props['children'].splice(idx, 0, block);
+      }
+    } else {
+      const root = this.currentBlocks();
+      let idx = targetIndex;
+      if (loc.parentArray === root && loc.index < targetIndex) {
+        idx--;
+      }
+      idx = Math.max(0, Math.min(idx, root.length));
+      root.splice(idx, 0, block);
+    }
+
+    this.currentBlocks.set([...this.currentBlocks()]);
     this.savePageDebounced();
   }
 
-  moveBlockUp(idx: number, event?: MouseEvent) {
+  insertBlockAt(type: string, targetContainerId: string | null, targetIndex: number) {
+    const defaults = BLOCK_DEFAULTS[type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[type])) : {};
+    const newBlock: Block = {
+      id: this.newBlockId(),
+      type,
+      props: defaults
+    };
+    if (targetContainerId) {
+      const parent = this.findBlock(targetContainerId);
+      if (parent) {
+        if (!Array.isArray(parent.props['children'])) parent.props['children'] = [];
+        parent.props['children'].splice(targetIndex, 0, newBlock);
+      }
+    } else {
+      const blocks = this.currentBlocks();
+      blocks.splice(targetIndex, 0, newBlock);
+    }
+    this.currentBlocks.set([...this.currentBlocks()]);
+    this.selectedBlock.set(newBlock);
+    this.savePageDebounced();
+  }
+
+  insertReusableBlockAt(reusableId: number, targetContainerId: string | null, targetIndex: number) {
+    const r = this.reusableBlocks().find(x => x.id === reusableId);
+    if (!r) return;
+    const clone = JSON.parse(JSON.stringify(r.block_data));
+    this.reassignIds(clone);
+    if (targetContainerId) {
+      const parent = this.findBlock(targetContainerId);
+      if (parent) {
+        if (!Array.isArray(parent.props['children'])) parent.props['children'] = [];
+        parent.props['children'].splice(targetIndex, 0, clone);
+      }
+    } else {
+      const blocks = this.currentBlocks();
+      blocks.splice(targetIndex, 0, clone);
+    }
+    this.currentBlocks.set([...this.currentBlocks()]);
+    this.selectedBlock.set(clone);
+    this.savePageDebounced();
+  }
+
+  deleteBlock(id: string, event?: Event) {
     if (event) event.stopPropagation();
-    if (idx <= 0) return;
-    const blocks = [...this.currentBlocks()];
-    const temp = blocks[idx - 1];
-    blocks[idx - 1] = blocks[idx];
-    blocks[idx] = temp;
-    this.currentBlocks.set(blocks);
-    this.savePageDebounced();
+    const loc = this.findBlockLocation(id);
+    if (loc) {
+      loc.parentArray.splice(loc.index, 1);
+      this.currentBlocks.set([...this.currentBlocks()]);
+      if (this.selectedBlock()?.id === id) {
+        this.selectedBlock.set(null);
+      }
+      this.savePageDebounced();
+      this.toastService.info('Block deleted');
+    }
   }
 
-  moveBlockDown(idx: number, event?: MouseEvent) {
+  moveBlockUp(blockOrIdx: Block | number, event?: Event) {
     if (event) event.stopPropagation();
-    const blocks = [...this.currentBlocks()];
-    if (idx >= blocks.length - 1) return;
-    const temp = blocks[idx + 1];
-    blocks[idx + 1] = blocks[idx];
-    blocks[idx] = temp;
-    this.currentBlocks.set(blocks);
+    let blockId: string | null = null;
+    if (typeof blockOrIdx === 'object' && blockOrIdx !== null) {
+      blockId = blockOrIdx.id;
+    } else if (typeof blockOrIdx === 'number') {
+      blockId = this.currentBlocks()[blockOrIdx]?.id || null;
+    }
+    if (!blockId) return;
+
+    const loc = this.findBlockLocation(blockId);
+    if (!loc || loc.index <= 0) return;
+
+    const arr = loc.parentArray;
+    const temp = arr[loc.index - 1];
+    arr[loc.index - 1] = arr[loc.index];
+    arr[loc.index] = temp;
+
+    this.currentBlocks.set([...this.currentBlocks()]);
     this.savePageDebounced();
   }
 
-  duplicateBlock(b: Block, event?: MouseEvent) {
+  moveBlockDown(blockOrIdx: Block | number, event?: Event) {
+    if (event) event.stopPropagation();
+    let blockId: string | null = null;
+    if (typeof blockOrIdx === 'object' && blockOrIdx !== null) {
+      blockId = blockOrIdx.id;
+    } else if (typeof blockOrIdx === 'number') {
+      blockId = this.currentBlocks()[blockOrIdx]?.id || null;
+    }
+    if (!blockId) return;
+
+    const loc = this.findBlockLocation(blockId);
+    if (!loc || loc.index >= loc.parentArray.length - 1) return;
+
+    const arr = loc.parentArray;
+    const temp = arr[loc.index + 1];
+    arr[loc.index + 1] = arr[loc.index];
+    arr[loc.index] = temp;
+
+    this.currentBlocks.set([...this.currentBlocks()]);
+    this.savePageDebounced();
+  }
+
+  duplicateBlock(b: Block, event?: Event) {
     if (event) event.stopPropagation();
     const cloned: Block = JSON.parse(JSON.stringify(b));
-    cloned.id = 'b' + Math.random().toString(36).slice(2, 10);
-    const idx = this.currentBlocks().findIndex(item => item.id === b.id);
-    const blocks = [...this.currentBlocks()];
-    blocks.splice(idx + 1, 0, cloned);
-    this.currentBlocks.set(blocks);
-    this.selectedBlock.set(cloned);
-    this.savePageDebounced();
+    this.reassignIds(cloned);
+
+    const loc = this.findBlockLocation(b.id);
+    if (loc) {
+      loc.parentArray.splice(loc.index + 1, 0, cloned);
+      this.currentBlocks.set([...this.currentBlocks()]);
+      this.selectedBlock.set(cloned);
+      this.savePageDebounced();
+      this.toastService.success('Block duplicated');
+    }
   }
 
-  saveAsReusable(b: Block) {
-    const name = prompt('Reusable Component Name:', this.getBlockLabel(b.type));
-    if (!name || !name.trim()) return;
+  private reassignIds(b: Block) {
+    b.id = this.newBlockId();
+    if (Array.isArray(b.props && b.props['children'])) {
+      b.props['children'].forEach((c: any) => this.reassignIds(c));
+    }
+  }
 
-    this.cmsService.createReusableBlock(name.trim(), b).subscribe({
-      next: () => this.loadReusableBlocks(),
-      error: (err) => console.error('Failed to save reusable block:', err)
+  // --- Tree / Layers Methods ---
+  isTreeCollapsed(id: string): boolean {
+    return this.collapsedTreeNodes().has(id);
+  }
+
+  toggleTreeCollapse(id: string, event?: Event) {
+    if (event) event.stopPropagation();
+    this.collapsedTreeNodes.update(set => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
+  }
+
+  onTreeNodeMouseEnter(blockId: string) {
+    const el = document.querySelector(`.cms-canvas [data-block-id="${blockId}"]`);
+    if (el) el.classList.add('tree-hover-highlight');
+  }
+
+  onTreeNodeMouseLeave(blockId: string) {
+    const el = document.querySelector(`.cms-canvas [data-block-id="${blockId}"]`);
+    if (el) el.classList.remove('tree-hover-highlight');
+  }
+
+  scrollToBlock(blockId: string) {
+    setTimeout(() => {
+      const el = document.querySelector(`.cms-canvas [data-block-id="${blockId}"]`) as HTMLElement;
+      if (!el) return;
+
+      const canvasWrap = document.querySelector('.cms-canvas-wrap') as HTMLElement;
+      if (canvasWrap) {
+        const wrapRect = canvasWrap.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const currentScroll = canvasWrap.scrollTop;
+        const targetScroll = currentScroll + (elRect.top - wrapRect.top) - (wrapRect.height / 2) + (elRect.height / 2);
+        canvasWrap.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+      } else {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      }
+
+      el.classList.add('pulse-highlight');
+      setTimeout(() => el.classList.remove('pulse-highlight'), 1600);
+    }, 60);
+  }
+
+  selectTreeBlock(block: Block, event?: Event) {
+    if (event) event.stopPropagation();
+    this.selectBlock(block, event);
+    this.scrollToBlock(block.id);
+  }
+
+  getBlockSnippet(block: Block): string {
+    const p = block.props || {};
+    switch (block.type) {
+      case 'heading': return p['text'] || 'Heading';
+      case 'paragraph': return p['text'] ? (p['text'].length > 20 ? p['text'].slice(0, 20) + '...' : p['text']) : '';
+      case 'button': return p['label'] || 'Button';
+      case 'image': return p['caption'] || '';
+      case 'carousel': return `${(p['slides'] || []).length} slides`;
+      case 'container': return p['mode'] === 'grid' ? `${p['columns'] || 2} cols` : (p['direction'] || 'row');
+      case 'header': return p['brandName'] || 'Brand';
+      case 'footer': return p['brandName'] || 'Brand';
+      case 'callout': return p['title'] || '';
+      case 'accordion': return `${(p['items'] || []).length} items`;
+      case 'table': return `${(p['headers'] || []).length} cols`;
+      case 'pricing': return `${(p['plans'] || []).length} plans`;
+      case 'stat': return p['value'] ? `${p['value']} ${p['label'] || ''}` : '';
+      case 'testimonial': return p['author'] || '';
+      default: return '';
+    }
+  }
+
+  getBlockIcon(type: string): SafeHtml {
+    for (const cat of this.blockCategories) {
+      const item = cat.items.find(i => i.type === type);
+      if (item) return this.iconSafe(item.iconSvg);
+    }
+    return this.iconSafe('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>');
+  }
+
+  onTreeDragStart(event: DragEvent, block: Block) {
+    event.stopPropagation();
+    this.dragPayload = JSON.stringify({ kind: 'block', id: block.id, fromTree: true });
+    event.dataTransfer!.setData(this.dragFormat, this.dragPayload);
+    event.dataTransfer!.setData('text/plain', block.id);
+    event.dataTransfer!.effectAllowed = 'move';
+  }
+
+  onTreeDragOver(event: DragEvent, targetBlock: Block) {
+    if (!this.dragPayload) return;
+    let payload: any;
+    try { payload = JSON.parse(this.dragPayload); } catch { return; }
+    if (payload.kind === 'block' && (payload.id === targetBlock.id || this.isDescendant(payload.id, targetBlock.id))) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer!.dropEffect = payload.kind === 'block' ? 'move' : 'copy';
+
+    const row = event.currentTarget as HTMLElement;
+    const rect = row.getBoundingClientRect();
+    const relY = (event.clientY - rect.top) / rect.height;
+    const isContainer = targetBlock.type === 'container' || targetBlock.type === 'header';
+
+    let pos: 'before' | 'after' | 'inside' = 'after';
+    if (isContainer && relY > 0.25 && relY < 0.75) {
+      pos = 'inside';
+    } else if (relY <= 0.5) {
+      pos = 'before';
+    } else {
+      pos = 'after';
+    }
+
+    this.treeDragTarget.set({ id: targetBlock.id, pos });
+  }
+
+  onTreeDragLeave(event: DragEvent, targetBlock: Block) {
+    const row = event.currentTarget as HTMLElement;
+    if (event.relatedTarget && row.contains(event.relatedTarget as Node)) return;
+    if (this.treeDragTarget()?.id === targetBlock.id) {
+      this.treeDragTarget.set(null);
+    }
+  }
+
+  onTreeDrop(event: DragEvent, targetBlock: Block) {
+    event.preventDefault();
+    event.stopPropagation();
+    const targetState = this.treeDragTarget();
+    this.treeDragTarget.set(null);
+
+    if (!this.dragPayload) return;
+    let payload: any;
+    try { payload = JSON.parse(this.dragPayload); } catch { return; }
+
+    if (payload.kind === 'block' && (payload.id === targetBlock.id || this.isDescendant(payload.id, targetBlock.id))) {
+      return;
+    }
+
+    const dropPos = targetState?.pos || 'after';
+    const isContainer = targetBlock.type === 'container' || targetBlock.type === 'header';
+
+    let targetParentId: string | null = null;
+    let targetIdx = 0;
+
+    if (dropPos === 'inside' && isContainer) {
+      targetParentId = targetBlock.id;
+      const container = this.findBlock(targetBlock.id);
+      targetIdx = (container && container.props && Array.isArray(container.props['children']))
+        ? container.props['children'].length : 0;
+      this.collapsedTreeNodes.update(set => {
+        const next = new Set(set);
+        next.delete(targetBlock.id);
+        return next;
+      });
+    } else {
+      const loc = this.findBlockLocation(targetBlock.id);
+      if (loc) {
+        targetParentId = loc.parentContainerId;
+        targetIdx = dropPos === 'before' ? loc.index : loc.index + 1;
+      }
+    }
+
+    if (payload.kind === 'block') {
+      this.moveBlockTo(payload.id, targetParentId, targetIdx);
+      this.toastService.success('Component moved');
+    } else if (payload.kind === 'type') {
+      this.insertBlockAt(payload.value, targetParentId, targetIdx);
+      this.toastService.success(`Added ${this.getBlockLabel(payload.value)}`);
+    } else if (payload.kind === 'reusable') {
+      this.insertReusableBlockAt(payload.value, targetParentId, targetIdx);
+      this.toastService.success('Added reusable component');
+    }
+
+    this.onDragEnd();
+  }
+
+  openSaveReusableModal(b: Block, event?: Event) {
+    if (event) event.stopPropagation();
+    this.targetReusableBlock.set(b);
+    const defaultName = this.getBlockSnippet(b) || this.getBlockLabel(b.type);
+    this.reusableNameInput.set(defaultName);
+    this.reusableCategoryInput.set(b.type || 'custom');
+    this.showSaveReusableModal.set(true);
+  }
+
+  closeSaveReusableModal() {
+    this.showSaveReusableModal.set(false);
+    this.targetReusableBlock.set(null);
+  }
+
+  confirmSaveReusable() {
+    const b = this.targetReusableBlock();
+    const name = this.reusableNameInput().trim();
+    if (!b || !name) return;
+
+    const category = this.reusableCategoryInput().trim() || b.type || 'custom';
+    const blockCopy = JSON.parse(JSON.stringify(b));
+
+    this.cmsService.createReusableBlock(name, blockCopy, category).subscribe({
+      next: () => {
+        this.closeSaveReusableModal();
+        this.loadReusableBlocks();
+        this.sidebarTab.set('reusable');
+        this.leftSidebarCollapsed.set(false);
+        this.toastService.success(`Saved reusable component "${name}"`);
+      },
+      error: (err) => {
+        console.error('Failed to save reusable block:', err);
+        this.toastService.error('Failed to save reusable component');
+      }
+    });
+  }
+
+  saveAsReusable(b: Block, event?: Event) {
+    this.openSaveReusableModal(b, event);
   }
 
   deleteReusableBlock(id: number, event: MouseEvent) {
     event.stopPropagation();
     if (!confirm('Delete this saved reusable block?')) return;
     this.cmsService.deleteReusableBlock(id).subscribe({
-      next: () => this.loadReusableBlocks(),
-      error: (err) => console.error('Failed to delete reusable block:', err)
+      next: () => {
+        this.loadReusableBlocks();
+        this.toastService.info('Deleted reusable component');
+      },
+      error: (err) => {
+        console.error('Failed to delete reusable block:', err);
+        this.toastService.error('Failed to delete reusable component');
+      }
     });
   }
 
@@ -661,60 +1385,93 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   onContainerDragOver(b: Block, event: DragEvent) {
     if (!this.dragPayload) return;
+    let payload: any;
+    try { payload = JSON.parse(this.dragPayload); } catch { return; }
+    if (payload.kind === 'block' && (payload.id === b.id || this.isDescendant(payload.id, b.id))) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
-    event.dataTransfer!.dropEffect = 'copy';
+    event.dataTransfer!.dropEffect = payload.kind === 'block' ? 'move' : 'copy';
+    this.dragInsertIndex.set(null);
+    this.dragOverContainers.set(new Set([b.id]));
+  }
+
+  onContainerDragLeave(b: Block, event: DragEvent) {
+    const containerEl = event.currentTarget as HTMLElement;
+    if (event.relatedTarget && containerEl.contains(event.relatedTarget as Node)) return;
     this.dragOverContainers.update(s => {
+      if (!s.has(b.id)) return s;
       const n = new Set(s);
-      n.add(b.id);
+      n.delete(b.id);
       return n;
     });
   }
 
-  onContainerDragLeave(b: Block, event: DragEvent) {
-    if (!this.dragPayload) return;
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
-                   event.clientY >= rect.top && event.clientY <= rect.bottom;
-    if (!inside) {
-      this.dragOverContainers.update(s => {
-        const n = new Set(s);
-        n.delete(b.id);
-        return n;
-      });
-    }
-  }
-
   onContainerDrop(b: Block, event: DragEvent) {
     if (!this.dragPayload) return;
+    let payload: any;
+    try { payload = JSON.parse(this.dragPayload); } catch { return; }
+    if (payload.kind === 'block' && (payload.id === b.id || this.isDescendant(payload.id, b.id))) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
+
+    this.dragOverContainers.update(s => {
+      const n = new Set(s);
+      n.delete(b.id);
+      return n;
+    });
+
+    const containerEl = event.currentTarget as HTMLElement;
     try {
-      const payload = JSON.parse(this.dragPayload);
+      const targetIdx = this.getContainerInsertIndex(containerEl, event.clientX, event.clientY);
       if (payload.kind === 'type') {
-        this.addChild(b, 'children', payload.value);
+        if (payload.value === 'header' || payload.value === 'footer') {
+          this.toastService.warning(`${this.getBlockLabel(payload.value)} cannot be placed inside a container`);
+          this.onDragEnd();
+          return;
+        }
+        this.insertBlockAt(payload.value, b.id, targetIdx);
+        this.toastService.success(`Added ${this.getBlockLabel(payload.value)} to container`);
       } else if (payload.kind === 'reusable') {
-        const r = this.reusableBlocks().find(x => x.id === payload.value);
-        if (r) this.addReusableChild(b, r);
+        this.insertReusableBlockAt(payload.value, b.id, targetIdx);
+        this.toastService.success('Added reusable component to container');
+      } else if (payload.kind === 'block') {
+        const blk = this.findBlock(payload.id);
+        if (blk && (blk.type === 'header' || blk.type === 'footer')) {
+          this.toastService.warning(`${this.getBlockLabel(blk.type)} cannot be placed inside a container`);
+          this.onDragEnd();
+          return;
+        }
+        this.moveBlockTo(payload.id, b.id, targetIdx);
+        this.toastService.success('Component moved into container');
       }
     } catch (_) {}
     this.onDragEnd();
   }
 
+  getContainerInsertIndex(containerEl: HTMLElement, clientX: number, clientY: number): number {
+    const children = Array.from(containerEl.querySelectorAll<HTMLElement>(':scope > .container-child, :scope > .block-wrap'));
+    if (!children.length) return 0;
+    for (let i = 0; i < children.length; i++) {
+      const rect = children[i].getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2 || (clientY < rect.bottom && clientX < rect.left + rect.width / 2)) {
+        return i;
+      }
+    }
+    return children.length;
+  }
+
   addReusableChild(b: Block, r: ReusableBlock) {
     const clone = JSON.parse(JSON.stringify(r.block_data));
-    clone.id = this.newBlockId();
+    this.reassignIds(clone);
     this.mutateAndSave(() => {
       if (!Array.isArray(b.props['children'])) b.props['children'] = [];
       b.props['children'].push(clone);
-    });
-  }
-
-  onChildDrop(b: Block, event: CdkDragDrop<any[]>) {
-    if (event.previousIndex === event.currentIndex) return;
-    this.mutateAndSave(() => {
-      if (!Array.isArray(b.props['children'])) b.props['children'] = [];
-      moveItemInArray(b.props['children'], event.previousIndex, event.currentIndex);
     });
   }
 
@@ -754,12 +1511,38 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   calloutTheme(type: string): { bg: string; border: string; titleColor: string; icon: string } {
+    const isDark = this.themeService.isDark();
     const themes: Record<string, { bg: string; border: string; titleColor: string; icon: string }> = {
-      tip: { bg: 'rgba(139, 92, 246, 0.12)', border: '#8b5cf6', titleColor: '#a78bfa', icon: '💡' },
-      info: { bg: 'rgba(59, 130, 246, 0.12)', border: '#3b82f6', titleColor: '#60a5fa', icon: 'ℹ️' },
-      success: { bg: 'rgba(16, 185, 129, 0.12)', border: '#10b981', titleColor: '#34d399', icon: '✅' },
-      warning: { bg: 'rgba(245, 158, 11, 0.12)', border: '#f59e0b', titleColor: '#fbbf24', icon: '⚠️' },
-      danger: { bg: 'rgba(239, 68, 68, 0.12)', border: '#ef4444', titleColor: '#f87171', icon: '🛑' }
+      tip: {
+        bg: isDark ? 'rgba(139, 92, 246, 0.12)' : 'rgba(139, 92, 246, 0.08)',
+        border: '#8b5cf6',
+        titleColor: isDark ? '#a78bfa' : '#6d28d9',
+        icon: '💡'
+      },
+      info: {
+        bg: isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)',
+        border: '#3b82f6',
+        titleColor: isDark ? '#60a5fa' : '#1d4ed8',
+        icon: 'ℹ️'
+      },
+      success: {
+        bg: isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+        border: '#10b981',
+        titleColor: isDark ? '#34d399' : '#047857',
+        icon: '✅'
+      },
+      warning: {
+        bg: isDark ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.08)',
+        border: '#f59e0b',
+        titleColor: isDark ? '#fbbf24' : '#b45309',
+        icon: '⚠️'
+      },
+      danger: {
+        bg: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+        border: '#ef4444',
+        titleColor: isDark ? '#f87171' : '#b91c1c',
+        icon: '🛑'
+      }
     };
     return themes[type] || themes['info'];
   }
@@ -818,15 +1601,27 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   savePageNow() {
     const page = this.activePage();
-    if (!page) return;
+    if (!page) {
+      this.toastService.info('No active page selected');
+      return;
+    }
+
+    if (this.isSaving()) return;
+    this.isSaving.set(true);
 
     this.cmsService.updatePage(page.id, {
       title: page.title,
       slug: page.slug,
       status: page.status,
-      blocks: this.currentBlocks()
+      blocks: this.currentBlocks(),
+      settings: this.pageSettings()
     }).subscribe({
       next: (res) => {
+        this.isSaving.set(false);
+        this.isSaved.set(true);
+        this.toastService.success('Page saved successfully');
+        setTimeout(() => this.isSaved.set(false), 1400);
+
         if (res && typeof res.id === 'number') {
           this.activePage.set(res);
           this.pages.update(list => {
@@ -841,8 +1636,100 @@ export class CmsViewComponent implements OnInit, OnDestroy {
           this.cmsService.getPage(page.id).subscribe(p => this.activePage.set(p));
         }
       },
-      error: (err) => console.error('Failed to save page:', err)
+      error: (err) => {
+        this.isSaving.set(false);
+        console.error('Failed to save page:', err);
+        this.toastService.error('Failed to save page');
+      }
     });
+  }
+
+  getCanvasBackground(): string {
+    const bg = this.pageSettings()['bg'] || 'default';
+    switch (bg) {
+      case 'pure-black': return '#000000';
+      case 'deep-navy': return '#0a1324';
+      case 'dark-card': return '#111827';
+      case 'light': return '#ffffff';
+      case 'custom': return this.pageSettings()['customBg'] || '#0f172a';
+      default: return this.effectiveCanvasTheme() === 'dark' ? '#0b0f19' : '#ffffff';
+    }
+  }
+
+  getCanvasTextColor(): string {
+    const bg = this.pageSettings()['bg'] || 'default';
+    if (bg === 'light') return '#0f172a';
+    if (bg === 'pure-black' || bg === 'deep-navy' || bg === 'dark-card') return '#f8fafc';
+    return this.effectiveCanvasTheme() === 'dark' ? '#f8fafc' : '#0f172a';
+  }
+
+  getCanvasFontFamily(): string {
+    const font = this.pageSettings()['fontFamily'] || 'system';
+    switch (font) {
+      case 'inter': return "'Inter', sans-serif";
+      case 'outfit': return "'Outfit', sans-serif";
+      case 'roboto': return "'Roboto', sans-serif";
+      case 'mono': return "'JetBrains Mono', monospace";
+      default: return "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif";
+    }
+  }
+
+  updateSetting(key: string, value: any) {
+    this.pageSettings.update(s => ({ ...s, [key]: value }));
+    this.savePageDebounced();
+  }
+
+  updateNumberSetting(key: string, value: any) {
+    const num = Number(value);
+    this.updateSetting(key, isNaN(num) ? 0 : num);
+  }
+
+  getPageWordCount(): number {
+    let count = 0;
+    const tally = (b: Block) => {
+      if (b.props) {
+        if (b.props['text']) count += String(b.props['text']).trim().split(/\s+/).filter(Boolean).length;
+        if (b.props['label']) count += String(b.props['label']).trim().split(/\s+/).filter(Boolean).length;
+        if (b.props['caption']) count += String(b.props['caption']).trim().split(/\s+/).filter(Boolean).length;
+        if (Array.isArray(b.props['slides'])) {
+          b.props['slides'].forEach((s: any) => {
+            if (s.caption) count += String(s.caption).trim().split(/\s+/).filter(Boolean).length;
+          });
+        }
+        if (Array.isArray(b.props['children'])) {
+          b.props['children'].forEach(tally);
+        }
+      }
+    };
+    this.currentBlocks().forEach(tally);
+    return count;
+  }
+
+  getReadTimeMinutes(): number {
+    return Math.max(1, Math.ceil(this.getPageWordCount() / 200));
+  }
+
+  getTotalBlockCount(): number {
+    let count = 0;
+    const tally = (list: Block[]) => {
+      list.forEach(b => {
+        count++;
+        if (Array.isArray(b.props && b.props['children'])) {
+          tally(b.props['children']);
+        }
+      });
+    };
+    tally(this.currentBlocks());
+    return count;
+  }
+
+  openLivePage() {
+    const page = this.activePage();
+    if (page?.slug) {
+      window.open(`/p/${page.slug}`, '_blank');
+    } else {
+      this.toastService.info('Page has no slug set');
+    }
   }
 
   private saveTimeout: any = null;
@@ -920,11 +1807,41 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     const canvas = document.getElementById('cmsCanvasDropList');
     if (!canvas) return 0;
     const wraps = Array.from(canvas.querySelectorAll<HTMLElement>(':scope > .block-wrap'));
+    if (!wraps.length) return 0;
+
+    let idx = wraps.length;
     for (let i = 0; i < wraps.length; i++) {
       const midY = wraps[i].getBoundingClientRect().top + wraps[i].getBoundingClientRect().height / 2;
-      if (event.clientY < midY) return i;
+      if (event.clientY < midY) {
+        idx = i;
+        break;
+      }
     }
-    return wraps.length;
+
+    const blocks = this.currentBlocks();
+    const hasHeader = blocks.length > 0 && blocks[0].type === 'header';
+    const hasFooter = blocks.length > 0 && blocks[blocks.length - 1].type === 'footer';
+
+    let draggedType: string | null = null;
+    if (this.dragPayload) {
+      try {
+        const p = JSON.parse(this.dragPayload);
+        if (p.kind === 'type') draggedType = p.value;
+        else if (p.kind === 'block') {
+          const b = this.findBlock(p.id);
+          if (b) draggedType = b.type;
+        }
+      } catch (_) {}
+    }
+
+    if (hasHeader && draggedType !== 'header' && idx === 0) {
+      idx = 1;
+    }
+    if (hasFooter && draggedType !== 'footer' && idx >= blocks.length) {
+      idx = Math.max(0, blocks.length - 1);
+    }
+
+    return idx;
   }
 
   private dragPayloadGetIndex(): number {

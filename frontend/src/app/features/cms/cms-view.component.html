@@ -15,10 +15,6 @@
           <span>Saved</span>
           <span class="cms-tab-badge">{{ reusableBlocks().length }}</span>
         </button>
-        <button type="button" class="cms-sidebar-tab" [class.active]="sidebarTab() === 'tree'"
-                (click)="sidebarTab.set('tree')">
-          <span>Layers</span>
-        </button>
       </div>
 
       <button type="button" id="cmsCollapseLeftSidebarBtn" class="sidebar-collapse-btn"
@@ -35,9 +31,10 @@
       <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
       </svg>
-      <input id="cmsBlocksSearchInput" [(ngModel)]="blockSearchQuery" placeholder="Search components & blocks..." autocomplete="off" />
-      @if (blockSearchQuery) {
-        <button type="button" id="cmsClearBlocksSearchBtn" class="clear-search-btn" (click)="blockSearchQuery = ''" title="Clear search">
+      <input id="cmsBlocksSearchInput" [ngModel]="blockSearchQuery()" (ngModelChange)="blockSearchQuery.set($event)"
+             (keydown.escape)="blockSearchQuery.set('')" placeholder="Search components & blocks..." autocomplete="off" />
+      @if (blockSearchQuery()) {
+        <button type="button" id="cmsClearBlocksSearchBtn" class="clear-search-btn" (click)="blockSearchQuery.set('')" title="Clear search">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -48,9 +45,24 @@
     <!-- Palette View Content -->
     @if (sidebarTab() === 'blocks') {
       <div id="cmsStandardBlocksView" class="palette-scroll-wrap" style="overflow-y:auto;flex:1;">
+        <div class="palette-toolbar">
+          <span class="palette-sections-label">Block Sections</span>
+          <button type="button" id="cmsToggleAllSectionsBtn" class="palette-toggle-all-btn"
+                  (click)="toggleAllCategories()"
+                  title="Toggle collapse / expand for all block sections"
+                  [attr.aria-expanded]="!allCategoriesCollapsed()">
+            {{ allCategoriesCollapsed() ? 'Expand All' : 'Collapse All' }}
+          </button>
+        </div>
+
         @for (cat of filteredBlockCategories(); track cat.id) {
-          <div class="palette-category" [attr.data-category]="cat.id">
-            <div class="category-title" role="button" tabindex="0">
+          <div class="palette-category" [attr.data-category]="cat.id" [class.collapsed]="isCategoryCollapsed(cat.id)">
+            <div class="category-title" role="button" tabindex="0"
+                 (click)="toggleCategory(cat.id)"
+                 (keydown.enter)="toggleCategory(cat.id, $event)"
+                 (keydown.space)="toggleCategory(cat.id, $event)"
+                 [attr.aria-expanded]="!isCategoryCollapsed(cat.id)"
+                 title="Click to collapse / expand section">
               <svg class="category-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
@@ -74,12 +86,12 @@
             </div>
           </div>
         } @empty {
-          <div class="cms-no-blocks-found">No blocks match "{{ blockSearchQuery }}"</div>
+          <div class="cms-no-blocks-found">No blocks match "{{ blockSearchQuery() }}"</div>
         }
       </div>
     } @else if (sidebarTab() === 'reusable') {
       <div class="palette-list custom-blocks-list" style="overflow-y:auto;flex:1;padding:4px 0;">
-        @for (r of reusableBlocks(); track r.id) {
+        @for (r of filteredReusableBlocks(); track r.id) {
           <div class="palette-item" draggable="true"
                (click)="addReusableBlock(r)"
                (dragstart)="onReusableDragStart($event, r)"
@@ -91,27 +103,20 @@
             </div>
             <div class="palette-info">
               <span class="palette-label">{{ r.name }}</span>
-              <span class="palette-sub">Custom {{ r.block_data.type }}</span>
+              <span class="palette-sub">Custom {{ r.block_data?.type || r.category || 'block' }}</span>
             </div>
             <button (click)="deleteReusableBlock(r.id, $event)" class="btn-icon ghost btn-xs" title="Delete">
               &times;
             </button>
           </div>
         } @empty {
-          <div class="cms-no-blocks-found">No saved components yet.</div>
-        }
-      </div>
-    } @else if (sidebarTab() === 'tree') {
-      <div class="cms-tree-list" style="overflow-y:auto;flex:1;padding:4px 0;">
-        @for (b of currentBlocks(); track b.id; let idx = $index) {
-          <div class="cms-page-item" [class.selected]="selectedBlock()?.id === b.id" (click)="selectBlock(b)">
-            <div class="page-node-info" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
-              <span class="p-title">{{ idx + 1 }}. {{ getBlockLabel(b.type) }}</span>
-              <button (click)="deleteBlock(b.id, $event)" class="btn-icon ghost btn-xs" title="Delete">&times;</button>
-            </div>
+          <div class="cms-no-blocks-found">
+            @if (blockSearchQuery()) {
+              No saved components match "{{ blockSearchQuery() }}"
+            } @else {
+              No saved components yet.
+            }
           </div>
-        } @empty {
-          <div class="cms-no-blocks-found">Canvas is empty</div>
         }
       </div>
     }
@@ -206,12 +211,45 @@
             </button>
           </div>
 
+          <!-- Layers Panel Toggle -->
+          <button type="button" id="cmsToggleLayersBtn" class="btn ghost btn-sm layers-btn"
+                  [class.active]="showLayersPanel()" (click)="toggleLayersPanel()"
+                  title="Toggle Draggable Layers Tree in Editor">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2" />
+              <polyline points="2 17 12 22 22 17" />
+              <polyline points="2 12 12 17 22 12" />
+            </svg>
+            <span>Layers</span>
+            <span class="layers-count-badge">{{ getTotalBlockCount() }}</span>
+          </button>
+
           <button id="cmsAiGenerateBtn" class="btn btn-sm btn-ai-sparkle" (click)="showAiModal = true"
                   title="Generate Website or Components with AI">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
             </svg>
             <span>AI Generate</span>
+          </button>
+
+          <button type="button" class="btn ghost btn-sm theme-mode-btn" (click)="toggleActiveModeTheme()"
+                  [title]="(isPreviewMode() ? 'Preview Theme: ' : 'Editor Theme: ') + (currentModeTheme() | titlecase) + ' (Effective: ' + (effectiveCanvasTheme() | titlecase) + ') — Click to cycle Dark / Light / Auto'">
+            @if (currentModeTheme() === 'auto') {
+              <svg class="auto-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              <span>{{ isPreviewMode() ? 'Preview: Auto' : 'Editor: Auto' }}</span>
+            } @else if (currentModeTheme() === 'dark') {
+              <svg class="moon-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+              </svg>
+              <span>{{ isPreviewMode() ? 'Preview: Dark' : 'Editor: Dark' }}</span>
+            } @else {
+              <svg class="sun-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+              </svg>
+              <span>{{ isPreviewMode() ? 'Preview: Light' : 'Editor: Light' }}</span>
+            }
           </button>
 
           <a id="cmsPreviewLink" class="btn ghost btn-sm" [href]="'/p/' + (activePage()?.slug || '')" target="_blank">
@@ -221,14 +259,155 @@
             <span>Live Page</span>
           </a>
 
-          <button id="cmsSaveBtn" class="btn primary btn-sm" (click)="savePageNow()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
-            </svg>
-            <span>Save</span>
+          <button id="cmsSaveBtn" class="btn primary btn-sm" (click)="savePageNow()" [disabled]="isSaving() || isSaved()">
+            @if (isSaved()) {
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>Saved</span>
+            } @else if (isSaving()) {
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite;">
+                <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12" />
+              </svg>
+              <span>Saving...</span>
+            } @else {
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+              </svg>
+              <span>Save</span>
+            }
           </button>
         </div>
       </div>
+
+      <!-- Recursive Tree Node Template for Layers -->
+      <ng-template #treeNodeTemplate let-block="block">
+        <div class="tree-node" [attr.data-tree-block-id]="block.id">
+          <div class="tree-node-row"
+               [class.selected]="selectedBlock()?.id === block.id"
+               [class.drag-target-before]="treeDragTarget()?.id === block.id && treeDragTarget()?.pos === 'before'"
+               [class.drag-target-after]="treeDragTarget()?.id === block.id && treeDragTarget()?.pos === 'after'"
+               [class.drag-target-inside]="treeDragTarget()?.id === block.id && treeDragTarget()?.pos === 'inside'"
+               draggable="true"
+               (click)="selectTreeBlock(block, $event)"
+               (mouseenter)="onTreeNodeMouseEnter(block.id)"
+               (mouseleave)="onTreeNodeMouseLeave(block.id)"
+               (dragstart)="onTreeDragStart($event, block)"
+               (dragover)="onTreeDragOver($event, block)"
+               (dragleave)="onTreeDragLeave($event, block)"
+               (drop)="onTreeDrop($event, block)"
+               (dragend)="onDragEnd()">
+
+            <!-- Expand/Collapse toggle if block has children or is container -->
+            @if (block.props && block.props['children'] && block.props['children'].length > 0) {
+              <button type="button" class="tree-toggle-btn" [class.collapsed]="isTreeCollapsed(block.id)"
+                      (click)="toggleTreeCollapse(block.id, $event)" title="Toggle children">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            } @else {
+              <span style="width: 16px; display: inline-block;"></span>
+            }
+
+            <div class="tree-node-icon" [innerHTML]="getBlockIcon(block.type)"></div>
+            <span class="tree-node-label" [title]="getBlockLabel(block.type)">{{ getBlockLabel(block.type) }}</span>
+            @if (getBlockSnippet(block)) {
+              <span class="tree-node-sub" [title]="getBlockSnippet(block)">{{ getBlockSnippet(block) }}</span>
+            }
+
+            <div class="tree-node-actions" (click)="$event.stopPropagation()">
+              <button type="button" class="tree-node-btn" (click)="duplicateBlock(block, $event)" title="Duplicate">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect width="13" height="13" x="9" y="9" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              </button>
+              <button type="button" class="tree-node-btn delete-btn" (click)="deleteBlock(block.id, $event)" title="Delete">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Recursive Children -->
+          @if (block.props && block.props['children'] && block.props['children'].length > 0) {
+            <div class="tree-children" [class.collapsed]="isTreeCollapsed(block.id)">
+              @for (child of block.props['children']; track child.id) {
+                @if (isNodeMatch(child)) {
+                  <ng-container *ngTemplateOutlet="treeNodeTemplate; context: { block: child }"></ng-container>
+                }
+              }
+            </div>
+          }
+        </div>
+      </ng-template>
+
+      <!-- Floating Draggable Layers Panel (Draggable to anywhere inside Editor) -->
+      @if (showLayersPanel()) {
+        <div id="cmsFloatingLayersPanel" class="cms-floating-layers-panel"
+             [class.minimized]="isLayersPanelMinimized()"
+             cdkDrag cdkDragBoundary=".cms-editor-wrap">
+          <!-- Panel Header & Drag Handle -->
+          <div class="floating-layers-header" cdkDragHandle>
+            <div class="floating-layers-title">
+              <svg class="layers-drag-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+                <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+                <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+              </svg>
+              <span>Layers</span>
+              <span class="layers-count-badge">{{ getTotalBlockCount() }}</span>
+            </div>
+            <div class="floating-layers-controls" (mousedown)="$event.stopPropagation()">
+              <button type="button" class="layers-ctrl-btn" (click)="toggleLayersPanelMinimized()"
+                      [title]="isLayersPanelMinimized() ? 'Expand Layers Panel' : 'Minimize Layers Panel'">
+                @if (isLayersPanelMinimized()) {
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                } @else {
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                }
+              </button>
+              <button type="button" class="layers-ctrl-btn close-btn" (click)="toggleLayersPanel()" title="Close Layers Panel">
+                &times;
+              </button>
+            </div>
+          </div>
+
+          <!-- Panel Body (Hidden when minimized) -->
+          @if (!isLayersPanelMinimized()) {
+            <div class="floating-layers-search">
+              <svg class="search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+              </svg>
+              <input [ngModel]="layersSearchQuery()" (ngModelChange)="layersSearchQuery.set($event)"
+                     (keydown.escape)="layersSearchQuery.set('')"
+                     placeholder="Filter layers..." />
+              @if (layersSearchQuery()) {
+                <button type="button" class="clear-search-btn" (click)="layersSearchQuery.set('')" style="border:none;background:transparent;cursor:pointer;color:var(--text-tertiary);font-size:14px;padding:0 2px;">
+                  &times;
+                </button>
+              }
+            </div>
+
+            <div class="floating-layers-tree-list">
+              @for (b of currentBlocks(); track b.id) {
+                @if (isNodeMatch(b)) {
+                  <ng-container *ngTemplateOutlet="treeNodeTemplate; context: { block: b }"></ng-container>
+                }
+              } @empty {
+                <div class="layers-empty-state">
+                  @if (layersSearchQuery()) {
+                    No layers match "{{ layersSearchQuery() }}"
+                  } @else {
+                    No layers yet. Add blocks to the canvas!
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
 
       <!-- Workspace Area: Canvas + Inspector -->
       <div class="cms-workspace" [class.right-collapsed]="rightSidebarCollapsed()">
@@ -244,49 +423,92 @@
 
         <!-- Center Canvas Frame -->
         <div class="cms-canvas-wrap">
-          <div id="canvasViewportContainer" class="canvas-viewport-container">
+          <div id="canvasViewportContainer" class="canvas-viewport-container"
+               [style.justifyContent]="pageSettings()['align'] === 'left' ? 'flex-start' : 'center'">
             <div class="canvas-viewport"
+                 [class.theme-dark]="effectiveCanvasTheme() === 'dark'"
+                 [class.theme-light]="effectiveCanvasTheme() === 'light'"
+                 [attr.data-theme]="effectiveCanvasTheme()"
                  [class.has-device-frame]="showDeviceFrame() && viewportMode() !== 'desktop'"
                  [class.is-mobile-viewport]="viewportMode() === 'mobile'"
                  [class.is-tablet-viewport]="viewportMode() === 'tablet'"
-                 [class.is-landscape]="isLandscape()">
+                 [class.is-landscape]="isLandscape()"
+                 [style.maxWidth]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] || '820px') : null"
+                 [style.minWidth]="viewportMode() === 'desktop' ? (pageSettings()['minWidth'] || '0px') : null"
+                 [style.width]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] === '100%' ? '100%' : (pageSettings()['maxWidth'] || '820px')) : null">
 
               <!-- Rendered Blocks Container -->
               <div id="cmsCanvasDropList" #cmsCanvas class="cms-canvas"
+                   [class.theme-dark]="effectiveCanvasTheme() === 'dark'"
+                   [class.theme-light]="effectiveCanvasTheme() === 'light'"
+                   [attr.data-theme]="effectiveCanvasTheme()"
                    [class.cms-drag-over]="draggingOver()"
-                   style="padding:24px;overflow-y:auto;height:100%;"
+                   [style.background]="getCanvasBackground()"
+                   [style.color]="getCanvasTextColor()"
+                   [style.fontFamily]="getCanvasFontFamily()"
+                   [style.borderRadius.px]="pageSettings()['borderRadius'] != null ? pageSettings()['borderRadius'] : 16"
+                   [style.padding]="(pageSettings()['paddingY'] != null ? pageSettings()['paddingY'] : 44) + 'px ' + (pageSettings()['paddingX'] != null ? pageSettings()['paddingX'] : 36) + 'px'"
+                   [style.minWidth]="viewportMode() === 'desktop' ? (pageSettings()['minWidth'] || '0px') : null"
+                   [style.maxWidth]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] || '820px') : null"
+                   [style.margin]="pageSettings()['align'] === 'left' && viewportMode() === 'desktop' ? '0 auto 0 0' : '0 auto'"
+                   style="overflow-y:auto;height:100%;transition:background 0.2s ease, padding 0.2s ease, border-radius 0.2s ease, max-width 0.2s ease;"
                    (click)="deselectBlock()"
                    (dragover)="onCanvasDragOver($event)"
                    (dragleave)="onCanvasDragLeave($event)"
-                   (drop)="onCanvasDrop($event)"
-                   cdkDropList
-                   cdkDropListOrientation="vertical"
-                   [cdkDropListData]="currentBlocks()"
-                   (cdkDropListDropped)="onBlockDrop($event)">
-                @for (b of currentBlocks(); track b.id; let idx = $index) {
-                  @if (draggingOver() && dragInsertIndex() === idx) {
-                    <div class="drop-indicator"></div>
-                  }
-                  <div class="block-wrap" [class.selected]="selectedBlock()?.id === b.id"
-                       [cdkDragDisabled]="isPreviewMode()"
-                       cdkDrag
+                   (drop)="onCanvasDrop($event)">
+                <ng-template #canvasBlockTemplate let-b="block" let-parent="parentBlock" let-idx="index" let-isChild="isChild">
+                  <div [class]="isChild ? 'container-child' : 'block-wrap'"
+                       [class.selected]="selectedBlock()?.id === b.id"
+                       [class.is-container]="b.type === 'container'"
+                       [class.has-parallax]="b.props['parallax'] && b.props['bgType'] === 'image'"
+                       [class.has-custom-bg]="b.props['bgType'] && b.props['bgType'] !== 'none'"
+                       [ngStyle]="getBlockWrapStyle(b)"
+                       [attr.data-block-id]="b.id"
+                       [attr.draggable]="!isPreviewMode()"
+                       (dragstart)="onBlockDragStart($event, b)"
+                       (dragend)="onDragEnd()"
                        (click)="selectBlock(b, $event)"
-                       style="position:relative;margin-bottom:12px;">
+                       style="position:relative;"
+                       [style.marginBottom.px]="isChild ? (b.type === 'container' ? 10 : 6) : 12">
 
                     @if (!isPreviewMode()) {
-                      <div class="block-toolbar" style="position:absolute;top:-14px;right:6px;gap:4px;background:#182032;border:1px solid #3b82f6;border-radius:4px;padding:2px 6px;z-index:30;">
-                        <span class="drag-handle" cdkDragHandle title="Drag to reorder">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="5" y1="6" x2="19" y2="6" /><line x1="5" y1="12" x2="19" y2="12" /><line x1="5" y1="18" x2="19" y2="18" />
-                          </svg>
-                        </span>
-                        <span style="font-size:10px;font-weight:700;color:#93c5fd;align-self:center;">{{ getBlockLabel(b.type) }}</span>
-                        <button (click)="moveBlockUp(idx, $event)" class="btn-icon ghost btn-xs" title="Move Up" [disabled]="idx === 0">▲</button>
-                        <button (click)="moveBlockDown(idx, $event)" class="btn-icon ghost btn-xs" title="Move Down" [disabled]="idx === currentBlocks().length - 1">▼</button>
-                        <button (click)="duplicateBlock(b, $event)" class="btn-icon ghost btn-xs" title="Duplicate">⧉</button>
-                        <button (click)="deleteBlock(b.id, $event)" class="btn-icon ghost btn-xs" title="Delete">&times;</button>
-                      </div>
+                      @if (!isChild) {
+                        <div class="block-toolbar" (click)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()" draggable="false" style="position:absolute;top:-14px;right:6px;gap:4px;background:#182032;border:1px solid #3b82f6;border-radius:4px;padding:2px 6px;z-index:30;">
+                          <span class="drag-handle" title="Drag to reorder">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <line x1="5" y1="6" x2="19" y2="6" /><line x1="5" y1="12" x2="19" y2="12" /><line x1="5" y1="18" x2="19" y2="18" />
+                            </svg>
+                          </span>
+                          <span style="font-size:10px;font-weight:700;color:#93c5fd;align-self:center;">{{ getBlockLabel(b.type) }}</span>
+                          <button (click)="moveBlockUp(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Move Up" [disabled]="idx === 0">▲</button>
+                          <button (click)="moveBlockDown(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Move Down" [disabled]="idx === currentBlocks().length - 1">▼</button>
+                          <button (click)="duplicateBlock(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Duplicate">⧉</button>
+                          <button (click)="openSaveReusableModal(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Save as Reusable Component" style="color:#f59e0b;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                          </button>
+                          <button (click)="deleteBlock(b.id, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Delete">&times;</button>
+                        </div>
+                      } @else {
+                        <div class="container-child-bar" (click)="$event.stopPropagation()">
+                          <span class="container-child-handle" title="Drag to reorder">⠿</span>
+                          <span class="container-child-label">{{ getBlockLabel(b.type) }}</span>
+                          <button (click)="moveBlockUp(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Move Up" [disabled]="idx === 0">▲</button>
+                          <button (click)="moveBlockDown(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Move Down" [disabled]="idx === (parent ? (parent.props['children'] || []).length - 1 : 0)">▼</button>
+                          <button (click)="duplicateBlock(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Duplicate">⧉</button>
+                          <button (click)="openSaveReusableModal(b, $event)" (mousedown)="$event.stopPropagation()" class="btn-icon ghost btn-xs" title="Save as Reusable Component" style="color:#f59e0b;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                          </button>
+                          <button class="btn-icon ghost btn-xs" title="Remove child" (click)="deleteBlock(b.id, $event)" (mousedown)="$event.stopPropagation()">&times;</button>
+                        </div>
+                      }
                     }
+
+                    <div [class.container-child-body]="isChild && b.type !== 'container'"
+                         [style.pointerEvents]="isPreviewMode() || b.type === 'container' ? 'auto' : 'none'">
 
                     @switch (b.type) {
                       @case ('header') {
@@ -501,7 +723,7 @@
                             }
                             <tbody>
                               @for (row of b.props['rows'] || []; track row) {
-                                <tr [style.background]="b.props['striped'] ? (($index % 2) ? 'rgba(255,255,255,0.02)' : 'transparent') : 'transparent'">
+                                <tr [style.background]="b.props['striped'] ? (($index % 2) ? (themeService.isDark() ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)') : 'transparent') : 'transparent'">
                                   @for (cell of row; track $index) {
                                     <td [style.borderBottom]="b.props['bordered'] ? '1px solid var(--border-subtle)' : 'none'" style="padding:8px 10px;font-size:12.5px;">{{ cell }}</td>
                                   }
@@ -524,32 +746,20 @@
                              [style.alignItems]="b.props['mode'] !== 'grid' ? (b.props['align'] || 'stretch') : 'stretch'"
                              [style.flexWrap]="b.props['mode'] !== 'grid' ? (b.props['wrap'] || 'wrap') : 'nowrap'"
                              [style.background]="b.props['bg'] === 'surface' ? 'var(--bg-surface-elevated)' : b.props['bg'] === 'dark' ? '#0f172a' : 'transparent'"
-                             class="container-block-preview" [class.drag-target]="isContainerDragOver(b)"
-                             style="margin-bottom:12px;"
+                             class="container-block-preview" [class.drag-target]="isContainerDragOver(b)" [class.drag-over]="isContainerDragOver(b)"
+                             style="margin-bottom:12px;position:relative;min-height:50px;"
                              (dragover)="onContainerDragOver(b, $event)"
                              (dragleave)="onContainerDragLeave(b, $event)"
-                             (drop)="onContainerDrop(b, $event)"
-                             cdkDropList
-                             cdkDropListOrientation="mixed"
-                             [cdkDropListData]="b.props['children'] || []"
-                             (cdkDropListDropped)="onChildDrop(b, $event)">
+                             (drop)="onContainerDrop(b, $event)">
                           @for (child of b.props['children'] || []; track child.id; let ci = $index) {
-                            <div class="container-child" cdkDrag [cdkDragDisabled]="isPreviewMode()">
-                              @if (!isPreviewMode()) {
-                                <div class="container-child-bar">
-                                  <span class="container-child-handle" cdkDragHandle title="Drag to reorder">⠿</span>
-                                  <span class="container-child-label">{{ getBlockLabel(child.type) }}</span>
-                                  <button class="btn-icon ghost btn-xs" title="Remove child" (click)="removeFromArray(b.props['children'], ci)">&times;</button>
-                                </div>
-                              }
-                              <div class="container-child-body">{{ getBlockLabel(child.type) }}</div>
-                            </div>
+                            <ng-container *ngTemplateOutlet="canvasBlockTemplate; context: { block: child, parentBlock: b, index: ci, isChild: true }"></ng-container>
                           } @empty {
-                            @if (isContainerDragOver(b)) {
-                              <div class="container-dropzone empty">Drop blocks here</div>
-                            } @else {
-                              <div style="padding:10px;font-size:11px;color:var(--text-tertiary);text-align:center;width:100%;border:1px dashed var(--border-subtle);border-radius:6px;">Empty container — drag blocks here or add from the inspector</div>
-                            }
+                            <div class="container-dropzone empty" [class.drag-over]="isContainerDragOver(b)" style="pointer-events:none;width:100%;">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/><path d="M3 12h18"/>
+                              </svg>
+                              <span>Container ({{ b.props['mode'] === 'grid' ? ((b.props['columns'] || 2) + ' cols') : (b.props['direction'] || 'row') }}) — Drag & drop blocks here</span>
+                            </div>
                           }
                         </div>
                       }
@@ -629,7 +839,8 @@
                       }
 
                       @case ('tilt-card') {
-                        <div style="position:relative;background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(255,255,255,0.03));border:1px solid var(--border-subtle);border-radius:20px;padding:28px 22px;margin-bottom:12px;">
+                        <div [style.background]="themeService.isDark() ? 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(255,255,255,0.03))' : 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(0,0,0,0.02))'"
+                             style="position:relative;border:1px solid var(--border-subtle);border-radius:20px;padding:28px 22px;margin-bottom:12px;">
                           @if (b.props['badge']) {
                             <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#38bdf8;background:rgba(56,189,248,0.15);padding:3px 9px;border-radius:999px;display:inline-block;margin-bottom:12px;">{{ b.props['badge'] }}</span>
                           }
@@ -789,7 +1000,15 @@
                         </div>
                       }
                     }
+                    </div>
                   </div>
+                </ng-template>
+
+                @for (b of currentBlocks(); track b.id; let idx = $index) {
+                  @if (draggingOver() && dragInsertIndex() === idx) {
+                    <div class="drop-indicator"></div>
+                  }
+                  <ng-container *ngTemplateOutlet="canvasBlockTemplate; context: { block: b, parentBlock: null, index: idx, isChild: false }"></ng-container>
                 } @empty {
                   @if (draggingOver() && dragInsertIndex() === 0) {
                     <div class="drop-indicator"></div>
@@ -815,7 +1034,17 @@
         <!-- Right Sidebar Inspector -->
         <aside id="cmsPropsPanel" class="cms-props">
           <div class="props-header">
-            <label class="section-eyebrow" style="margin:0;">Inspector</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <label class="section-eyebrow" style="margin:0;">
+                {{ selectedBlock() ? 'Block Inspector' : 'Canvas Settings' }}
+              </label>
+              @if (selectedBlock()) {
+                <button type="button" class="btn ghost btn-xs" style="padding:2px 6px;font-size:10px;"
+                        (click)="deselectBlock()" title="Configure Canvas Settings">
+                  Canvas Settings
+                </button>
+              }
+            </div>
             <button type="button" id="cmsCollapseRightSidebarBtn" class="sidebar-collapse-btn"
                     (click)="toggleRightSidebar()" title="Collapse Inspector">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -830,7 +1059,12 @@
               <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--border-subtle);margin-bottom:12px;">
                 <span style="font-size:12px;font-weight:700;color:var(--accent-primary);">{{ getBlockLabel(b.type) }}</span>
                 <div style="display:flex;gap:4px;">
-                  <button (click)="saveAsReusable(b)" class="btn ghost btn-xs" title="Save as reusable">Save Reusable</button>
+                  <button (click)="openSaveReusableModal(b, $event)" class="btn ghost btn-xs" title="Save as reusable component" style="display:flex;align-items:center;gap:4px;color:#f59e0b;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                    <span>Save Reusable</span>
+                  </button>
                   <button (click)="deleteBlock(b.id)" class="btn-icon ghost btn-xs" title="Delete block">&times;</button>
                 </div>
               </div>
@@ -1014,12 +1248,468 @@
                   <pre style="background:var(--bg-surface);padding:10px;border-radius:6px;font-size:11px;overflow:auto;max-height:260px;font-family:var(--font-mono);border:1px solid var(--border-subtle);">{{ b.props | json }}</pre>
                 </div>
               }
+
+              <!-- Universal Background & Parallax Config on Every Component -->
+              <section class="props-section" [class.collapsed]="isBlockSectionCollapsed(b.id, 'bg')" style="margin-top:16px;border-top:1px solid var(--border-subtle);padding-top:14px;">
+                <button type="button" class="props-section-header" (click)="toggleBlockSection(b.id, 'bg')">
+                  <span class="props-section-chevron">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+                  </span>
+                  <span class="props-section-title">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
+                    </svg>
+                    <span>Background & Parallax</span>
+                  </span>
+                  @if (b.props['parallax'] && b.props['bgType'] === 'image') {
+                    <span class="badge" style="margin-left:auto;font-size:9.5px;padding:1px 6px;background:rgba(99,102,241,0.2);color:#818cf8;border-radius:4px;font-weight:700;">Parallax ON</span>
+                  }
+                </button>
+
+                @if (!isBlockSectionCollapsed(b.id, 'bg')) {
+                  <div class="props-section-body" style="padding-top:10px;">
+                    <label class="prop-field-label">
+                      <span class="prop-field-title">Background Type</span>
+                      <select class="prop-input" [ngModel]="b.props['bgType'] || 'none'"
+                              (ngModelChange)="setBlockBgType(b, $event)">
+                        <option value="none">None (Transparent / Theme)</option>
+                        <option value="color">Solid Color</option>
+                        <option value="gradient">Gradient</option>
+                        <option value="image">Image (with Parallax)</option>
+                      </select>
+                    </label>
+
+                    <!-- Solid Color Controls -->
+                    @if (b.props['bgType'] === 'color') {
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Background Color</span>
+                        <div class="prop-color-row">
+                          <input type="color" [value]="b.props['bgColor'] || '#0f172a'"
+                                 (input)="setProp(b, 'bgColor', $event.target.value)" />
+                          <input class="prop-input" [ngModel]="b.props['bgColor'] || '#0f172a'"
+                                 (ngModelChange)="setProp(b, 'bgColor', $event)" placeholder="#0f172a" />
+                        </div>
+                      </label>
+                      <div class="color-presets-row" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;margin-bottom:10px;">
+                        @for (c of bgColorsList; track c) {
+                          <button type="button" class="color-preset-dot" [style.background]="c"
+                                  (click)="setProp(b, 'bgColor', c)" [title]="c"></button>
+                        }
+                      </div>
+                    }
+
+                    <!-- Gradient Controls -->
+                    @if (b.props['bgType'] === 'gradient') {
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Gradient CSS</span>
+                        <input class="prop-input" [ngModel]="b.props['bgGradient'] || 'linear-gradient(135deg, #0f172a, #312e81)'"
+                               (ngModelChange)="setProp(b, 'bgGradient', $event)"
+                               placeholder="linear-gradient(135deg, #0f172a, #312e81)" />
+                      </label>
+                      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;margin-bottom:10px;">
+                        @for (g of gradientPresets; track g.label) {
+                          <button type="button" class="btn secondary btn-xs"
+                                  [style.background]="g.css" style="color:#fff;border:none;font-size:10px;padding:4px 8px;border-radius:5px;cursor:pointer;"
+                                  (click)="setProp(b, 'bgGradient', g.css)" [title]="g.css">
+                            {{ g.label }}
+                          </button>
+                        }
+                      </div>
+                    }
+
+                    <!-- Image & Parallax Controls -->
+                    @if (b.props['bgType'] === 'image') {
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Image URL</span>
+                        <input class="prop-input" [ngModel]="b.props['bgImage'] || ''"
+                               (ngModelChange)="setProp(b, 'bgImage', $event)"
+                               placeholder="https://images.unsplash.com/..." />
+                      </label>
+
+                      <!-- Quick Wallpaper Presets -->
+                      <div style="margin:4px 0 10px;">
+                        <span style="font-size:10px;font-weight:600;color:var(--text-tertiary);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em;">Preset Wallpapers</span>
+                        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                          @for (img of imagePresets; track img.label) {
+                            <button type="button" class="btn ghost btn-xs" style="font-size:10px;padding:2px 7px;"
+                                    (click)="setProp(b, 'bgImage', img.url)" [title]="img.label">
+                              {{ img.label }}
+                            </button>
+                          }
+                        </div>
+                      </div>
+
+                      <!-- Parallax Toggle Card -->
+                      <div class="parallax-toggle-card" [class.active]="!!b.props['parallax']"
+                           style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+                        <label class="prop-toggle" style="margin:0;cursor:pointer;display:flex;align-items:flex-start;gap:8px;">
+                          <input type="checkbox" [checked]="!!b.props['parallax']"
+                                 (change)="setProp(b, 'parallax', $event.target.checked)" style="margin-top:2px;" />
+                          <div>
+                            <span style="font-size:12px;font-weight:700;display:block;color:var(--text-primary);">
+                              Parallax Background Effect
+                            </span>
+                            <span style="font-size:10.5px;color:var(--text-secondary);display:block;line-height:1.3;margin-top:2px;">
+                              Background image stays fixed in viewport while component content scrolls smoothly over it
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+
+                      <div class="prop-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                        <label class="prop-field-label">
+                          <span class="prop-field-title">Image Fit / Size</span>
+                          <select class="prop-input" [ngModel]="b.props['bgSize'] || 'cover'"
+                                  (ngModelChange)="setProp(b, 'bgSize', $event)">
+                            <option value="cover">Cover (Full Fill)</option>
+                            <option value="contain">Contain (Fit Inside)</option>
+                            <option value="auto">Auto (Native Size)</option>
+                          </select>
+                        </label>
+
+                        <label class="prop-field-label">
+                          <span class="prop-field-title">Image Position</span>
+                          <select class="prop-input" [ngModel]="b.props['bgPosition'] || 'center'"
+                                  (ngModelChange)="setProp(b, 'bgPosition', $event)">
+                            <option value="center">Center</option>
+                            <option value="top">Top</option>
+                            <option value="bottom">Bottom</option>
+                            <option value="left">Left</option>
+                            <option value="right">Right</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div class="prop-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                        <label class="prop-field-label">
+                          <span class="prop-field-title">Repeat</span>
+                          <select class="prop-input" [ngModel]="b.props['bgRepeat'] || 'no-repeat'"
+                                  (ngModelChange)="setProp(b, 'bgRepeat', $event)">
+                            <option value="no-repeat">No Repeat</option>
+                            <option value="repeat">Repeat (Tiles)</option>
+                            <option value="repeat-x">Repeat Horizontal</option>
+                            <option value="repeat-y">Repeat Vertical</option>
+                          </select>
+                        </label>
+
+                        <label class="prop-field-label">
+                          <span class="prop-field-title">Dark Tint Overlay</span>
+                          <select class="prop-input" [ngModel]="b.props['bgOverlay'] || 'none'"
+                                  (ngModelChange)="setProp(b, 'bgOverlay', $event)">
+                            <option value="none">None (Pure Image)</option>
+                            <option value="rgba(0,0,0,0.35)">Subtle Dark (35%)</option>
+                            <option value="rgba(0,0,0,0.55)">Medium Dark (55%)</option>
+                            <option value="rgba(0,0,0,0.75)">Deep Dark (75%)</option>
+                            <option value="rgba(15,23,42,0.65)">Navy Tint</option>
+                          </select>
+                        </label>
+                      </div>
+                    }
+                  </div>
+                }
+              </section>
             } @else {
-              <div class="no-selection-state" style="text-align:center;padding:40px 10px;color:var(--text-tertiary);">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px;opacity:0.5;">
-                  <path d="M3 3h7v7H3z" /><path d="M14 3h7v7h-7z" /><path d="M14 14h7v7h-7z" /><path d="M3 14h7v7H3z" />
-                </svg>
-                <p style="font-size:12px;line-height:1.4;">Click any canvas block to configure its layout, styles and properties.</p>
+              <!-- Canvas Settings Panel -->
+              <div class="canvas-settings-panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-primary);">
+                      <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" />
+                    </svg>
+                    <span style="font-size:12.5px;font-weight:700;color:var(--text-primary);">Canvas Settings</span>
+                  </div>
+                  <span class="badge" style="font-size:10px;padding:2px 7px;border-radius:4px;"
+                        [style.background]="activePage()?.status === 'published' ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)'"
+                        [style.color]="activePage()?.status === 'published' ? '#10b981' : 'var(--text-tertiary)'">
+                    {{ activePage()?.status === 'published' ? '● Published' : '● Draft' }}
+                  </span>
+                </div>
+
+                <!-- First Page / Homepage Setting -->
+                <div class="first-page-card" [class.is-first]="!!activePage()?.is_first_page">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <span [style.color]="activePage()?.is_first_page ? '#f59e0b' : 'var(--text-tertiary)'" style="font-size:15px;">
+                        {{ activePage()?.is_first_page ? '★' : '☆' }}
+                      </span>
+                      <strong [style.color]="activePage()?.is_first_page ? '#fbbf24' : 'var(--text-primary)'" style="font-size:12.5px;">
+                        First Page (Homepage)
+                      </strong>
+                    </div>
+                    @if (activePage()?.is_first_page) {
+                      <span class="badge" style="background:#f59e0b;color:#1e1b4b;font-weight:700;font-size:10px;padding:2px 7px;border-radius:999px;">
+                        Root /p
+                      </span>
+                    }
+                  </div>
+                  <p style="font-size:11.5px;color:var(--text-secondary);margin:0 0 10px 0;line-height:1.4;">
+                    @if (activePage()?.is_first_page) {
+                      This page serves as your site homepage. It is served automatically at /p and opens first in the studio.
+                    } @else {
+                      Set this page as the default homepage. Visitors landing on /p will see this page first.
+                    }
+                  </p>
+                  @if (!activePage()?.is_first_page) {
+                    <button type="button" class="btn primary btn-sm"
+                            style="width:100%;justify-content:center;background:#f59e0b;border-color:#f59e0b;color:#1e1b4b;font-weight:700;"
+                            (click)="toggleFirstPage()">
+                      ★ Set as First Page
+                    </button>
+                  }
+                </div>
+
+                <!-- Section: Layout -->
+                <section class="props-section" [class.collapsed]="isSettingsSectionCollapsed('layout')">
+                  <button type="button" class="props-section-header" (click)="toggleSettingsSection('layout')">
+                    <span class="props-section-chevron">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+                    </span>
+                    <span class="props-section-title">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                      <span>Layout</span>
+                    </span>
+                  </button>
+                  @if (!isSettingsSectionCollapsed('layout')) {
+                    <div class="props-section-body">
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Canvas Max Width</span>
+                        <select [ngModel]="pageSettings()['maxWidth'] || '820px'" (ngModelChange)="updateSetting('maxWidth', $event)" class="prop-input">
+                          <option value="640px">Narrow (640px)</option>
+                          <option value="760px">Standard (760px)</option>
+                          <option value="820px">Default (820px)</option>
+                          <option value="960px">Wide (960px)</option>
+                          <option value="100%">Full Width (100% of Viewport)</option>
+                        </select>
+                      </label>
+
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Canvas Min Width</span>
+                        <select [ngModel]="pageSettings()['minWidth'] || '0px'" (ngModelChange)="updateSetting('minWidth', $event)" class="prop-input">
+                          <option value="0px">None (0px)</option>
+                          <option value="320px">Small (320px)</option>
+                          <option value="480px">Medium (480px)</option>
+                          <option value="640px">Large (640px)</option>
+                          <option value="768px">Tablet (768px)</option>
+                          <option value="100%">Full Width (100%)</option>
+                        </select>
+                      </label>
+
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Canvas Alignment</span>
+                        <select [ngModel]="pageSettings()['align'] || 'center'" (ngModelChange)="updateSetting('align', $event)" class="prop-input">
+                          <option value="center">Center Aligned in Editor</option>
+                          <option value="left">Left Aligned in Editor</option>
+                        </select>
+                      </label>
+                    </div>
+                  }
+                </section>
+
+                <!-- Section: Appearance -->
+                <section class="props-section" [class.collapsed]="isSettingsSectionCollapsed('appearance')">
+                  <button type="button" class="props-section-header" (click)="toggleSettingsSection('appearance')">
+                    <span class="props-section-chevron">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+                    </span>
+                    <span class="props-section-title">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2s6 6 6 11a6 6 0 0 1-12 0c0-5 6-11 6-11z"/></svg>
+                      <span>Appearance</span>
+                    </span>
+                  </button>
+                  @if (!isSettingsSectionCollapsed('appearance')) {
+                    <div class="props-section-body">
+                      <!-- Mode Theme Preferences (Editor & Preview) -->
+                      <div class="prop-dual-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                        <label class="prop-field-label" style="margin-bottom: 0;">
+                          <span class="prop-field-title" style="display: flex; align-items: center; gap: 4px;">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                            Editor Theme
+                          </span>
+                          <select [ngModel]="editorTheme()" (ngModelChange)="setEditorTheme($event)" class="prop-input">
+                            <option value="dark">Dark (Default)</option>
+                            <option value="light">Light</option>
+                            <option value="auto">Auto Detect</option>
+                          </select>
+                        </label>
+
+                        <label class="prop-field-label" style="margin-bottom: 0;">
+                          <span class="prop-field-title" style="display: flex; align-items: center; gap: 4px;">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            Preview Theme
+                          </span>
+                          <select [ngModel]="previewTheme()" (ngModelChange)="setPreviewTheme($event)" class="prop-input">
+                            <option value="light">Light (Default)</option>
+                            <option value="dark">Dark</option>
+                            <option value="auto">Auto Detect</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div class="theme-status-pill" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 6px; font-size: 11px; margin-bottom: 12px; background: var(--bg-subtle); border: 1px solid var(--border-subtle);">
+                        <span style="color: var(--text-secondary); display: flex; align-items: center; gap: 5px;">
+                          <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%;" [style.background]="effectiveCanvasTheme() === 'dark' ? '#38bdf8' : '#eab308'"></span>
+                          Active Canvas: <strong style="color: var(--text-primary);">{{ effectiveCanvasTheme() | titlecase }}</strong> ({{ isPreviewMode() ? 'Preview Mode' : 'Editor Mode' }})
+                        </span>
+                        <button type="button" class="btn ghost btn-xs" (click)="toggleActiveModeTheme()" style="padding: 2px 6px; font-size: 10px; height: auto;">
+                          Switch Active
+                        </button>
+                      </div>
+
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Canvas Background Theme</span>
+                        <select [ngModel]="pageSettings()['bg'] || 'default'" (ngModelChange)="updateSetting('bg', $event)" class="prop-input">
+                          <option value="default">Adaptive Theme (Dark in Edit, Light in Preview)</option>
+                          <option value="pure-black">OLED Pure Black (#000000)</option>
+                          <option value="deep-navy">Deep Navy (#0a1324)</option>
+                          <option value="dark-card">Slate Card (#111827)</option>
+                          <option value="light">Clean Light Card (#ffffff)</option>
+                          <option value="custom">Custom Background Color...</option>
+                        </select>
+                      </label>
+
+                      @if (pageSettings()['bg'] === 'custom') {
+                        <label class="prop-field-label">
+                          <span class="prop-field-title">Custom Background Color</span>
+                          <div class="prop-color-row">
+                            <input type="color" [value]="pageSettings()['customBg'] || '#0f172a'"
+                                   (input)="updateSetting('customBg', $any($event.target).value)" />
+                            <input [ngModel]="pageSettings()['customBg'] || '#0f172a'"
+                                   (ngModelChange)="updateSetting('customBg', $event)"
+                                   class="prop-input" placeholder="#0f172a" />
+                          </div>
+                        </label>
+                      }
+
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Typography Font Family</span>
+                        <select [ngModel]="pageSettings()['fontFamily'] || 'system'" (ngModelChange)="updateSetting('fontFamily', $event)" class="prop-input">
+                          <option value="system">System Default (San Francisco / Segoe UI)</option>
+                          <option value="inter">Inter (Modern Tech / Clean)</option>
+                          <option value="outfit">Outfit (Modern Geometric / Display)</option>
+                          <option value="roboto">Roboto (Classic Sans)</option>
+                          <option value="mono">JetBrains Mono (Code / Editorial)</option>
+                        </select>
+                      </label>
+
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Corner Border Radius (px)</span>
+                        <input type="number" min="0" max="64" step="2"
+                               [ngModel]="pageSettings()['borderRadius'] != null ? pageSettings()['borderRadius'] : 16"
+                               (ngModelChange)="updateNumberSetting('borderRadius', $event)"
+                               class="prop-input" />
+                      </label>
+                    </div>
+                  }
+                </section>
+
+                <!-- Section: Spacing -->
+                <section class="props-section" [class.collapsed]="isSettingsSectionCollapsed('spacing')">
+                  <button type="button" class="props-section-header" (click)="toggleSettingsSection('spacing')">
+                    <span class="props-section-chevron">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+                    </span>
+                    <span class="props-section-title">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+                      <span>Spacing</span>
+                    </span>
+                  </button>
+                  @if (!isSettingsSectionCollapsed('spacing')) {
+                    <div class="props-section-body">
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Padding Top & Bottom (px)</span>
+                        <input type="number" min="0" max="300" step="4"
+                               [ngModel]="pageSettings()['paddingY'] != null ? pageSettings()['paddingY'] : 44"
+                               (ngModelChange)="updateNumberSetting('paddingY', $event)"
+                               class="prop-input" />
+                      </label>
+
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Padding Left & Right (px)</span>
+                        <input type="number" min="0" max="200" step="4"
+                               [ngModel]="pageSettings()['paddingX'] != null ? pageSettings()['paddingX'] : 36"
+                               (ngModelChange)="updateNumberSetting('paddingX', $event)"
+                               class="prop-input" />
+                      </label>
+                    </div>
+                  }
+                </section>
+
+                <!-- Section: Page Summary -->
+                <section class="props-section" [class.collapsed]="isSettingsSectionCollapsed('summary')">
+                  <button type="button" class="props-section-header" (click)="toggleSettingsSection('summary')">
+                    <span class="props-section-chevron">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+                    </span>
+                    <span class="props-section-title">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+                      <span>Page Summary</span>
+                    </span>
+                  </button>
+                  @if (!isSettingsSectionCollapsed('summary')) {
+                    <div class="props-section-body">
+                      <div class="canvas-stats-grid">
+                        <div class="canvas-stat-box">
+                          <span class="canvas-stat-label">Total Blocks</span>
+                          <span class="canvas-stat-value">{{ getTotalBlockCount() }}</span>
+                        </div>
+                        <div class="canvas-stat-box">
+                          <span class="canvas-stat-label">Word Count</span>
+                          <span class="canvas-stat-value">{{ getPageWordCount() }}</span>
+                        </div>
+                        <div class="canvas-stat-box">
+                          <span class="canvas-stat-label">Read Time</span>
+                          <span class="canvas-stat-value">~{{ getReadTimeMinutes() }} min</span>
+                        </div>
+                        <div class="canvas-stat-box">
+                          <span class="canvas-stat-label">Live Status</span>
+                          <span class="canvas-stat-value" [style.color]="activePage()?.status === 'published' ? '#10b981' : 'var(--text-secondary)'">
+                            {{ activePage()?.status === 'published' ? 'Published' : 'Draft' }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </section>
+
+                <!-- Section: Page Meta & Actions -->
+                <section class="props-section" [class.collapsed]="isSettingsSectionCollapsed('meta')">
+                  <button type="button" class="props-section-header" (click)="toggleSettingsSection('meta')">
+                    <span class="props-section-chevron">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+                    </span>
+                    <span class="props-section-title">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                      <span>Page Details</span>
+                    </span>
+                  </button>
+                  @if (!isSettingsSectionCollapsed('meta')) {
+                    <div class="props-section-body">
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Page Title</span>
+                        <input class="prop-input" [value]="activePage()?.title || ''" (change)="updateActiveTitle($event)" placeholder="Title" />
+                      </label>
+
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">URL Slug</span>
+                        <input class="prop-input" [value]="activePage()?.slug || ''" (change)="updateActiveSlug($event)" placeholder="slug" />
+                      </label>
+
+                      <label class="prop-field-label">
+                        <span class="prop-field-title">Publish Status</span>
+                        <select class="prop-input" [value]="activePage()?.status || 'draft'" (change)="updateActiveStatus($event)">
+                          <option value="draft">Draft (Private)</option>
+                          <option value="published">Published (Live)</option>
+                        </select>
+                      </label>
+
+                      <button type="button" class="btn ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px;"
+                              (click)="openLivePage()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                        <span>View Live URL (/p/{{ activePage()?.slug || '' }})</span>
+                      </button>
+                    </div>
+                  }
+                </section>
               </div>
             }
           </div>
@@ -1031,5 +1721,71 @@
   <!-- AI Modal -->
   @if (showAiModal) {
     <app-ai-modal (close)="showAiModal = false" (pageGenerated)="onAiPageGenerated($event)"></app-ai-modal>
+  }
+
+  <!-- Save as Reusable Modal -->
+  @if (showSaveReusableModal()) {
+    <div class="cms-modal-backdrop" (click)="closeSaveReusableModal()" (keydown.escape)="closeSaveReusableModal()">
+      <div class="cms-modal-card" (click)="$event.stopPropagation()" role="dialog" aria-labelledby="saveReusableTitle">
+        <div class="cms-modal-header">
+          <div class="cms-modal-title-wrap">
+            <div class="cms-modal-icon-badge">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </div>
+            <div>
+              <h3 id="saveReusableTitle" class="cms-modal-title">Save as Reusable Component</h3>
+              <p class="cms-modal-subtitle">Save this {{ targetReusableBlock()?.type }} component to your reusable library to use across pages.</p>
+            </div>
+          </div>
+          <button type="button" class="cms-modal-close" (click)="closeSaveReusableModal()" title="Close">&times;</button>
+        </div>
+
+        <div class="cms-modal-body">
+          <label class="prop-field-label">
+            <span class="prop-field-title">Component Name</span>
+            <input type="text" [ngModel]="reusableNameInput()" (ngModelChange)="reusableNameInput.set($event)"
+                   (keydown.enter)="confirmSaveReusable()"
+                   class="prop-input" placeholder="e.g. Hero Section with CTA" autofocus />
+          </label>
+
+          <label class="prop-field-label">
+            <span class="prop-field-title">Category / Tag</span>
+            <select [ngModel]="reusableCategoryInput()" (ngModelChange)="reusableCategoryInput.set($event)" class="prop-input">
+              <option [value]="targetReusableBlock()?.type">{{ getBlockLabel(targetReusableBlock()?.type || '') }}</option>
+              <option value="container">Container / Section</option>
+              <option value="hero">Hero Section</option>
+              <option value="card">Card / Grid</option>
+              <option value="navigation">Navigation</option>
+              <option value="callout">Callout / Banner</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+
+          @if (targetReusableBlock(); as blk) {
+            <div class="reusable-preview-box">
+              <div class="preview-box-header">
+                <span class="preview-badge">{{ getBlockLabel(blk.type) }}</span>
+                @if (blk.props['children'] && blk.props['children'].length > 0) {
+                  <span class="children-count">{{ blk.props['children'].length }} nested blocks</span>
+                }
+              </div>
+              <div class="preview-snippet">{{ getBlockSnippet(blk) }}</div>
+            </div>
+          }
+        </div>
+
+        <div class="cms-modal-footer">
+          <button type="button" class="btn ghost btn-sm" (click)="closeSaveReusableModal()">Cancel</button>
+          <button type="button" class="btn primary btn-sm" (click)="confirmSaveReusable()" [disabled]="!reusableNameInput().trim()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>Save Component</span>
+          </button>
+        </div>
+      </div>
+    </div>
   }
 </main>

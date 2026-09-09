@@ -1,0 +1,168 @@
+<aside class="app-sidebar" [class.collapsed]="isCollapsed()">
+  <!-- Brand Header -->
+  <div class="sidebar-header">
+    <a routerLink="/" class="sidebar-brand" [title]="isCollapsed() ? 'Aladenflow Studio' : ''">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="5.5" height="18" rx="2" fill="currentColor" fill-opacity="0.2" />
+          <rect x="10.5" y="3" width="5.5" height="12" rx="2" fill="currentColor" fill-opacity="0.4" />
+          <rect x="18" y="3" width="5.5" height="15" rx="2" fill="currentColor" fill-opacity="0.6" />
+        </svg>
+      </div>
+      @if (!isCollapsed()) {
+        <div class="brand-text">
+          <span class="brand-title">Aladenflow</span>
+          <span class="version-badge">STUDIO</span>
+        </div>
+      }
+    </a>
+
+    @if (!isCollapsed()) {
+      <button type="button" class="btn-sidebar-collapse" (click)="toggleCollapsed()" title="Collapse sidebar to icon dock">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="11 17 6 12 11 7" />
+          <polyline points="18 17 13 12 18 7" />
+        </svg>
+      </button>
+    }
+  </div>
+
+  <!-- Primary Navigation Items (Boards and Site Builder) -->
+  <nav class="sidebar-nav">
+    @if (!isCollapsed()) {
+      <div class="nav-section-title">WORKSPACE</div>
+    }
+
+    <!-- Dashboard Nav Tab -->
+    <a routerLink="/dashboard" class="sidebar-nav-item" routerLinkActive="active"
+       [title]="isCollapsed() ? 'Dashboard' : ''">
+      <div class="nav-item-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </div>
+      @if (!isCollapsed()) {
+        <span class="nav-item-label">Dashboard</span>
+      }
+    </a>
+
+    <!-- Boards Nav Tab -->
+    <a routerLink="/kanban" class="sidebar-nav-item" routerLinkActive="active"
+       [title]="isCollapsed() ? 'Boards (' + boardsCount() + ')' : ''">
+      <div class="nav-item-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M9 3v18" />
+          <path d="M15 3v18" />
+        </svg>
+      </div>
+      @if (!isCollapsed()) {
+        <span class="nav-item-label">Boards</span>
+        @if (boardsCount() > 0) {
+          <span class="nav-item-badge">{{ boardsCount() }}</span>
+        }
+      }
+    </a>
+
+    <!-- Site Builder Nav Tab -->
+    <a routerLink="/cms" class="sidebar-nav-item" routerLinkActive="active"
+       [title]="isCollapsed() ? 'Site Builder (' + pagesCount() + ')' : ''">
+      <div class="nav-item-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+          <path d="M12 4v16" />
+          <path d="M4 12h8" />
+        </svg>
+      </div>
+      @if (!isCollapsed()) {
+        <span class="nav-item-label">Site Builder</span>
+        @if (pagesCount() > 0) {
+          <span class="nav-item-badge">{{ pagesCount() }}</span>
+        }
+      }
+    </a>
+
+    <!-- Context Info Box (Expanded Mode) -->
+    @if (!isCollapsed()) {
+      <div class="sidebar-context-box">
+        @if (currentRoute() === '/kanban') {
+          <div class="context-pill">
+            <span class="context-kicker">ACTIVE BOARD</span>
+            <div class="context-val" [title]="activeBoardName()">
+              <span class="dot-indicator"></span>
+              <span class="val-text">{{ activeBoardName() }}</span>
+            </div>
+          </div>
+        } @else if (currentRoute() === '/cms') {
+          <div class="context-pill">
+            <span class="context-kicker">ACTIVE PAGE</span>
+            <div class="context-val" [title]="activePageTitle()">
+              <span class="dot-indicator" [class.published]="activePageStatus() === 'published'"
+                    [class.draft]="activePageStatus() !== 'published'"></span>
+              <span class="val-text">{{ activePageTitle() }}</span>
+            </div>
+          </div>
+        } @else if (currentRoute() === '/dashboard') {
+          <div class="context-pill">
+            <span class="context-kicker">WORKSPACE</span>
+            <div class="context-val">
+              <span class="dot-indicator"></span>
+              <span class="val-text">Overview</span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </nav>
+
+  <!-- Sidebar Footer -->
+  <div class="sidebar-footer">
+    <!-- Theme Switcher -->
+    <button type="button" class="sidebar-footer-btn" (click)="themeService.toggleThemeMode()"
+            [title]="'Theme: ' + (themeService.themeMode() === 'auto' ? 'Auto (' + (themeService.systemIsDark() ? 'Dark' : 'Light') + ')' : (themeService.themeMode() | titlecase)) + ' — Click to switch'">
+      <div class="footer-btn-icon">
+        @if (themeService.themeMode() === 'auto') {
+          <svg class="auto-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        } @else if (themeService.themeMode() === 'dark') {
+          <svg class="moon-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+          </svg>
+        } @else {
+          <svg class="sun-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" />
+            <path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" />
+            <path d="M2 12h2" /><path d="M20 12h2" />
+            <path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+          </svg>
+        }
+      </div>
+      @if (!isCollapsed()) {
+        <span class="footer-btn-label">{{ themeService.themeMode() === 'auto' ? 'Auto Theme' : (themeService.themeMode() === 'dark' ? 'Dark Mode' : 'Light Mode') }}</span>
+      }
+    </button>
+
+    <!-- Expand button when collapsed -->
+    @if (isCollapsed()) {
+      <button type="button" class="sidebar-footer-btn expand-btn" (click)="toggleCollapsed()" title="Expand sidebar">
+        <div class="footer-btn-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="13 17 18 12 13 7" />
+            <polyline points="6 17 11 12 6 7" />
+          </svg>
+        </div>
+      </button>
+    }
+  </div>
+</aside>

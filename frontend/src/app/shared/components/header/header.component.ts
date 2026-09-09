@@ -1,7 +1,7 @@
 import { Component, inject, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
+import { Router, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs/operators';
 import { ThemeService, AmbientTheme } from '../../../core/services/theme.service';
@@ -12,7 +12,7 @@ import { CmsPage } from '../../../core/models/cms.model';
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive],
+  imports: [CommonModule, FormsModule],
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.css']
 })
@@ -35,7 +35,8 @@ export class HeaderComponent {
   currentRoute = computed(() => {
     const url = this.routeEvent() || '';
     if (url.startsWith('/cms')) return '/cms';
-    return '/kanban';
+    if (url.startsWith('/kanban')) return '/kanban';
+    return '/dashboard';
   });
 
   onBoardSelect(event: Event) {

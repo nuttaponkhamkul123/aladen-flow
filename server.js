@@ -41,6 +41,103 @@ function logActivity(cardId, boardId, message) {
   );
 }
 
+// Consolidated Workspace Overview & Statistics
+app.get('/api/overview', (req, res) => {
+  try {
+    const totalBoards = db.prepare('SELECT COUNT(*) as count FROM boards').get()?.count || 0;
+    const boards = db.prepare('SELECT id, name FROM boards ORDER BY created_at ASC').all() || [];
+
+    const totalCards = db.prepare('SELECT COUNT(*) as count FROM cards WHERE archived = 0').get()?.count || 0;
+
+    const cards = db.prepare(`
+      SELECT c.id, c.title, c.priority, c.due_date, c.created_at, col.name as column_name, col.board_id, b.name as board_name
+      FROM cards c
+      JOIN columns col ON col.id = c.column_id
+      JOIN boards b ON b.id = col.board_id
+      WHERE c.archived = 0
+      ORDER BY c.created_at DESC
+    `).all() || [];
+
+    let todoCards = 0;
+    let doingCards = 0;
+    let doneCards = 0;
+    let highPriorityCards = 0;
+
+    cards.forEach(c => {
+      const col = (c.column_name || '').toLowerCase();
+      if (col.includes('done') || col.includes('complete') || col.includes('finished')) {
+        doneCards++;
+      } else if (col.includes('doing') || col.includes('progress') || col.includes('review')) {
+        doingCards++;
+      } else {
+        todoCards++;
+      }
+      if (c.priority === 'high' || c.priority === 'urgent') {
+        highPriorityCards++;
+      }
+    });
+
+    const totalPages = db.prepare('SELECT COUNT(*) as count FROM pages').get()?.count || 0;
+    const publishedPages = db.prepare("SELECT COUNT(*) as count FROM pages WHERE status = 'published'").get()?.count || 0;
+    const draftPages = totalPages - publishedPages;
+    const totalReusableBlocks = db.prepare('SELECT COUNT(*) as count FROM reusable_blocks').get()?.count || 0;
+
+    const recentPages = db.prepare(`
+      SELECT id, title, slug, status, is_first_page, updated_at, created_at
+      FROM pages
+      ORDER BY updated_at DESC
+      LIMIT 6
+    `).all() || [];
+
+    const recentActivities = db.prepare(`
+      SELECT a.id, a.card_id, a.board_id, a.message, a.created_at, b.name as board_name
+      FROM activities a
+      LEFT JOIN boards b ON b.id = a.board_id
+      ORDER BY a.created_at DESC
+      LIMIT 8
+    `).all() || [];
+
+    const boardProgress = boards.map(b => {
+      const bCards = cards.filter(c => c.board_id === b.id);
+      const bDone = bCards.filter(c => {
+        const col = (c.column_name || '').toLowerCase();
+        return col.includes('done') || col.includes('complete');
+      }).length;
+      return {
+        id: b.id,
+        name: b.name,
+        total: bCards.length,
+        done: bDone,
+        percentage: bCards.length > 0 ? Math.round((bDone / bCards.length) * 100) : 0
+      };
+    });
+
+    res.json({
+      kanban: {
+        totalBoards,
+        totalCards,
+        todoCards,
+        doingCards,
+        doneCards,
+        highPriorityCards,
+        recentCards: cards.slice(0, 6),
+        boardProgress
+      },
+      cms: {
+        totalPages,
+        publishedPages,
+        draftPages,
+        totalReusableBlocks,
+        recentPages
+      },
+      recentActivities
+    });
+  } catch (err) {
+    console.error('Failed to get overview:', err);
+    res.status(500).json({ error: 'Internal server error fetching overview data' });
+  }
+});
+
 app.get('/api/boards', (req, res) => {
   const boards = db.prepare('SELECT * FROM boards ORDER BY created_at ASC').all();
   res.json(boards);
@@ -530,21 +627,58 @@ app.delete('/api/pages/:id', (req, res) => {
 
 // Reusable Blocks API
 app.get('/api/reusable-blocks', (req, res) => {
-  const rows = db.prepare('SELECT * FROM reusable_blocks ORDER BY created_at DESC').all();
-  rows.forEach(r => {
-    try { r.block_data = JSON.parse(r.block_data); }
-    catch { r.block_data = null; }
-  });
-  res.json(rows);
+  try {
+    const rows = db.prepare('SELECT * FROM reusable_blocks ORDER BY created_at DESC').all();
+    const result = [];
+    rows.forEach(r => {
+      try {
+        r.block_data = typeof r.block_data === 'string' ? JSON.parse(r.block_data) : r.block_data;
+        if (r.block_data && typeof r.block_data === 'object') {
+          result.push(r);
+        }
+      } catch {
+        // Skip unparseable rows
+      }
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('Failed to get reusable blocks:', err);
+    res.status(500).json({ error: 'Failed to retrieve reusable blocks' });
+  }
 });
 
 app.post('/api/reusable-blocks', (req, res) => {
-  const { name, category = 'custom', block_data } = req.body;
-  if (!name || !name.trim()) return res.status(400).json({ error: 'name required' });
-  if (!block_data || typeof block_data !== 'object') return res.status(400).json({ error: 'block_data required' });
-  const jsonStr = JSON.stringify(block_data);
-  const info = db.prepare('INSERT INTO reusable_blocks (name, category, block_data) VALUES (?, ?, ?)').run(name.trim(), category, jsonStr);
-  res.json({ id: info.lastInsertRowid, name: name.trim(), category, block_data });
+  try {
+    const { name, category = 'custom', block_data } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'name required' });
+    if (!block_data) return res.status(400).json({ error: 'block_data required' });
+
+    let parsedBlock = block_data;
+    if (typeof parsedBlock === 'string') {
+      try {
+        parsedBlock = JSON.parse(parsedBlock);
+      } catch (e) {
+        return res.status(400).json({ error: 'invalid block_data JSON' });
+      }
+    }
+    if (!parsedBlock || typeof parsedBlock !== 'object') {
+      return res.status(400).json({ error: 'block_data must be an object' });
+    }
+
+    const cat = (category && String(category).trim()) || parsedBlock.type || 'custom';
+    const jsonStr = JSON.stringify(parsedBlock);
+    const info = db.prepare('INSERT INTO reusable_blocks (name, category, block_data) VALUES (?, ?, ?)').run(name.trim(), cat, jsonStr);
+    const createdRow = db.prepare('SELECT * FROM reusable_blocks WHERE id = ?').get(info.lastInsertRowid);
+    if (createdRow) {
+      createdRow.block_data = parsedBlock;
+      res.json(createdRow);
+    } else {
+      res.json({ id: info.lastInsertRowid, name: name.trim(), category: cat, block_data: parsedBlock });
+    }
+  } catch (err) {
+    console.error('Failed to save reusable block:', err);
+    res.status(500).json({ error: 'Failed to save reusable block' });
+  }
 });
 
 app.delete('/api/reusable-blocks/:id', (req, res) => {
@@ -1747,7 +1881,12 @@ function makeBlockBgCss(p) {
   } else if (type === 'gradient' && p.bgGradient) {
     css += `background:${p.bgGradient};`;
   } else if (type === 'image' && p.bgImage) {
-    css += `background-image:url('${p.bgImage}');background-size:${p.bgSize || 'cover'};background-position:${p.bgPosition || 'center'};background-repeat:${p.bgRepeat || 'no-repeat'};`;
+    if (p.bgOverlay && p.bgOverlay !== 'none') {
+      css += `background-image:linear-gradient(${p.bgOverlay}, ${p.bgOverlay}), url('${p.bgImage}');`;
+    } else {
+      css += `background-image:url('${p.bgImage}');`;
+    }
+    css += `background-size:${p.bgSize || 'cover'};background-position:${p.bgPosition || 'center'};background-repeat:${p.bgRepeat || 'no-repeat'};`;
   }
   if (p.parallax && type === 'image') css += 'background-attachment:fixed;';
   return css;
@@ -2533,6 +2672,7 @@ function renderPublishedPage(page, blocks, tags) {
   const marginX = (settings.marginX != null ? Number(settings.marginX) : 0) + 'px';
   const borderRadius = (settings.borderRadius != null ? Number(settings.borderRadius) : 0) + 'px';
   const bgType = settings.bg || 'default';
+  const previewTheme = settings.previewTheme || 'light';
 
   let pageBg = '#f8fafc';
   let cardBg = '#ffffff';
@@ -2549,6 +2689,8 @@ function renderPublishedPage(page, blocks, tags) {
     pageBg = settings.customBg; cardBg = settings.customBg; textColor = '#ffffff'; borderColor = 'rgba(255,255,255,0.15)';
   } else if (bgType === 'light') {
     pageBg = '#f1f5f9'; cardBg = '#ffffff'; textColor = '#0f172a'; borderColor = '#e2e8f0';
+  } else if (bgType === 'default' && previewTheme === 'dark') {
+    pageBg = '#0b0f17'; cardBg = '#111827'; textColor = '#f8fafc'; borderColor = '#1f2937';
   }
 
   const fontMap = {
@@ -2599,16 +2741,40 @@ function renderPublishedPage(page, blocks, tags) {
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css" />
   <style>
+    :root {
+      --pub-page-bg: ${pageBg};
+      --pub-card-bg: ${cardBg};
+      --pub-text-color: ${textColor};
+      --pub-border-color: ${borderColor};
+    }
+    ${bgType === 'default' && previewTheme === 'auto' ? `
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --pub-page-bg: #0b0f17;
+        --pub-card-bg: #111827;
+        --pub-text-color: #f8fafc;
+        --pub-border-color: #1f2937;
+      }
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --pub-page-bg: #f8fafc;
+        --pub-card-bg: #ffffff;
+        --pub-text-color: #0f172a;
+        --pub-border-color: #e2e8f0;
+      }
+    }
+    ` : ''}
     html {
       height: auto !important;
       min-height: 100vh !important;
       overflow-x: hidden !important;
       overflow-y: auto !important;
     }
-    body { font-family: ${fontFamily}; background: ${pageBg}; color: ${textColor}; margin: 0; min-height: 100vh; overflow: visible; display: block; }
-    .wrap { max-width: ${maxWidth}; min-width: ${minWidth}; margin: ${alignMargin}; padding: ${paddingY} ${paddingX}; border-radius: ${borderRadius}; background: ${cardBg}; min-height: 100vh; box-sizing: border-box; box-shadow: 0 0 0 1px ${borderColor}; display: flex; flex-direction: column; }
+    body { font-family: ${fontFamily}; background: var(--pub-page-bg); color: var(--pub-text-color); margin: 0; min-height: 100vh; overflow: visible; display: block; }
+    .wrap { max-width: ${maxWidth}; min-width: ${minWidth}; margin: ${alignMargin}; padding: ${paddingY} ${paddingX}; border-radius: ${borderRadius}; background: var(--pub-card-bg); min-height: 100vh; box-sizing: border-box; box-shadow: 0 0 0 1px var(--pub-border-color); display: flex; flex-direction: column; }
     .cms-page-main { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; }
-    .tags { margin-top: 32px; padding-top: 16px; border-top: 1px solid ${borderColor}; font-size: 12px; color: #64748b; }
+    .tags { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--pub-border-color); font-size: 12px; color: #64748b; }
     .tags span { display: inline-block; background: rgba(100,116,139,0.15); padding: 2px 8px; border-radius: 999px; margin-right: 4px; }
     .cms-table th { background: rgba(100,116,139,0.12); color: inherit; font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 2px solid ${borderColor}; }
     .cms-table td { padding: 9px 14px; border-bottom: 1px solid ${borderColor}; color: inherit; opacity: 0.9; }
