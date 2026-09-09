@@ -94,9 +94,12 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
     url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop',
     alt: 'Abstract gradient artwork',
     caption: '',
-    aspectRatio: '16/9',
-    fit: 'cover',
-    borderRadius: 8
+    width: '100%',
+    align: 'center',
+    objectFit: 'cover',
+    borderRadius: 8,
+    shadow: false,
+    border: false
   },
   divider: {
     style: 'solid',
@@ -139,8 +142,7 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
     type: 'info',
     icon: '💡',
     title: 'Did you know?',
-    text: 'You can combine Kanban project tracking with full visual site publishing on one canvas.',
-    color: ''
+    text: 'You can combine Kanban project tracking with full visual site publishing on one canvas.'
   },
   accordion: {
     items: [
@@ -151,13 +153,13 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
   },
   tabs: {
     tabs: [
-      { title: 'Overview', content: 'Explore our core capabilities and workflows designed for modern creators and agile teams.' },
-      { title: 'Features', content: 'Real-time drag-and-drop, responsive layout previews, AI-assisted generation, and Kanban boards.' },
-      { title: 'Roadmap', content: 'Upcoming integrations include cloud syncing, webhook notifications, and multi-user collaboration.' }
+      { label: 'Overview', content: 'Explore our core capabilities and workflows designed for modern creators and agile teams.' },
+      { label: 'Features', content: 'Real-time drag-and-drop, responsive layout previews, AI-assisted generation, and Kanban boards.' },
+      { label: 'Roadmap', content: 'Upcoming integrations include cloud syncing, webhook notifications, and multi-user collaboration.' }
     ]
   },
   pricing: {
-    plan: 'Pro Plan',
+    planName: 'Pro Plan',
     price: '$29',
     period: '/month',
     description: 'Everything you need to launch and scale your online presence.',
@@ -167,9 +169,9 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
       'Local Ollama & Cloud AI generation',
       'Custom styling & responsive previews'
     ],
-    ctaLabel: 'Get Started Today',
-    ctaUrl: '#',
-    isPopular: true,
+    buttonLabel: 'Get Started Today',
+    buttonUrl: '#',
+    highlight: true,
     badge: 'Most Popular'
   },
   stat: {
@@ -177,7 +179,7 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
     value: '128.4K',
     subtext: 'vs previous month',
     trend: '+24.8%',
-    trendDirection: 'up'
+    trendType: 'up'
   },
   testimonial: {
     quote: 'This platform completely transformed our development process. The visual builder combined with Kanban is unmatched!',
