@@ -24,11 +24,12 @@
 
     <div class="modal-body">
       <div class="modal-main">
-        @if (card.due_date) {
-          <div class="card-badge-row">
+        <div class="card-badge-row">
+          <span class="badge" [class]="'priority-' + card.priority">{{ card.priority | titlecase }} Priority</span>
+          @if (card.due_date) {
             <span class="meta-date">Due {{ card.due_date }}</span>
-          </div>
-        }
+          }
+        </div>
 
         <section class="modal-section">
           <div class="section-title">
