@@ -47,6 +47,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   private carouselIdx = new Map<string, number>();
   private tabIdx = new Map<string, number>();
   private pendingChildType = new Map<string, string>();
+  private dragOverContainers = signal<Set<string>>(new Set());
 
   constructor() {
     effect(() => {
@@ -62,6 +63,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
         this.carouselIdx.clear();
         this.tabIdx.clear();
         this.pendingChildType.clear();
+        this.dragOverContainers.set(new Set());
       }
     });
     this.tickTimer = setInterval(() => this.nowTick.set(Date.now()), 1000);
@@ -638,7 +640,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
       if (!Array.isArray(b.props[containerKey])) b.props[containerKey] = [];
       const defaults = BLOCK_DEFAULTS[type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[type])) : {};
       b.props[containerKey].push({
-        id: 'b' + Math.random().toString(36).slice(2, 12),
+        id: this.newBlockId(),
         type,
         props: defaults
       });
@@ -647,6 +649,73 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   childLabel(child: any): string {
     return child && typeof child === 'object' ? this.getBlockLabel(child.type) : 'Child';
+  }
+
+  private newBlockId(): string {
+    return 'b' + Math.random().toString(36).slice(2, 12);
+  }
+
+  isContainerDragOver(b: Block): boolean {
+    return this.dragOverContainers().has(b.id);
+  }
+
+  onContainerDragOver(b: Block, event: DragEvent) {
+    if (!this.dragPayload) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer!.dropEffect = 'copy';
+    this.dragOverContainers.update(s => {
+      const n = new Set(s);
+      n.add(b.id);
+      return n;
+    });
+  }
+
+  onContainerDragLeave(b: Block, event: DragEvent) {
+    if (!this.dragPayload) return;
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
+                   event.clientY >= rect.top && event.clientY <= rect.bottom;
+    if (!inside) {
+      this.dragOverContainers.update(s => {
+        const n = new Set(s);
+        n.delete(b.id);
+        return n;
+      });
+    }
+  }
+
+  onContainerDrop(b: Block, event: DragEvent) {
+    if (!this.dragPayload) return;
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      const payload = JSON.parse(this.dragPayload);
+      if (payload.kind === 'type') {
+        this.addChild(b, 'children', payload.value);
+      } else if (payload.kind === 'reusable') {
+        const r = this.reusableBlocks().find(x => x.id === payload.value);
+        if (r) this.addReusableChild(b, r);
+      }
+    } catch (_) {}
+    this.onDragEnd();
+  }
+
+  addReusableChild(b: Block, r: ReusableBlock) {
+    const clone = JSON.parse(JSON.stringify(r.block_data));
+    clone.id = this.newBlockId();
+    this.mutateAndSave(() => {
+      if (!Array.isArray(b.props['children'])) b.props['children'] = [];
+      b.props['children'].push(clone);
+    });
+  }
+
+  onChildDrop(b: Block, event: CdkDragDrop<any[]>) {
+    if (event.previousIndex === event.currentIndex) return;
+    this.mutateAndSave(() => {
+      if (!Array.isArray(b.props['children'])) b.props['children'] = [];
+      moveItemInArray(b.props['children'], event.previousIndex, event.currentIndex);
+    });
   }
 
   tableCols(b: Block): number {
@@ -758,15 +827,19 @@ export class CmsViewComponent implements OnInit, OnDestroy {
       blocks: this.currentBlocks()
     }).subscribe({
       next: (res) => {
-        this.activePage.set(res);
-        this.pages.update(list => {
-          const idx = list.findIndex(p => p.id === res.id);
-          if (idx >= 0) {
-            list[idx] = res;
-            return [...list];
-          }
-          return list;
-        });
+        if (res && typeof res.id === 'number') {
+          this.activePage.set(res);
+          this.pages.update(list => {
+            const idx = list.findIndex(p => p.id === res.id);
+            if (idx >= 0) {
+              list[idx] = res;
+              return [...list];
+            }
+            return list;
+          });
+        } else {
+          this.cmsService.getPage(page.id).subscribe(p => this.activePage.set(p));
+        }
       },
       error: (err) => console.error('Failed to save page:', err)
     });

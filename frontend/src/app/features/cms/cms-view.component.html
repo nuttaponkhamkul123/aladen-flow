@@ -290,19 +290,20 @@
 
                     @switch (b.type) {
                       @case ('header') {
-                        <header class="block-header-nav" [class.sticky]="b.props['sticky']">
-                          <div class="nav-brand-area">
-                            <span class="nav-brand-title">{{ b.props['brandName'] || 'Aladen Studio' }}</span>
-                          </div>
-                          <nav class="nav-links-area">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:10px;margin-bottom:12px;"
+                             [style.position]="b.props['sticky'] ? 'sticky' : 'static'"
+                             [style.top]="b.props['sticky'] ? '0' : 'auto'"
+                             [style.zIndex]="'10'">
+                          <span style="font-weight:800;font-size:15px;white-space:nowrap;">{{ b.props['brandName'] || 'Aladen Studio' }}</span>
+                          <nav style="display:flex;gap:14px;align-items:center;overflow-x:auto;min-width:0;">
                             @for (lnk of b.props['links'] || []; track lnk.label) {
-                              <a [href]="lnk.url || '#'" class="nav-link-item">{{ lnk.label }}</a>
+                              <a [href]="lnk.url || '#'" style="text-decoration:none;color:var(--text-secondary);font-size:12.5px;font-weight:500;white-space:nowrap;">{{ lnk.label }}</a>
                             }
                           </nav>
-                          @if (b.props['ctaLabel']) {
-                            <a [href]="b.props['ctaUrl'] || '#'" class="btn primary btn-sm">{{ b.props['ctaLabel'] }}</a>
+                          @if (b.props['showCta'] !== false) {
+                            <a [href]="b.props['ctaUrl'] || '#'" class="btn primary btn-sm" style="white-space:nowrap;">{{ b.props['ctaLabel'] || 'Get Started' }}</a>
                           }
-                        </header>
+                        </div>
                       }
 
                       @case ('heading') {
@@ -523,13 +524,32 @@
                              [style.alignItems]="b.props['mode'] !== 'grid' ? (b.props['align'] || 'stretch') : 'stretch'"
                              [style.flexWrap]="b.props['mode'] !== 'grid' ? (b.props['wrap'] || 'wrap') : 'nowrap'"
                              [style.background]="b.props['bg'] === 'surface' ? 'var(--bg-surface-elevated)' : b.props['bg'] === 'dark' ? '#0f172a' : 'transparent'"
-                             style="margin-bottom:12px;">
-                          @for (child of b.props['children'] || []; track child.id) {
-                            <div style="padding:10px;border:1px dashed var(--border-subtle);border-radius:6px;font-size:12px;color:var(--text-secondary);text-align:center;">
-                              {{ getBlockLabel(child.type) }} (child)
+                             class="container-block-preview" [class.drag-target]="isContainerDragOver(b)"
+                             style="margin-bottom:12px;"
+                             (dragover)="onContainerDragOver(b, $event)"
+                             (dragleave)="onContainerDragLeave(b, $event)"
+                             (drop)="onContainerDrop(b, $event)"
+                             cdkDropList
+                             cdkDropListOrientation="mixed"
+                             [cdkDropListData]="b.props['children'] || []"
+                             (cdkDropListDropped)="onChildDrop(b, $event)">
+                          @for (child of b.props['children'] || []; track child.id; let ci = $index) {
+                            <div class="container-child" cdkDrag [cdkDragDisabled]="isPreviewMode()">
+                              @if (!isPreviewMode()) {
+                                <div class="container-child-bar">
+                                  <span class="container-child-handle" cdkDragHandle title="Drag to reorder">⠿</span>
+                                  <span class="container-child-label">{{ getBlockLabel(child.type) }}</span>
+                                  <button class="btn-icon ghost btn-xs" title="Remove child" (click)="removeFromArray(b.props['children'], ci)">&times;</button>
+                                </div>
+                              }
+                              <div class="container-child-body">{{ getBlockLabel(child.type) }}</div>
                             </div>
                           } @empty {
-                            <div style="padding:10px;font-size:11px;color:var(--text-tertiary);text-align:center;width:100%;">Empty container — add child blocks from the inspector</div>
+                            @if (isContainerDragOver(b)) {
+                              <div class="container-dropzone empty">Drop blocks here</div>
+                            } @else {
+                              <div style="padding:10px;font-size:11px;color:var(--text-tertiary);text-align:center;width:100%;border:1px dashed var(--border-subtle);border-radius:6px;">Empty container — drag blocks here or add from the inspector</div>
+                            }
                           }
                         </div>
                       }
@@ -622,10 +642,18 @@
                       }
 
                       @case ('marquee') {
-                        <div style="overflow:hidden;margin:0 -24px 12px;padding:12px 0;">
-                          <div style="display:flex;gap:12px;white-space:nowrap;">
-                            @for (item of b.props['items'] || []; track $index) {
-                              <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:999px;font-size:12.5px;font-weight:600;">
+                        @let marqueeItems = b.props['items'] || [];
+                        <div class="cms-marquee-wrap"
+                             [style.margin]="'0 -24px 12px'">
+                          <div class="cms-marquee-track"
+                               [style.animationDuration]="b.props['speed'] === 'slow' ? '34s' : b.props['speed'] === 'fast' ? '12s' : '20s'">
+                            @for (item of marqueeItems; track $index) {
+                              <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:999px;font-size:12.5px;font-weight:600;margin-right:12px;white-space:nowrap;">
+                                <span>{{ item.icon || '✦' }}</span> {{ item.text || 'Item' }}
+                              </span>
+                            }
+                            @for (item of marqueeItems; track $index) {
+                              <span aria-hidden="true" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:999px;font-size:12.5px;font-weight:600;margin-right:12px;white-space:nowrap;">
                                 <span>{{ item.icon || '✦' }}</span> {{ item.text || 'Item' }}
                               </span>
                             }
