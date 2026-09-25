@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "build:frontend": "npm run build --prefix frontend",
-    "start:frontend": "npm start --prefix frontend"
+    "start:frontend": "npm start --prefix frontend",
+    "createCard": "node .agents/skills/createCard/scripts/card-manager.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

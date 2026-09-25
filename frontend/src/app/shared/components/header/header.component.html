@@ -21,6 +21,14 @@
         </svg>
         <span class="context-label">Dashboard</span>
       </div>
+    } @else if (currentRoute() === '/automations') {
+      <div class="topbar-context-badge">
+        <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <span class="context-label">Automations</span>
+      </div>
     } @else {
       <div class="topbar-context-badge">
         <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -224,9 +232,8 @@
           <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
       } @else if (themeService.themeMode() === 'dark') {
-        <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </svg>
       } @else {
         <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"

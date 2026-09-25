@@ -1,0 +1,551 @@
+<div class="automations-container">
+  <!-- Top Command Toolbar -->
+  <header class="automations-toolbar">
+    <div class="toolbar-left">
+      <div class="flow-picker-group">
+        <div class="flow-icon-badge">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </div>
+        @if (automationService.automations().length > 0) {
+          <div class="flow-select-wrap">
+            <select class="flow-select" [ngModel]="automationService.activeFlow()?.id" (ngModelChange)="selectFlow(automationService.automations().find(f => f.id === +$event)!)">
+              @for (flow of automationService.automations(); track flow.id) {
+                <option [value]="flow.id">{{ flow.name }}</option>
+              }
+            </select>
+          </div>
+        }
+        <button type="button" class="btn-tool new-flow-btn" (click)="createNewFlow()" title="Create New Automation Flow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>New Flow</span>
+        </button>
+      </div>
+
+      @if (automationService.activeFlow(); as flow) {
+        <div class="flow-status-pill" (click)="toggleActive(flow, $event)" [title]="flow.is_active ? 'Flow active and listening' : 'Flow paused'">
+          <span class="status-indicator-dot" [class.active]="flow.is_active"></span>
+          <span class="status-text">{{ flow.is_active ? 'Active' : 'Paused' }}</span>
+        </div>
+
+        <div class="flow-meta-stat" title="Total executions">
+          <span class="meta-label">Runs:</span>
+          <span class="meta-val">{{ flow.execution_count || 0 }}</span>
+        </div>
+      }
+    </div>
+
+    <!-- Center Node Palette Controls -->
+    <div class="toolbar-center">
+      <div class="palette-pill-group">
+        <button type="button" class="btn-palette trigger-palette" (click)="addNode('trigger')" title="Add Trigger Node">
+          <span class="palette-dot purple"></span>
+          <span>+ Trigger</span>
+        </button>
+        <button type="button" class="btn-palette condition-palette" (click)="addNode('condition')" title="Add Condition Node">
+          <span class="palette-dot amber"></span>
+          <span>+ Condition</span>
+        </button>
+        <button type="button" class="btn-palette action-palette" (click)="addNode('action')" title="Add Action Node">
+          <span class="palette-dot emerald"></span>
+          <span>+ Action</span>
+        </button>
+      </div>
+
+      <button type="button" class="btn-tool template-btn" (click)="showTemplateModal.set(true)" title="Browse Pre-built Templates">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+          <path d="M6 6h10"/>
+          <path d="M6 10h10"/>
+        </svg>
+        <span>Templates</span>
+      </button>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="toolbar-right">
+      <button type="button" class="btn-tool test-btn" (click)="runTestFlow(true)" [disabled]="automationService.isExecuting()" title="Execute flow immediately">
+        <svg class="zap-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <span>{{ automationService.isExecuting() ? 'Running...' : 'Test Run' }}</span>
+      </button>
+
+      <button type="button" class="btn-tool logs-btn" (click)="showLogsDrawer.set(!showLogsDrawer())" title="View Execution History">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span>Logs</span>
+      </button>
+
+      <button type="button" class="btn-tool delete-flow-btn" (click)="deleteCurrentFlow()" title="Delete This Flow">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Canvas Area -->
+  <main class="automations-body">
+    <div class="canvas-viewport" id="flowCanvas" (click)="onCanvasClick($event)">
+      <!-- Connecting Helper Floating Banner -->
+      @if (connectingSourceNode(); as src) {
+        <div class="flow-connecting-banner" (click)="$event.stopPropagation()">
+          <div class="banner-pulse-dot"></div>
+          <span class="banner-text">
+            Linking from <strong>{{ src.title }}</strong>: Click an input port (or drag) to connect.
+          </span>
+          <button type="button" class="banner-cancel-btn" (click)="cancelConnecting()">Cancel (Esc)</button>
+        </div>
+      }
+
+      <!-- SVG Connecting Wires Layer -->
+      @if (automationService.activeFlow(); as flow) {
+        <svg class="canvas-svg-layer">
+          <defs>
+            <linearGradient id="wireGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#a855f7" />
+              <stop offset="50%" stop-color="#38bdf8" />
+              <stop offset="100%" stop-color="#10b981" />
+            </linearGradient>
+            <filter id="wireGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <!-- Temporary wire during drag or port linking -->
+          @if (connectingSourceNode() && connectingMousePos()) {
+            <path
+              [attr.d]="getTempWirePath()"
+              class="flow-wire-temp"
+            />
+          }
+
+          @for (edge of flow.edges; track edge.id) {
+            <!-- Base connecting wire -->
+            <path
+              [attr.d]="getEdgePath(edge)"
+              class="flow-wire-base"
+              [class.selected]="selectedEdge()?.id === edge.id"
+              (click)="selectedEdge.set(edge); $event.stopPropagation()"
+            />
+            <!-- Glowing animated pulse wire -->
+            <path
+              [attr.d]="getEdgePath(edge)"
+              class="flow-wire-pulse"
+              [class.active-pulse]="isWireAnimating()"
+              (click)="selectedEdge.set(edge); $event.stopPropagation()"
+            />
+
+            <!-- Midpoint Delete Badge when wire is selected -->
+            @if (selectedEdge()?.id === edge.id) {
+              <g [attr.transform]="'translate(' + getEdgeMidpoint(edge).x + ',' + getEdgeMidpoint(edge).y + ')'"
+                 class="wire-delete-badge"
+                 (click)="deleteEdge(edge); $event.stopPropagation()">
+                <circle r="12" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
+                <text text-anchor="middle" dy="4" fill="#ffffff" font-size="13" font-weight="bold">×</text>
+              </g>
+            }
+          }
+        </svg>
+
+        <!-- Canvas Node Cards -->
+        @for (node of flow.nodes; track node.id) {
+          <div
+            class="flow-node-card {{ node.type }}-node"
+            [class.selected]="selectedNode()?.id === node.id"
+            [style.left.px]="node.x"
+            [style.top.px]="node.y"
+            (mousedown)="startDragNode(node, $event)"
+            (click)="selectedNode.set(node)"
+          >
+            <!-- Left Input Port -->
+            @if (node.type !== 'trigger') {
+              <div class="node-port port-input"
+                   [class.is-potential-target]="connectingSourceNode() && connectingSourceNode()?.id !== node.id"
+                   (mousedown)="onInputPortMouseDown(node, $event)"
+                   (mouseup)="completeConnection(node, $event)"
+                   (click)="onInputPortClick(node, $event)"
+                   (mouseenter)="onPortMouseEnter(node, 'input')"
+                   (mouseleave)="onPortMouseLeave(node)"
+                   title="Input Port (Connect from another node)"></div>
+            }
+
+            <!-- Node Header -->
+            <div class="node-header">
+              <div class="node-type-badge">
+                @if (node.type === 'trigger') {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                  <span>TRIGGER</span>
+                } @else if (node.type === 'condition') {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                  </svg>
+                  <span>CONDITION</span>
+                } @else {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  <span>ACTION</span>
+                }
+              </div>
+
+              <button type="button" class="node-del-btn" (click)="deleteNode(node); $event.stopPropagation()" title="Remove Node">
+                &times;
+              </button>
+            </div>
+
+            <!-- Node Body -->
+            <div class="node-content">
+              <h4 class="node-title">{{ node.title }}</h4>
+              <p class="node-subtitle">{{ node.subtitle || 'Configure node properties' }}</p>
+            </div>
+
+            <!-- Node Summary Tag -->
+            <div class="node-footer-tag">
+              @if (node.type === 'trigger') {
+                <span class="tag-text">Event: {{ node.config['event'] || 'card_updated' }}</span>
+              } @else if (node.type === 'condition') {
+                <span class="tag-text">If {{ node.config['field'] || 'column' }} {{ node.config['operator'] || '==' }} "{{ node.config['value'] || '' }}"</span>
+              } @else {
+                <span class="tag-text">Do: {{ node.config['action_type'] || 'move_card_column' }}</span>
+              }
+            </div>
+
+            <!-- Right Output Port -->
+            <div class="node-port port-output"
+                 [class.is-connecting-source]="connectingSourceNode()?.id === node.id"
+                 (mousedown)="startConnecting(node, 'output', $event)"
+                 (click)="onOutputPortClick(node, $event)"
+                 (mouseenter)="onPortMouseEnter(node, 'output')"
+                 (mouseleave)="onPortMouseLeave(node)"
+                 title="Output Port (Drag or click to connect to next node)"></div>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Inspector Panel (Right Drawer) -->
+    @if (selectedNode(); as node) {
+      <aside class="node-inspector-panel">
+        <div class="inspector-header">
+          <div class="inspector-title-group">
+            <span class="inspector-pill {{ node.type }}">{{ node.type | uppercase }}</span>
+            <h3 class="inspector-heading">Node Inspector</h3>
+          </div>
+          <button type="button" class="close-inspector-btn" (click)="selectedNode.set(null)">&times;</button>
+        </div>
+
+        <div class="inspector-body">
+          <div class="form-group">
+            <label class="form-label">Node Title</label>
+            <input type="text" class="form-input" [(ngModel)]="node.title" (ngModelChange)="saveCurrentFlow()"/>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Subtitle / Description</label>
+            <input type="text" class="form-input" [(ngModel)]="node.subtitle" (ngModelChange)="saveCurrentFlow()"/>
+          </div>
+
+          <div class="inspector-divider"></div>
+
+          <!-- Configuration Fields By Type -->
+          @if (node.type === 'trigger') {
+            <div class="form-group">
+              <label class="form-label">Triggering Event</label>
+              <select class="form-select" [(ngModel)]="node.config['event']" (ngModelChange)="saveCurrentFlow()">
+                <option value="checklist_completed">Checklist 100% Completed</option>
+                <option value="card_updated">Card Created or Updated</option>
+                <option value="cms_page_published">CMS Page Published</option>
+                <option value="manual_trigger">Manual Trigger</option>
+              </select>
+              <span class="form-hint">Fires automatically whenever this event occurs in the workspace.</span>
+            </div>
+          } @else if (node.type === 'condition') {
+            <div class="form-group">
+              <label class="form-label">Target Field</label>
+              <select class="form-select" [(ngModel)]="node.config['field']" (ngModelChange)="saveCurrentFlow()">
+                <option value="column_name">Card Column Name</option>
+                <option value="priority">Card Priority</option>
+                <option value="title_or_desc">Card Title / Description</option>
+                <option value="status">CMS Page Status</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Comparison Operator</label>
+              <select class="form-select" [(ngModel)]="node.config['operator']" (ngModelChange)="saveCurrentFlow()">
+                <option value="equals">Equals (==)</option>
+                <option value="not_equals">Does Not Equal (!=)</option>
+                <option value="contains">Contains Substring</option>
+                <option value="not_contains">Does Not Contain</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Value to Match</label>
+              <input type="text" class="form-input" [(ngModel)]="node.config['value']" (ngModelChange)="saveCurrentFlow()" placeholder="e.g. Done, urgent, bug"/>
+            </div>
+          } @else {
+            <div class="form-group">
+              <label class="form-label">Action Type</label>
+              <select class="form-select" [(ngModel)]="node.config['action_type']" (ngModelChange)="saveCurrentFlow()">
+                <option value="move_card_column">Move Card to Column</option>
+                <option value="set_priority">Set Card Priority</option>
+                <option value="create_card">Create Board Verification Card</option>
+              </select>
+            </div>
+
+            @if (node.config['action_type'] === 'move_card_column') {
+              <div class="form-group">
+                <label class="form-label">Target Column Name</label>
+                <input type="text" class="form-input" [(ngModel)]="node.config['target_column']" (ngModelChange)="saveCurrentFlow()" placeholder="Done"/>
+              </div>
+            } @else if (node.config['action_type'] === 'set_priority') {
+              <div class="form-group">
+                <label class="form-label">Set Priority Level</label>
+                <select class="form-select" [(ngModel)]="node.config['priority']" (ngModelChange)="saveCurrentFlow()">
+                  <option value="urgent">Urgent</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            } @else if (node.config['action_type'] === 'create_card') {
+              <div class="form-group">
+                <label class="form-label">Target Column</label>
+                <input type="text" class="form-input" [(ngModel)]="node.config['target_column']" (ngModelChange)="saveCurrentFlow()" placeholder="Review"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Title Prefix</label>
+                <input type="text" class="form-input" [(ngModel)]="node.config['title_prefix']" (ngModelChange)="saveCurrentFlow()" placeholder="Verify Live SEO: "/>
+              </div>
+            }
+
+            <div class="form-group">
+              <label class="form-label">Activity Log Message</label>
+              <input type="text" class="form-input" [(ngModel)]="node.config['add_activity']" (ngModelChange)="saveCurrentFlow()" placeholder="Auto-transitioned by flow"/>
+            </div>
+          }
+
+          <!-- Connection Management Section in Inspector -->
+          <div class="inspector-divider"></div>
+          <div class="inspector-section-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            <span>Node Connections</span>
+          </div>
+
+          <!-- Outgoing connections -->
+          <div class="form-group">
+            <label class="form-label">Connects to (Next Step)</label>
+            @if (getNodeOutgoingEdges(node.id).length === 0) {
+              <div class="no-connections-text">Not connected to any next node.</div>
+            } @else {
+              <div class="connections-list">
+                @for (edge of getNodeOutgoingEdges(node.id); track edge.id) {
+                  <div class="connection-tag-item">
+                    <span class="conn-arrow">→</span>
+                    <span class="conn-name">{{ getNodeById(edge.target)?.title || edge.target }}</span>
+                    <button type="button" class="conn-remove-btn" (click)="deleteEdge(edge)" title="Disconnect link">&times;</button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Link to a new node via dropdown -->
+          @if (getAvailableTargetNodes(node.id).length > 0) {
+            <div class="form-group">
+              <label class="form-label">+ Add Link To Node</label>
+              <div style="display:flex;gap:6px;">
+                <select class="form-select" [(ngModel)]="targetSelectForNode" style="flex:1;">
+                  <option value="">Select target node...</option>
+                  @for (tgt of getAvailableTargetNodes(node.id); track tgt.id) {
+                    <option [value]="tgt.id">{{ tgt.title }} ({{ tgt.type }})</option>
+                  }
+                </select>
+                <button type="button" class="btn primary btn-sm" [disabled]="!targetSelectForNode"
+                        (click)="connectFromInspector(targetSelectForNode)">Link</button>
+              </div>
+            </div>
+          }
+
+          <!-- Incoming connections -->
+          <div class="form-group">
+            <label class="form-label">Incoming Links (From)</label>
+            @if (getNodeIncomingEdges(node.id).length === 0) {
+              <div class="no-connections-text">No incoming connections.</div>
+            } @else {
+              <div class="connections-list">
+                @for (edge of getNodeIncomingEdges(node.id); track edge.id) {
+                  <div class="connection-tag-item">
+                    <span class="conn-arrow">←</span>
+                    <span class="conn-name">{{ getNodeById(edge.source)?.title || edge.source }}</span>
+                    <button type="button" class="conn-remove-btn" (click)="deleteEdge(edge)" title="Disconnect link">&times;</button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="inspector-actions">
+            <button type="button" class="btn-delete-node" (click)="deleteNode(node)">
+              Delete Node
+            </button>
+          </div>
+        </div>
+      </aside>
+    }
+  </main>
+
+  <!-- Execution Logs Slide-Out Drawer -->
+  @if (showLogsDrawer()) {
+    <div class="logs-drawer-overlay" (click)="showLogsDrawer.set(false)">
+      <div class="logs-drawer" (click)="$event.stopPropagation()">
+        <div class="logs-drawer-header">
+          <div class="logs-drawer-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>Automation Execution History</span>
+          </div>
+          <button type="button" class="close-drawer-btn" (click)="showLogsDrawer.set(false)">&times;</button>
+        </div>
+
+        <div class="logs-drawer-content">
+          @if (automationService.recentLogs().length === 0) {
+            <div class="logs-empty-state">No execution runs logged yet. Click "Test Run" to execute!</div>
+          } @else {
+            <div class="logs-list">
+              @for (log of automationService.recentLogs(); track log.id) {
+                <div class="log-entry-item" [class.success]="log.status === 'success'" [class.skipped]="log.status === 'skipped'">
+                  <div class="log-top">
+                    <span class="log-badge {{ log.status }}">{{ log.status | uppercase }}</span>
+                    <span class="log-flow-name">{{ log.automation_name || 'Automation Rule' }}</span>
+                    <span class="log-time">{{ log.created_at }}</span>
+                  </div>
+                  <div class="log-summary">{{ log.summary }}</div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Test Execution Result Modal -->
+  @if (showTestModal() && automationService.lastExecutionResult(); as result) {
+    <div class="modal-backdrop" (click)="showTestModal.set(false)">
+      <div class="test-result-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <div class="status-icon-circle" [class.success]="result.passed" [class.skipped]="!result.passed">
+              @if (result.passed) {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              } @else {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              }
+            </div>
+            <div>
+              <h3 class="modal-h3">{{ result.passed ? 'Automation Executed Successfully' : 'Conditions Not Satisfied' }}</h3>
+              <p class="modal-sub">{{ result.flowName }}</p>
+            </div>
+          </div>
+          <button type="button" class="close-modal-btn" (click)="showTestModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="result-summary-box">
+            <span class="summary-kicker">SUMMARY</span>
+            <p class="summary-text">{{ result.summary }}</p>
+          </div>
+
+          <div class="timeline-steps">
+            <span class="steps-title">EXECUTION TRACE</span>
+            @for (step of result.steps; track step.nodeId) {
+              <div class="timeline-step {{ step.status }}">
+                <div class="step-dot"></div>
+                <div class="step-info">
+                  <div class="step-title-line">
+                    <span class="step-type-pill {{ step.type }}">{{ step.type | uppercase }}</span>
+                    <strong class="step-title">{{ step.title }}</strong>
+                    <span class="step-badge {{ step.status }}">{{ step.status }}</span>
+                  </div>
+                  <div class="step-msg">{{ step.message }}</div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="showTestModal.set(false)">Dismiss</button>
+          <button type="button" class="btn-primary" (click)="runTestFlow(true)">Run Again</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Template Library Modal -->
+  @if (showTemplateModal()) {
+    <div class="modal-backdrop" (click)="showTemplateModal.set(false)">
+      <div class="template-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div>
+            <h3 class="modal-h3">Automation Template Library</h3>
+            <p class="modal-sub">Deploy pre-built workflow automations with a single click</p>
+          </div>
+          <button type="button" class="close-modal-btn" (click)="showTemplateModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body templates-grid">
+          @for (tmpl of templates; track tmpl.name) {
+            <div class="template-card">
+              <div class="tmpl-card-header">
+                <span class="tmpl-badge">{{ tmpl.badge }}</span>
+                <span class="tmpl-cat">{{ tmpl.category | uppercase }}</span>
+              </div>
+              <h4 class="tmpl-title">{{ tmpl.name }}</h4>
+              <p class="tmpl-desc">{{ tmpl.description }}</p>
+              <div class="tmpl-nodes-preview">
+                <span class="node-chip trigger">Trigger: {{ tmpl.nodes[0].title }}</span>
+                <span class="chip-arrow">&rarr;</span>
+                <span class="node-chip condition">Cond: {{ tmpl.nodes[1].title }}</span>
+                <span class="chip-arrow">&rarr;</span>
+                <span class="node-chip action">Action: {{ tmpl.nodes[2].title }}</span>
+              </div>
+              <button type="button" class="btn-apply-template" (click)="applyTemplate(tmpl)">
+                Use This Template
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Save Toast Notification -->
+  @if (saveSuccessToast(); as toast) {
+    <div class="automation-toast">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      <span>{{ toast }}</span>
+    </div>
+  }
+</div>

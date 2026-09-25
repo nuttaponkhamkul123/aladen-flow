@@ -37,6 +37,7 @@ export class HeaderComponent {
     const url = this.routeEvent() || '';
     if (url.startsWith('/cms')) return '/cms';
     if (url.startsWith('/kanban')) return '/kanban';
+    if (url.startsWith('/automations')) return '/automations';
     return '/dashboard';
   });
 

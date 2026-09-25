@@ -1,6 +1,12 @@
 <div class="modal" (click)="onBackdropClick($event)">
   <div class="modal-backdrop"></div>
   <div class="modal-panel" (click)="$event.stopPropagation()">
+    @if (card.cover) {
+      <div class="card-cover-banner"
+           [style.backgroundImage]="card.cover.startsWith('http') || card.cover.startsWith('data:') ? 'url(' + card.cover + ')' : null"
+           [style.background]="!card.cover.startsWith('http') && !card.cover.startsWith('data:') ? card.cover : null">
+      </div>
+    }
     <div class="modal-header">
       <div class="modal-title-wrap">
         <div class="modal-card-icon">

@@ -424,6 +424,19 @@ app.patch('/api/checklist/:id', (req, res) => {
   }
   if (checked !== undefined) {
     db.prepare('UPDATE checklist_items SET checked = ? WHERE id = ?').run(checked ? 1 : 0, id);
+    if (checked) {
+      try {
+        const item = db.prepare('SELECT card_id FROM checklist_items WHERE id = ?').get(id);
+        if (item) {
+          const stats = db.prepare('SELECT COUNT(*) as total, SUM(checked) as checkedCount FROM checklist_items WHERE card_id = ?').get(item.card_id);
+          if (stats && stats.total > 0 && stats.total === stats.checkedCount) {
+            runAutomationsForTrigger('checklist_completed', { card_id: item.card_id });
+          }
+        }
+      } catch (e) {
+        console.error('Checklist automation trigger error:', e);
+      }
+    }
   }
   res.json({ ok: true });
 });
@@ -432,6 +445,365 @@ app.delete('/api/checklist/:id', (req, res) => {
   db.prepare('DELETE FROM checklist_items WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
+
+// ==========================================
+// AUTOMATION FLOW ENGINE & API ENDPOINTS
+// ==========================================
+
+function getAutomationCardContext(cardId) {
+  if (!cardId) {
+    return db.prepare(`
+      SELECT c.*, col.name as column_name, col.board_id, b.name as board_name
+      FROM cards c
+      JOIN columns col ON col.id = c.column_id
+      JOIN boards b ON b.id = col.board_id
+      WHERE c.archived = 0
+      ORDER BY c.updated_at DESC LIMIT 1
+    `).get() || null;
+  }
+  return db.prepare(`
+    SELECT c.*, col.name as column_name, col.board_id, b.name as board_name
+    FROM cards c
+    JOIN columns col ON col.id = c.column_id
+    JOIN boards b ON b.id = col.board_id
+    WHERE c.id = ?
+  `).get(cardId) || null;
+}
+
+function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
+  const steps = [];
+  const nodes = typeof flow.nodes_json === 'string' ? JSON.parse(flow.nodes_json || '[]') : (flow.nodes || []);
+  const edges = typeof flow.edges_json === 'string' ? JSON.parse(flow.edges_json || '[]') : (flow.edges || []);
+
+  const triggerNode = nodes.find(n => n.type === 'trigger') || nodes[0];
+  const conditionNodes = nodes.filter(n => n.type === 'condition');
+  const actionNodes = nodes.filter(n => n.type === 'action');
+
+  let cardContext = inputContext.card || getAutomationCardContext(inputContext.card_id);
+  let pageContext = inputContext.page || (inputContext.page_id ? db.prepare('SELECT * FROM pages WHERE id = ?').get(inputContext.page_id) : null);
+
+  // Trigger step
+  if (triggerNode) {
+    steps.push({
+      nodeId: triggerNode.id,
+      type: 'trigger',
+      title: triggerNode.title || 'Trigger Evaluated',
+      status: 'passed',
+      message: `Trigger matched: ${triggerNode.title} (${flow.trigger_type || 'manual'})`
+    });
+  }
+
+  // Condition evaluation
+  let conditionsPassed = true;
+  for (const cond of conditionNodes) {
+    const cfg = cond.config || {};
+    let passed = true;
+    let actualVal = '';
+    const field = cfg.field || 'column_name';
+    const operator = cfg.operator || 'equals';
+    const expectedVal = String(cfg.value || '').toLowerCase().trim();
+
+    if (field === 'column_name') {
+      actualVal = String(cardContext?.column_name || '').toLowerCase().trim();
+    } else if (field === 'priority') {
+      actualVal = String(cardContext?.priority || '').toLowerCase().trim();
+    } else if (field === 'title_or_desc') {
+      actualVal = `${cardContext?.title || ''} ${cardContext?.description || ''}`.toLowerCase();
+    } else if (field === 'status') {
+      actualVal = String(pageContext?.status || 'published').toLowerCase().trim();
+    } else {
+      actualVal = String(cardContext?.[field] || pageContext?.[field] || '').toLowerCase().trim();
+    }
+
+    if (operator === 'equals') {
+      passed = actualVal === expectedVal;
+    } else if (operator === 'not_equals') {
+      passed = actualVal !== expectedVal;
+    } else if (operator === 'contains') {
+      passed = actualVal.includes(expectedVal);
+    } else if (operator === 'not_contains') {
+      passed = !actualVal.includes(expectedVal);
+    }
+
+    steps.push({
+      nodeId: cond.id,
+      type: 'condition',
+      title: cond.title || 'Condition Evaluated',
+      status: passed ? 'passed' : 'failed',
+      message: passed
+        ? `Condition passed: "${field}" ${operator} "${expectedVal}" (Actual: "${actualVal || 'none'}")`
+        : `Condition failed: "${field}" ${operator} "${expectedVal}" (Actual: "${actualVal || 'none'}")`
+    });
+
+    if (!passed) {
+      conditionsPassed = false;
+      break;
+    }
+  }
+
+  // Action execution
+  const actionMessages = [];
+  if (conditionsPassed && actionNodes.length > 0) {
+    for (const act of actionNodes) {
+      const cfg = act.config || {};
+      const actionType = cfg.action_type || 'move_card_column';
+
+      if (actionType === 'move_card_column') {
+        const targetColName = cfg.target_column || 'Done';
+        if (cardContext && commit) {
+          const targetCol = db.prepare(`
+            SELECT id, name FROM columns
+            WHERE board_id = ? AND LOWER(name) = LOWER(?)
+            LIMIT 1
+          `).get(cardContext.board_id, targetColName);
+
+          if (targetCol && targetCol.id !== cardContext.column_id) {
+            db.prepare('UPDATE cards SET column_id = ?, updated_at = datetime("now") WHERE id = ?')
+              .run(targetCol.id, cardContext.id);
+            const msg = cfg.add_activity || `Auto-moved to "${targetCol.name}" via automation flow`;
+            logActivity(cardContext.id, cardContext.board_id, msg);
+            actionMessages.push(`Moved card "${cardContext.title}" to column "${targetCol.name}"`);
+          } else {
+            actionMessages.push(`Card "${cardContext.title}" already in target column "${targetColName}"`);
+          }
+        } else {
+          actionMessages.push(`[Preview] Would move card "${cardContext?.title || 'Selected Card'}" to "${targetColName}"`);
+        }
+      } else if (actionType === 'set_priority') {
+        const prio = cfg.priority || 'urgent';
+        if (cardContext && commit) {
+          db.prepare('UPDATE cards SET priority = ?, updated_at = datetime("now") WHERE id = ?')
+            .run(prio, cardContext.id);
+          const msg = cfg.add_activity || `Priority set to ${prio} by automation`;
+          logActivity(cardContext.id, cardContext.board_id, msg);
+          actionMessages.push(`Card "${cardContext.title}" priority set to "${prio.toUpperCase()}"`);
+        } else {
+          actionMessages.push(`[Preview] Would set priority of "${cardContext?.title || 'Selected Card'}" to "${prio.toUpperCase()}"`);
+        }
+      } else if (actionType === 'create_card') {
+        const targetColName = cfg.target_column || 'Review';
+        const board = db.prepare('SELECT id FROM boards ORDER BY id ASC LIMIT 1').get();
+        if (board && commit) {
+          let col = db.prepare('SELECT id FROM columns WHERE board_id = ? AND LOWER(name) = LOWER(?) LIMIT 1')
+            .get(board.id, targetColName);
+          if (!col) {
+            col = db.prepare('SELECT id FROM columns WHERE board_id = ? ORDER BY position ASC LIMIT 1').get(board.id);
+          }
+          if (col) {
+            const cardTitle = `${cfg.title_prefix || 'Verification: '}${pageContext?.title || cardContext?.title || 'Task'}`;
+            const maxPos = db.prepare('SELECT COALESCE(MAX(position), -1) as m FROM cards WHERE column_id = ?').get(col.id).m;
+            const newCard = db.prepare(`
+              INSERT INTO cards (column_id, title, description, priority, position)
+              VALUES (?, ?, ?, ?, ?)
+            `).run(col.id, cardTitle, 'Auto-generated QA task from automation flow.', cfg.priority || 'high', maxPos + 1);
+
+            logActivity(newCard.lastInsertRowid, board.id, cfg.add_activity || 'Created via automation');
+            actionMessages.push(`Created verification card "${cardTitle}" in column #${col.id}`);
+          }
+        } else {
+          actionMessages.push(`[Preview] Would create QA card in "${targetColName}" column`);
+        }
+      }
+
+      steps.push({
+        nodeId: act.id,
+        type: 'action',
+        title: act.title || 'Action Executed',
+        status: conditionsPassed ? 'executed' : 'skipped',
+        message: actionMessages[actionMessages.length - 1] || 'Action completed successfully'
+      });
+    }
+  }
+
+  const overallStatus = !conditionsPassed ? 'skipped' : 'success';
+  const summary = conditionsPassed
+    ? (actionMessages.join('; ') || 'Flow executed with all conditions satisfied.')
+    : 'Flow conditions not met for current context.';
+
+  if (commit) {
+    try {
+      db.prepare(`
+        UPDATE automations
+        SET execution_count = execution_count + 1,
+            last_executed_at = datetime('now'),
+            updated_at = datetime('now')
+        WHERE id = ?
+      `).run(flow.id);
+
+      db.prepare(`
+        INSERT INTO automation_logs (automation_id, status, summary, details_json, created_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `).run(
+        flow.id,
+        overallStatus,
+        summary,
+        JSON.stringify({ steps, inputContext, actionMessages })
+      );
+    } catch (e) {
+      console.error('Failed to log automation run:', e);
+    }
+  }
+
+  return {
+    flowId: flow.id,
+    flowName: flow.name,
+    status: overallStatus,
+    passed: conditionsPassed,
+    summary,
+    steps,
+    actionMessages
+  };
+}
+
+function runAutomationsForTrigger(triggerType, context = {}) {
+  try {
+    const activeRules = db.prepare('SELECT * FROM automations WHERE is_active = 1 AND trigger_type = ?').all(triggerType);
+    const results = [];
+    for (const rule of activeRules) {
+      const res = evaluateAutomationFlow(rule, context, true);
+      results.push(res);
+    }
+    return results;
+  } catch (err) {
+    console.error(`Error running automations for ${triggerType}:`, err);
+    return [];
+  }
+}
+
+// REST Endpoints for Automations
+app.get('/api/automations', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM automations ORDER BY created_at DESC').all();
+    const list = rows.map(r => ({
+      ...r,
+      is_active: Boolean(r.is_active),
+      nodes: JSON.parse(r.nodes_json || '[]'),
+      edges: JSON.parse(r.edges_json || '[]')
+    }));
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/automations/logs/recent', (req, res) => {
+  try {
+    const logs = db.prepare(`
+      SELECT l.*, a.name as automation_name, a.trigger_type
+      FROM automation_logs l
+      LEFT JOIN automations a ON a.id = l.automation_id
+      ORDER BY l.created_at DESC
+      LIMIT 40
+    `).all();
+    const parsed = logs.map(l => ({
+      ...l,
+      details: JSON.parse(l.details_json || '{}')
+    }));
+    res.json(parsed);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/automations/:id', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM automations WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Automation not found' });
+    const logs = db.prepare('SELECT * FROM automation_logs WHERE automation_id = ? ORDER BY created_at DESC LIMIT 30').all(req.params.id);
+    res.json({
+      ...row,
+      is_active: Boolean(row.is_active),
+      nodes: JSON.parse(row.nodes_json || '[]'),
+      edges: JSON.parse(row.edges_json || '[]'),
+      logs: logs.map(l => ({ ...l, details: JSON.parse(l.details_json || '{}') }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/automations', (req, res) => {
+  try {
+    const { name, description = '', trigger_type = 'checklist_completed', nodes = [], edges = [], is_active = true } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+    const info = db.prepare(`
+      INSERT INTO automations (name, description, trigger_type, is_active, nodes_json, edges_json)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      name.trim(),
+      description,
+      trigger_type,
+      is_active ? 1 : 0,
+      JSON.stringify(nodes),
+      JSON.stringify(edges)
+    );
+    res.json({ id: info.lastInsertRowid, ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/automations/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, description, trigger_type, nodes, edges, is_active } = req.body;
+    const existing = db.prepare('SELECT * FROM automations WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Automation not found' });
+
+    const updates = [];
+    const params = [];
+    if (typeof name === 'string' && name.trim()) { updates.push('name = ?'); params.push(name.trim()); }
+    if (typeof description === 'string') { updates.push('description = ?'); params.push(description); }
+    if (typeof trigger_type === 'string') { updates.push('trigger_type = ?'); params.push(trigger_type); }
+    if (typeof is_active === 'boolean' || typeof is_active === 'number') { updates.push('is_active = ?'); params.push(is_active ? 1 : 0); }
+    if (Array.isArray(nodes)) { updates.push('nodes_json = ?'); params.push(JSON.stringify(nodes)); }
+    if (Array.isArray(edges)) { updates.push('edges_json = ?'); params.push(JSON.stringify(edges)); }
+
+    if (updates.length > 0) {
+      updates.push("updated_at = datetime('now')");
+      params.push(id);
+      db.prepare(`UPDATE automations SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/automations/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM automations WHERE id = ?').run(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/automations/:id/toggle', (req, res) => {
+  try {
+    const auto = db.prepare('SELECT id, is_active FROM automations WHERE id = ?').get(req.params.id);
+    if (!auto) return res.status(404).json({ error: 'Automation not found' });
+    const next = auto.is_active ? 0 : 1;
+    db.prepare('UPDATE automations SET is_active = ?, updated_at = datetime("now") WHERE id = ?').run(next, auto.id);
+    res.json({ ok: true, is_active: Boolean(next) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/automations/:id/execute', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM automations WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Automation not found' });
+
+    const { card_id, page_id, commit = true } = req.body || {};
+    const result = evaluateAutomationFlow(row, { card_id, page_id }, commit);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 function slugify(s) {
   return String(s || '')
@@ -1910,22 +2282,39 @@ function makeBlockBgCss(p) {
   return css;
 }
 
-// Appends a CSS string into the first tag's style attribute of a rendered block HTML string.
-function injectBgStyleIntoFirstTag(html, css) {
-  if (!css || typeof html !== 'string' || !html) return html;
+// Injects id, data-block-id, and bgCss into the first tag of a rendered block HTML string
+function injectBlockAttributes(html, b, bgCss) {
+  if (typeof html !== 'string' || !html) return html;
+  const p = (b && b.props) || {};
+  const anchorId = p.anchorId || (b && b.id) || '';
   const gt = html.indexOf('>');
   if (gt === -1) return html;
-  const firstTag = html.slice(0, gt + 1);
-  const styleAttrMatch = firstTag.match(/style="([^"]*)"/);
-  if (styleAttrMatch) {
-    const inner = styleAttrMatch[1];
-    const separator = inner && !inner.trim().endsWith(';') ? ';' : '';
-    const replaced = firstTag.replace(/style="([^"]*)"/, `style="${inner}${separator}${css}"`);
-    return replaced + html.slice(gt + 1);
+  let firstTag = html.slice(0, gt + 1);
+
+  if (anchorId && !firstTag.includes(' id=')) {
+    const spaceIdx = firstTag.indexOf(' ');
+    if (spaceIdx > 0) {
+      firstTag = firstTag.slice(0, spaceIdx) + ` id="${escHtml(anchorId)}" data-block-id="${escHtml((b && b.id) || '')}"` + firstTag.slice(spaceIdx);
+    } else {
+      const closeIdx = firstTag.endsWith('/>') ? firstTag.length - 2 : firstTag.length - 1;
+      firstTag = firstTag.slice(0, closeIdx) + ` id="${escHtml(anchorId)}" data-block-id="${escHtml((b && b.id) || '')}"` + firstTag.slice(closeIdx);
+    }
   }
-  const selfClosing = firstTag.endsWith('/>');
-  const openTag = selfClosing ? firstTag.slice(0, gt - 1) : firstTag.slice(0, gt);
-  return `${openTag} style="${css}"${selfClosing ? '/>' : '>'}` + html.slice(gt + 1);
+
+  if (bgCss) {
+    const styleAttrMatch = firstTag.match(/style="([^"]*)"/);
+    if (styleAttrMatch) {
+      const inner = styleAttrMatch[1];
+      const separator = inner && !inner.trim().endsWith(';') ? ';' : '';
+      firstTag = firstTag.replace(/style="([^"]*)"/, `style="${inner}${separator}${bgCss}"`);
+    } else {
+      const selfClosing = firstTag.endsWith('/>');
+      const openTag = selfClosing ? firstTag.slice(0, -2) : firstTag.slice(0, -1);
+      firstTag = `${openTag} style="${bgCss}"${selfClosing ? '/>' : '>'}`;
+    }
+  }
+
+  return firstTag + html.slice(gt + 1);
 }
 
 function renderBlockHtml(b) {
@@ -1946,9 +2335,10 @@ function renderBlockHtml(b) {
       ? `<div style="position:absolute;inset:0;z-index:1;background:${escHtml(p.bgOverlay)};pointer-events:none;"></div>`
       : '';
     const fallbackBg = bgCss ? `background:${p.bgColor};` : '';
-    return `<div class="cms-block-video-wrap${parallaxCls}"${speedAttr} style="position:relative;overflow:hidden;${fallbackBg}">${bgLayer}${overlay}<div style="position:relative;z-index:2;">${inner}</div></div>`;
+    const anchorId = p.anchorId || b.id || '';
+    return `<div id="${escHtml(anchorId)}" data-block-id="${escHtml(b.id || '')}" class="cms-block-video-wrap${parallaxCls}"${speedAttr} style="position:relative;overflow:hidden;${fallbackBg}">${bgLayer}${overlay}<div style="position:relative;z-index:2;">${inner}</div></div>`;
   }
-  return injectBgStyleIntoFirstTag(renderBlockInnerHtml(b), bgCss);
+  return injectBlockAttributes(renderBlockInnerHtml(b), b, bgCss);
 }
 
 function renderBlockInnerHtml(b) {
@@ -2700,13 +3090,13 @@ function renderPublishedPage(page, blocks, tags) {
       : JSON.parse(page.settings || '{}');
   } catch (_) { settings = {}; }
 
-  const maxWidth = settings.maxWidth || '760px';
+  const maxWidth = settings.maxWidth || '820px';
   const minWidth = settings.minWidth || '0px';
-  const paddingX = (settings.paddingX != null ? Number(settings.paddingX) : 24) + 'px';
-  const paddingY = (settings.paddingY != null ? Number(settings.paddingY) : 48) + 'px';
+  const paddingX = (settings.paddingX != null ? Number(settings.paddingX) : 36) + 'px';
+  const paddingY = (settings.paddingY != null ? Number(settings.paddingY) : 44) + 'px';
   const marginY = (settings.marginY != null ? Number(settings.marginY) : 0) + 'px';
   const marginX = (settings.marginX != null ? Number(settings.marginX) : 0) + 'px';
-  const borderRadius = (settings.borderRadius != null ? Number(settings.borderRadius) : 0) + 'px';
+  const borderRadius = (settings.borderRadius != null ? Number(settings.borderRadius) : 16) + 'px';
   const bgType = settings.bg || 'default';
   const previewTheme = settings.previewTheme || 'light';
 
@@ -2806,6 +3196,10 @@ function renderPublishedPage(page, blocks, tags) {
       min-height: 100vh !important;
       overflow-x: hidden !important;
       overflow-y: auto !important;
+      scroll-behavior: smooth;
+    }
+    [id] {
+      scroll-margin-top: 88px;
     }
     body { font-family: ${fontFamily}; background: var(--pub-page-bg); color: var(--pub-text-color); margin: 0; min-height: 100vh; overflow: visible; display: block; }
     .wrap { max-width: ${maxWidth}; min-width: ${minWidth}; margin: ${alignMargin}; padding: ${paddingY} ${paddingX}; border-radius: ${borderRadius}; background: var(--pub-card-bg); min-height: 100vh; box-sizing: border-box; box-shadow: 0 0 0 1px var(--pub-border-color); display: flex; flex-direction: column; }
@@ -2888,12 +3282,23 @@ function renderPublishedPage(page, blocks, tags) {
       justify-content: space-between;
       padding: 14px 24px;
     }
-    .cms-header-block.layout-centered .cms-header-inner {
+    .cms-header-block.layout-centered .cms-header-inner,
+    .cms-header-block.layout-center .cms-header-inner {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 12px;
       padding: 18px 24px;
+    }
+    .cms-header-block.layout-left .cms-header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 28px;
+      padding: 14px 24px;
+    }
+    .cms-header-block.layout-left .cms-header-actions {
+      margin-left: auto;
     }
     .cms-header-block.layout-floating {
       border-radius: 999px;
@@ -2974,6 +3379,11 @@ function renderPublishedPage(page, blocks, tags) {
       background: transparent;
       color: #c7d2fe;
       border: 1.5px solid #6366f1;
+    }
+    .cms-header-cta-btn.cta-soft {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
     }
     .cms-header-cta-btn.cta-glow {
       background: #6366f1;

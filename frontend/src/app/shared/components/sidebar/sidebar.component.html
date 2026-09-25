@@ -89,6 +89,39 @@
       }
     </a>
 
+    <!-- Automations Nav Tab -->
+    <a routerLink="/automations" class="sidebar-nav-item" routerLinkActive="active"
+       [title]="isCollapsed() ? 'Automations (' + automationsCount() + ')' : ''">
+      <div class="nav-item-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      </div>
+      @if (!isCollapsed()) {
+        <span class="nav-item-label">Automations</span>
+        @if (automationsCount() > 0) {
+          <span class="nav-item-badge">{{ automationsCount() }}</span>
+        }
+      }
+    </a>
+
+    <!-- Settings Nav Tab -->
+    <button type="button" id="aladenSidebarSettingsBtn" class="sidebar-nav-item action-btn"
+            (click)="openSettings()" [title]="isCollapsed() ? 'Aladenflow Settings' : ''">
+      <div class="nav-item-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+      @if (!isCollapsed()) {
+        <span class="nav-item-label">Settings</span>
+        <span class="nav-item-badge app-badge">⚙</span>
+      }
+    </button>
+
     <!-- Context Info Box (Expanded Mode) -->
     @if (!isCollapsed()) {
       <div class="sidebar-context-box">
@@ -109,6 +142,14 @@
               <span class="val-text">{{ activePageTitle() }}</span>
             </div>
           </div>
+        } @else if (currentRoute() === '/automations') {
+          <div class="context-pill">
+            <span class="context-kicker">AUTOMATION FLOW</span>
+            <div class="context-val" [title]="activeFlowName()">
+              <span class="dot-indicator" style="background:#c084fc; box-shadow: 0 0 6px #c084fc;"></span>
+              <span class="val-text">{{ activeFlowName() }}</span>
+            </div>
+          </div>
         } @else if (currentRoute() === '/dashboard') {
           <div class="context-pill">
             <span class="context-kicker">WORKSPACE</span>
@@ -124,6 +165,21 @@
 
   <!-- Sidebar Footer -->
   <div class="sidebar-footer">
+    <!-- Settings Quick Action Button -->
+    <button type="button" id="aladenSidebarFooterSettingsBtn" class="sidebar-footer-btn settings-btn" (click)="openSettings()"
+            [title]="isCollapsed() ? 'Settings' : 'Aladenflow Settings & Preferences'">
+      <div class="footer-btn-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+      @if (!isCollapsed()) {
+        <span class="footer-btn-label">Settings</span>
+      }
+    </button>
+
     <!-- Theme Switcher -->
     <button type="button" class="sidebar-footer-btn" (click)="themeService.toggleThemeMode()"
             [title]="'Theme: ' + (themeService.themeMode() === 'auto' ? 'Auto (' + (themeService.systemIsDark() ? 'Dark' : 'Light') + ')' : (themeService.themeMode() | titlecase)) + ' — Click to switch'">
@@ -134,9 +190,8 @@
             <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
         } @else if (themeService.themeMode() === 'dark') {
-          <svg class="moon-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+          <svg class="moon-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
         } @else {
           <svg class="sun-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"

@@ -6,6 +6,8 @@ import { filter, map } from 'rxjs/operators';
 import { ThemeService } from '../../../core/services/theme.service';
 import { BoardService } from '../../../core/services/board.service';
 import { CmsService } from '../../../core/services/cms.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { AutomationService } from '../../../core/services/automation.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -18,9 +20,15 @@ export class SidebarComponent {
   themeService = inject(ThemeService);
   boardService = inject(BoardService);
   cmsService = inject(CmsService);
+  settingsService = inject(SettingsService);
+  automationService = inject(AutomationService);
   private router = inject(Router);
 
   isCollapsed = signal<boolean>(this.loadCollapsedState());
+
+  openSettings(tab: 'general' | 'ai' | 'canvas' | 'storage' = 'general') {
+    this.settingsService.open(tab);
+  }
 
   private loadCollapsedState(): boolean {
     try {
@@ -53,11 +61,17 @@ export class SidebarComponent {
     const url = this.routeEvent() || '';
     if (url.startsWith('/cms')) return '/cms';
     if (url.startsWith('/kanban')) return '/kanban';
+    if (url.startsWith('/automations')) return '/automations';
     return '/dashboard';
   });
 
   boardsCount = computed(() => this.boardService.boards().length);
   pagesCount = computed(() => this.cmsService.pages().length);
+  automationsCount = computed(() => this.automationService.automations().length);
+
+  activeFlowName = computed(() => {
+    return this.automationService.activeFlow()?.name || 'Automation Flow';
+  });
 
   activeBoardName = computed(() => {
     const id = this.boardService.activeBoardId();

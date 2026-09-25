@@ -1,9 +1,20 @@
 :host {
-  display: block;
+  display: contents;
 }
+
 .modal {
   display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px;
+  box-sizing: border-box;
 }
+
+.modal-panel,
+.ai-modal-panel {
+  margin: auto !important;
+}
+
 .ai-modal-panel {
   max-width: 600px;
   width: 95%;

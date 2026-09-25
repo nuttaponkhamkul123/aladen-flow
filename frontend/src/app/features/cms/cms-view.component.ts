@@ -7,6 +7,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CmsService } from '../../core/services/cms.service';
 import { ToastService } from '../../core/services/toast.service';
 import { ThemeService, ThemeMode } from '../../core/services/theme.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { CmsPage, ReusableBlock, Block, BlockCategory, BLOCK_DEFAULTS } from '../../core/models/cms.model';
 import { AiModalComponent } from './components/ai-modal/ai-modal.component';
 import { PROP_SCHEMAS, PropField } from './cms-prop-schema';
@@ -22,6 +23,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   cmsService = inject(CmsService);
   toastService = inject(ToastService);
   themeService = inject(ThemeService);
+  settingsService = inject(SettingsService);
   private destroyRef = inject(DestroyRef);
   private sanitizer = inject(DomSanitizer);
 
@@ -31,9 +33,14 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   selectedBlock = signal<Block | null>(null);
   reusableBlocks = signal<ReusableBlock[]>([]);
 
-  sidebarTab = signal<'blocks' | 'reusable' | 'tree'>('blocks');
+  sidebarTab = signal<'blocks' | 'reusable' | 'tree' | 'settings'>('blocks');
   leftSidebarCollapsed = signal<boolean>(false);
   rightSidebarCollapsed = signal<boolean>(false);
+
+  leftSidebarWidth = signal<number>(this.loadSidebarWidth('cms_left_sidebar_w', 280));
+  rightSidebarWidth = signal<number>(this.loadSidebarWidth('cms_right_sidebar_w', 300));
+  isResizingLeft = signal<boolean>(false);
+  isResizingRight = signal<boolean>(false);
 
   draggingOver = signal<boolean>(false);
   dragInsertIndex = signal<number | null>(null);
@@ -244,7 +251,11 @@ export class CmsViewComponent implements OnInit, OnDestroy {
     const type = p['bgType'] || 'none';
     const s: Record<string, string> = {};
 
-    if (type === 'color' && p['bgColor']) {
+    if (type === 'none') {
+      s['background'] = 'transparent';
+      s['background-color'] = 'transparent';
+      s['background-image'] = 'none';
+    } else if (type === 'color' && p['bgColor']) {
       s['background'] = p['bgColor'];
       s['background-color'] = p['bgColor'];
     } else if (type === 'gradient' && p['bgGradient']) {
@@ -271,7 +282,27 @@ export class CmsViewComponent implements OnInit, OnDestroy {
       }
     }
 
+    if (p['customCss'] && typeof p['customCss'] === 'string') {
+      Object.assign(s, this.getBlockCustomCss(b));
+    }
+
     return s;
+  }
+
+  getBlockCustomCss(b: Block): Record<string, string> {
+    if (!b || !b.props) return {};
+    const cssStr = b.props['customCss'];
+    if (!cssStr || typeof cssStr !== 'string') return {};
+    const res: Record<string, string> = {};
+    cssStr.split(';').forEach(rule => {
+      const idx = rule.indexOf(':');
+      if (idx > 0) {
+        const k = rule.substring(0, idx).trim().replace(/-([a-z])/g, (_, g) => g.toUpperCase());
+        const v = rule.substring(idx + 1).trim();
+        if (k && v) res[k] = v;
+      }
+    });
+    return res;
   }
 
   videoPresets = [
@@ -750,6 +781,108 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   toggleRightSidebar() {
     this.rightSidebarCollapsed.set(!this.rightSidebarCollapsed());
+  }
+
+  private loadSidebarWidth(key: string, fallback: number): number {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          const parsed = parseInt(val, 10);
+          if (!isNaN(parsed) && parsed >= 180 && parsed <= 700) return parsed;
+        }
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  startLeftResize(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isResizingLeft.set(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (e: MouseEvent) => {
+      const cmsElem = document.querySelector('.cms') as HTMLElement;
+      const leftOffset = cmsElem ? cmsElem.getBoundingClientRect().left : 0;
+      const newWidth = Math.max(200, Math.min(560, Math.round(e.clientX - leftOffset)));
+      this.leftSidebarWidth.set(newWidth);
+    };
+
+    const onMouseUp = () => {
+      this.isResizingLeft.set(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      try {
+        localStorage.setItem('cms_left_sidebar_w', String(this.leftSidebarWidth()));
+      } catch (_) {}
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  resetLeftSidebarWidth() {
+    this.leftSidebarWidth.set(280);
+    try {
+      localStorage.setItem('cms_left_sidebar_w', '280');
+    } catch (_) {}
+    this.toastService.show('Left sidebar reset to 280px', 'info');
+  }
+
+  startRightResize(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isResizingRight.set(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (e: MouseEvent) => {
+      const cmsWorkspace = document.querySelector('.cms-workspace') as HTMLElement;
+      const rightEdge = cmsWorkspace ? cmsWorkspace.getBoundingClientRect().right : window.innerWidth;
+      const newWidth = Math.max(220, Math.min(600, Math.round(rightEdge - e.clientX)));
+      this.rightSidebarWidth.set(newWidth);
+    };
+
+    const onMouseUp = () => {
+      this.isResizingRight.set(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      try {
+        localStorage.setItem('cms_right_sidebar_w', String(this.rightSidebarWidth()));
+      } catch (_) {}
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  resetRightSidebarWidth() {
+    this.rightSidebarWidth.set(300);
+    try {
+      localStorage.setItem('cms_right_sidebar_w', '300');
+    } catch (_) {}
+    this.toastService.show('Right inspector reset to 300px', 'info');
+  }
+
+  toggleLeftSidebarSettings() {
+    if (this.sidebarTab() === 'settings') {
+      this.sidebarTab.set('blocks');
+    } else {
+      this.sidebarTab.set('settings');
+      if (this.leftSidebarCollapsed()) {
+        this.leftSidebarCollapsed.set(false);
+      }
+    }
+  }
+
+  openGlobalSettings(tab: 'general' | 'ai' | 'canvas' | 'storage' = 'canvas') {
+    this.settingsService.open(tab);
   }
 
   setViewport(mode: 'desktop' | 'tablet' | 'mobile') {

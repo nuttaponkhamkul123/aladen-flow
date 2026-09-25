@@ -1,6 +1,6 @@
-<main class="cms" [class.left-collapsed]="leftSidebarCollapsed()">
+<main class="cms" [class.left-collapsed]="leftSidebarCollapsed()" [class.is-resizing]="isResizingLeft() || isResizingRight()" [style.gridTemplateColumns]="leftSidebarCollapsed() ? '0px 1fr' : (leftSidebarWidth() + 'px 1fr')">
   <!-- Left Sidebar (Blocks & Palette) -->
-  <aside id="cmsSidebar" class="cms-sidebar">
+  <aside id="cmsSidebar" class="cms-sidebar" [style.width.px]="leftSidebarCollapsed() ? 0 : leftSidebarWidth()">
     <div class="cms-sidebar-header-row">
       <div class="cms-sidebar-tabs">
         <button type="button" class="cms-sidebar-tab" [class.active]="sidebarTab() === 'blocks'"
@@ -15,18 +15,37 @@
           <span>Saved</span>
           <span class="cms-tab-badge">{{ reusableBlocks().length }}</span>
         </button>
+        <button type="button" id="cmsSidebarSettingsTabBtn" class="cms-sidebar-tab" [class.active]="sidebarTab() === 'settings'"
+                (click)="sidebarTab.set('settings')" title="Canvas & Page Settings">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span>Settings</span>
+        </button>
       </div>
 
-      <button type="button" id="cmsCollapseLeftSidebarBtn" class="sidebar-collapse-btn"
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button type="button" id="cmsLeftSidebarSettingsBtn" class="sidebar-collapse-btn"
+                [class.active]="sidebarTab() === 'settings'"
+                (click)="toggleLeftSidebarSettings()" title="Canvas & Page Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <button type="button" id="cmsCollapseLeftSidebarBtn" class="sidebar-collapse-btn"
               (click)="toggleLeftSidebar()" title="Collapse Left Sidebar">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <rect width="18" height="18" x="3" y="3" rx="2" />
           <path d="M9 3v18" /><path d="m14 9-3 3 3 3" />
         </svg>
       </button>
+      </div>
     </div>
 
     <!-- Component Search Bar -->
+    @if (sidebarTab() !== 'settings') {
     <div class="cms-blocks-search-wrap">
       <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
@@ -41,6 +60,7 @@
         </button>
       }
     </div>
+    }
 
     <!-- Palette View Content -->
     @if (sidebarTab() === 'blocks') {
@@ -118,6 +138,135 @@
             }
           </div>
         }
+      </div>
+    } @else if (sidebarTab() === 'settings') {
+      <div id="cmsLeftSidebarSettingsView" class="palette-scroll-wrap sidebar-settings-scroll-wrap" style="overflow-y:auto;flex:1;padding:4px 0 20px;">
+        <div class="sidebar-settings-header" style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary);">Canvas & Page Settings</div>
+            <div style="font-size:10.5px;color:var(--text-secondary);">Active page configuration</div>
+          </div>
+          <button type="button" class="btn ghost btn-xs" (click)="openGlobalSettings('ai')" title="Open AI Configuration" style="font-size:10px;padding:2px 6px;">
+            AI Config
+          </button>
+        </div>
+
+        <!-- Canvas Background -->
+        <div class="setting-row" style="margin-bottom:12px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Canvas Background</label>
+          <div class="select-wrapper">
+            <select [ngModel]="pageSettings()['bg'] || 'default'" (ngModelChange)="updateSetting('bg', $event)" class="prop-input" style="font-size:11.5px;padding:5px 8px;">
+              <option value="default">Default Surface</option>
+              <option value="dark">Obsidian Dark (#0b0f19)</option>
+              <option value="light">Clean Light (#f8fafc)</option>
+              <option value="slate">Slate Navy (#1e293b)</option>
+              <option value="custom">Custom Color...</option>
+            </select>
+          </div>
+          @if (pageSettings()['bg'] === 'custom') {
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+              <input type="color" [value]="pageSettings()['customBg'] || '#0f172a'"
+                     (input)="updateSetting('customBg', $any($event.target).value)" style="width:28px;height:28px;border-radius:4px;border:none;cursor:pointer;padding:0;" />
+              <input [ngModel]="pageSettings()['customBg'] || '#0f172a'"
+                     (ngModelChange)="updateSetting('customBg', $event)" class="prop-input" style="flex:1;font-size:11.5px;padding:4px 8px;" />
+            </div>
+          }
+        </div>
+
+        <!-- Page Max Width -->
+        <div class="setting-row" style="margin-bottom:12px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Page Max Width</label>
+          <div class="select-wrapper">
+            <select [ngModel]="pageSettings()['maxWidth'] || '820px'" (ngModelChange)="updateSetting('maxWidth', $event)" class="prop-input" style="font-size:11.5px;padding:5px 8px;">
+              <option value="640px">Narrow (640px)</option>
+              <option value="820px">Standard (820px)</option>
+              <option value="960px">Medium (960px)</option>
+              <option value="1100px">Wide (1100px)</option>
+              <option value="1280px">Expanded (1280px)</option>
+              <option value="100%">Full Width (100%)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Page Alignment -->
+        <div class="setting-row" style="margin-bottom:12px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Page Alignment</label>
+          <div class="select-wrapper">
+            <select [ngModel]="pageSettings()['align'] || 'center'" (ngModelChange)="updateSetting('align', $event)" class="prop-input" style="font-size:11.5px;padding:5px 8px;">
+              <option value="center">Centered</option>
+              <option value="left">Left Aligned</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Font Family -->
+        <div class="setting-row" style="margin-bottom:12px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Font Family</label>
+          <div class="select-wrapper">
+            <select [ngModel]="pageSettings()['fontFamily'] || 'system'" (ngModelChange)="updateSetting('fontFamily', $event)" class="prop-input" style="font-size:11.5px;padding:5px 8px;">
+              <option value="system">System Default</option>
+              <option value="inter">Inter (Clean Modern)</option>
+              <option value="roboto">Roboto (Geometric)</option>
+              <option value="outfit">Outfit (Display Sans)</option>
+              <option value="serif">Playfair Display (Serif)</option>
+              <option value="mono">JetBrains Mono (Code)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Theme Mode -->
+        <div class="setting-row" style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Canvas Theme</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <button type="button" class="btn ghost btn-xs" [class.primary]="editorTheme() === 'dark'"
+                    (click)="setEditorTheme('dark')" style="font-size:11px;padding:5px;">
+              Dark
+            </button>
+            <button type="button" class="btn ghost btn-xs" [class.primary]="editorTheme() === 'light'"
+                    (click)="setEditorTheme('light')" style="font-size:11px;padding:5px;">
+              Light
+            </button>
+          </div>
+        </div>
+
+        <!-- Studio Sidebar Dimensions -->
+        <div class="setting-row" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-subtle);">
+          <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">Sidebar Dimensions</div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary);">
+              <span>Left Sidebar:</span>
+              <strong style="color:var(--text-primary);">{{ leftSidebarWidth() }}px</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary);">
+              <span>Right Inspector:</span>
+              <strong style="color:var(--text-primary);">{{ rightSidebarWidth() }}px</strong>
+            </div>
+            <button type="button" class="btn ghost btn-xs" (click)="resetLeftSidebarWidth(); resetRightSidebarWidth()"
+                    style="margin-top:4px;font-size:10.5px;width:100%;justify-content:center;">
+              Reset Widths (280px / 300px)
+            </button>
+          </div>
+        </div>
+
+        <!-- Open App Settings Modal -->
+        <div style="margin-top:14px;">
+          <button type="button" class="btn btn-secondary btn-xs" (click)="openGlobalSettings('general')"
+                  style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;padding:6px 10px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span>Aladenflow App Settings</span>
+          </button>
+        </div>
+      </div>
+    }
+    @if (!leftSidebarCollapsed()) {
+      <div class="cms-resizer left-resizer"
+           (mousedown)="startLeftResize($event)"
+           (dblclick)="resetLeftSidebarWidth()"
+           title="Drag to resize Left Sidebar • Double-click to reset (280px)">
+        <div class="resizer-handle-line"></div>
       </div>
     }
   </aside>
@@ -240,8 +389,8 @@
               </svg>
               <span>{{ isPreviewMode() ? 'Preview: Auto' : 'Editor: Auto' }}</span>
             } @else if (currentModeTheme() === 'dark') {
-              <svg class="moon-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+              <svg class="moon-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
               <span>{{ isPreviewMode() ? 'Preview: Dark' : 'Editor: Dark' }}</span>
             } @else {
@@ -410,7 +559,7 @@
       }
 
       <!-- Workspace Area: Canvas + Inspector -->
-      <div class="cms-workspace" [class.right-collapsed]="rightSidebarCollapsed()">
+      <div class="cms-workspace" [class.right-collapsed]="rightSidebarCollapsed()" [style.gridTemplateColumns]="rightSidebarCollapsed() ? '1fr 0px' : ('1fr ' + rightSidebarWidth() + 'px')">
         <!-- Edge Expand Trigger for Right Sidebar -->
         <button type="button" id="cmsExpandRightSidebarBtn" class="cms-edge-expand-btn right"
                 (click)="toggleRightSidebar()" title="Expand Inspector">
@@ -429,6 +578,7 @@
                  [class.theme-dark]="effectiveCanvasTheme() === 'dark'"
                  [class.theme-light]="effectiveCanvasTheme() === 'light'"
                  [attr.data-theme]="effectiveCanvasTheme()"
+                 [class.is-preview-mode]="isPreviewMode()"
                  [class.has-device-frame]="showDeviceFrame() && viewportMode() !== 'desktop'"
                  [class.is-mobile-viewport]="viewportMode() === 'mobile'"
                  [class.is-tablet-viewport]="viewportMode() === 'tablet'"
@@ -436,6 +586,12 @@
                  [style.maxWidth]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] || '820px') : null"
                  [style.minWidth]="viewportMode() === 'desktop' ? (pageSettings()['minWidth'] || '0px') : null"
                  [style.width]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] === '100%' ? '100%' : (pageSettings()['maxWidth'] || '820px')) : null">
+
+              @if (showDeviceFrame() && viewportMode() !== 'desktop') {
+                <div class="device-frame-top">
+                  <div class="device-speaker-notch"></div>
+                </div>
+              }
 
               <!-- Rendered Blocks Container -->
               <div id="cmsCanvasDropList" #cmsCanvas class="cms-canvas"
@@ -447,7 +603,7 @@
                    [style.color]="getCanvasTextColor()"
                    [style.fontFamily]="getCanvasFontFamily()"
                    [style.borderRadius.px]="pageSettings()['borderRadius'] != null ? pageSettings()['borderRadius'] : 16"
-                   [style.padding]="(pageSettings()['paddingY'] != null ? pageSettings()['paddingY'] : 44) + 'px ' + (pageSettings()['paddingX'] != null ? pageSettings()['paddingX'] : 36) + 'px'"
+                   [style.padding]="viewportMode() === 'mobile' ? '18px 12px' : (pageSettings()['paddingY'] != null ? pageSettings()['paddingY'] : 44) + 'px ' + (pageSettings()['paddingX'] != null ? pageSettings()['paddingX'] : 36) + 'px'"
                    [style.minWidth]="viewportMode() === 'desktop' ? (pageSettings()['minWidth'] || '0px') : null"
                    [style.maxWidth]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] || '820px') : null"
                    [style.margin]="pageSettings()['align'] === 'left' && viewportMode() === 'desktop' ? '0 auto 0 0' : '0 auto'"
@@ -458,6 +614,8 @@
                    (drop)="onCanvasDrop($event)">
                 <ng-template #canvasBlockTemplate let-b="block" let-parent="parentBlock" let-idx="index" let-isChild="isChild">
                   <div [class]="isChild ? 'container-child' : 'block-wrap'"
+                       [class.is-flex-row-child]="isChild && parent?.props?.['mode'] !== 'grid' && parent?.props?.['direction'] === 'row'"
+                       [class.is-sticky-header]="b.type === 'header' && b.props['sticky']"
                        [class.selected]="selectedBlock()?.id === b.id"
                        [class.is-container]="b.type === 'container'"
                        [class.has-parallax]="b.props['parallax'] && (b.props['bgType'] === 'image' || b.props['bgType'] === 'video')"
@@ -469,7 +627,7 @@
                        (dragend)="onDragEnd()"
                        (click)="selectBlock(b, $event)"
                        style="position:relative;"
-                       [style.marginBottom.px]="isChild ? (b.type === 'container' ? 10 : 6) : 12">
+                       [style.marginBottom.px]="(isChild && parent?.props?.['mode'] !== 'grid' && parent?.props?.['direction'] === 'row') ? 0 : (isChild ? (b.type === 'container' ? 10 : 6) : 12)">
 
                     @if (b.props['bgType'] === 'video') {
                       <div class="block-video-bg"
@@ -544,31 +702,78 @@
 
                     @switch (b.type) {
                       @case ('header') {
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:10px;margin-bottom:12px;"
-                             [style.position]="b.props['sticky'] ? 'sticky' : 'static'"
-                             [style.top]="b.props['sticky'] ? '0' : 'auto'"
-                             [style.zIndex]="'10'">
-                          <span style="font-weight:800;font-size:15px;white-space:nowrap;">{{ b.props['brandName'] || 'Aladen Studio' }}</span>
-                          <nav style="display:flex;gap:14px;align-items:center;overflow-x:auto;min-width:0;">
-                            @for (lnk of b.props['links'] || []; track lnk.label) {
-                              <a [href]="lnk.url || '#'" style="text-decoration:none;color:var(--text-secondary);font-size:12.5px;font-weight:500;white-space:nowrap;">{{ lnk.label }}</a>
-                            }
-                          </nav>
-                          @if (b.props['showCta'] !== false) {
-                            <a [href]="b.props['ctaUrl'] || '#'" class="btn primary btn-sm" style="white-space:nowrap;">{{ b.props['ctaLabel'] || 'Get Started' }}</a>
+                        <header class="cms-header-block"
+                                [class.variant-glass]="(b.props['styleVariant'] || 'glass') === 'glass'"
+                                [class.variant-solid]="b.props['styleVariant'] === 'solid'"
+                                [class.variant-transparent]="b.props['styleVariant'] === 'transparent'"
+                                [class.variant-bordered]="b.props['styleVariant'] === 'bordered'"
+                                [class.layout-spread]="(b.props['layout'] || 'spread') === 'spread'"
+                                [class.layout-centered]="b.props['layout'] === 'centered' || b.props['layout'] === 'center'"
+                                [class.layout-left]="b.props['layout'] === 'left'"
+                                [class.layout-floating]="b.props['layout'] === 'floating'"
+                                [class.is-sticky]="b.props['sticky']"
+                                [style.position]="b.props['sticky'] ? 'sticky' : 'static'"
+                                [style.top]="b.props['sticky'] ? '0' : 'auto'"
+                                [style.zIndex]="'10'">
+                          @if (b.props['showTopBar']) {
+                            <div class="cms-header-topbar">
+                              @if (b.props['topBarBadge']) {
+                                <span class="cms-header-topbar-badge">{{ b.props['topBarBadge'] }}</span>
+                              }
+                              <a [href]="b.props['topBarLink'] || '#'" class="cms-header-topbar-link">{{ b.props['topBarText'] || 'Announcement message' }}</a>
+                            </div>
                           }
-                        </div>
+                          <div class="cms-header-inner">
+                            <a [href]="b.props['brandUrl'] || '#'" class="cms-header-brand">
+                              @if (b.props['brandLogo']) {
+                                <img [src]="b.props['brandLogo']" [alt]="b.props['brandName'] || 'Logo'" [style.height.px]="b.props['logoHeight'] || 32" class="cms-header-logo-img" />
+                              } @else if (b.props['brandIcon']) {
+                                <span class="cms-header-brand-icon">{{ b.props['brandIcon'] }}</span>
+                              }
+                              <span class="cms-header-brand-name">{{ b.props['brandName'] || 'Aladen Studio' }}</span>
+                            </a>
+                            <nav class="cms-header-nav" [style.display]="viewportMode() === 'mobile' ? 'none' : 'flex'">
+                              @for (lnk of b.props['links'] || []; track lnk.label) {
+                                <a [href]="lnk.url || '#'" class="cms-header-link">{{ lnk.label }}</a>
+                              }
+                            </nav>
+                            <div class="cms-header-actions">
+                              @if (b.props['showSearch']) {
+                                <div class="cms-header-search">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                                  </svg>
+                                  <input type="text" class="cms-header-search-input" [placeholder]="b.props['searchPlaceholder'] || 'Search...'" />
+                                </div>
+                              }
+                              @if (b.props['showCta'] !== false) {
+                                <a [href]="b.props['ctaUrl'] || '#'"
+                                   class="cms-header-cta-btn"
+                                   [class.cta-filled]="!b.props['ctaVariant'] || b.props['ctaVariant'] === 'filled'"
+                                   [class.cta-outline]="b.props['ctaVariant'] === 'outline'"
+                                   [class.cta-soft]="b.props['ctaVariant'] === 'soft'"
+                                   [class.cta-glow]="b.props['ctaVariant'] === 'glow'">
+                                  {{ b.props['ctaLabel'] || 'Get Started' }}
+                                </a>
+                              }
+                            </div>
+                          </div>
+                        </header>
                       }
 
                       @case ('heading') {
                         <div [style.textAlign]="b.props['align'] || 'left'"
                              [style.color]="b.props['color'] || 'inherit'"
+                             [style.marginTop.px]="isChild ? 0 : 18"
                              [style.marginBottom.px]="b.props['margin'] != null ? b.props['margin'] : 12">
                           @switch (b.props['level'] || 2) {
-                            @case (1) { <h1 style="font-size:32px;font-weight:800;letter-spacing:-0.03em;">{{ b.props['text'] || 'Heading 1' }}</h1> }
-                            @case (2) { <h2 style="font-size:24px;font-weight:700;letter-spacing:-0.02em;">{{ b.props['text'] || 'Heading 2' }}</h2> }
-                            @case (3) { <h3 style="font-size:20px;font-weight:600;">{{ b.props['text'] || 'Heading 3' }}</h3> }
-                            @default { <h4 style="font-size:16px;font-weight:600;">{{ b.props['text'] || 'Heading 4' }}</h4> }
+                            @case (1) { <h1 style="font-size:32px;font-weight:800;letter-spacing:-0.03em;margin:0;">{{ b.props['text'] || 'Heading 1' }}</h1> }
+                            @case (2) { <h2 style="font-size:24px;font-weight:700;letter-spacing:-0.02em;margin:0;">{{ b.props['text'] || 'Heading 2' }}</h2> }
+                            @case (3) { <h3 style="font-size:20px;font-weight:600;margin:0;">{{ b.props['text'] || 'Heading 3' }}</h3> }
+                            @case (4) { <h4 style="font-size:16px;font-weight:600;margin:0;">{{ b.props['text'] || 'Heading 4' }}</h4> }
+                            @case (5) { <h5 style="font-size:14px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;margin:0;">{{ b.props['text'] || 'Heading 5' }}</h5> }
+                            @case (6) { <h6 style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;margin:0;">{{ b.props['text'] || 'Heading 6' }}</h6> }
+                            @default { <h2 style="font-size:24px;font-weight:700;margin:0;">{{ b.props['text'] || 'Heading 2' }}</h2> }
                           }
                         </div>
                       }
@@ -585,11 +790,13 @@
                       }
 
                       @case ('button') {
-                        <div style="margin:14px 0;"
-                             [style.textAlign]="b.props['align'] === 'center' ? 'center' : b.props['align'] === 'right' ? 'right' : 'left'">
+                        <div [style.margin]="isChild ? '0' : '14px 0'"
+                             [style.width]="b.props['align'] === 'full' ? '100%' : null"
+                             [style.textAlign]="b.props['align'] === 'center' || b.props['align'] === 'full' ? 'center' : b.props['align'] === 'right' ? 'right' : 'left'">
                           <a [href]="b.props['url'] || '#'"
                              class="btn"
                              [style.display]="b.props['align'] === 'full' ? 'block' : 'inline-block'"
+                             [style.width]="b.props['align'] === 'full' ? '100%' : null"
                              [style.textAlign]="'center'"
                              [style.background]="b.props['variant'] === 'filled' ? (b.props['color'] || '#6366f1') : b.props['variant'] === 'soft' ? (b.props['color'] || '#6366f1') + '22' : 'transparent'"
                              [style.color]="b.props['variant'] === 'filled' ? (b.props['textColor'] || '#ffffff') : (b.props['color'] || '#6366f1')"
@@ -599,14 +806,14 @@
                              [style.fontSize]="b.props['size'] === 'small' ? '12.5px' : b.props['size'] === 'large' ? '16px' : '14px'"
                              [style.fontWeight]="'600'"
                              [style.textDecoration]="'none'"
-                             [style.boxSizing]="b.props['align'] === 'full' ? 'border-box' : 'border-box'">
+                             [style.boxSizing]="'border-box'">
                             {{ b.props['label'] || 'Button Action' }}
                           </a>
                         </div>
                       }
 
                       @case ('image') {
-                        <div style="margin:14px 0;"
+                        <div [style.margin]="isChild ? '0' : ((b.props['align'] === 'center' || !b.props['align']) ? '14px auto' : (b.props['align'] === 'right' ? '14px 0 14px auto' : '14px auto 14px 0'))"
                              [style.textAlign]="b.props['align'] || 'center'">
                           @if (b.props['url']) {
                             <img [src]="b.props['url']" [alt]="b.props['alt'] || ''"
@@ -629,18 +836,26 @@
                       }
 
                       @case ('bento') {
-                        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;margin-bottom:12px;">
-                          @for (item of b.props['items'] || []; track item.title) {
-                            <div style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:14px;"
-                                 [style.gridColumn]="item.span === 2 ? 'span 2' : 'span 1'">
-                              <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <span style="font-size:20px;">{{ item.icon }}</span>
-                                <span style="font-size:10px;background:rgba(59,130,246,0.15);color:#60a5fa;padding:2px 6px;border-radius:4px;">{{ item.tag }}</span>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin:16px 0;">
+                          @for (item of b.props['items'] || []; track $index) {
+                            <div class="cms-bento-card"
+                                 [style.gridColumn]="item.span === 2 ? 'span 2' : null"
+                                 [style.gridRow]="item.tall ? 'span 2' : null"
+                                 [style.background]="item.bg || 'var(--bg-surface-elevated)'"
+                                 style="border:1px solid var(--border-subtle);border-radius:16px;padding:20px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;">
+                              <div>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                  @if (item.icon) { <span style="font-size:22px;">{{ item.icon }}</span> }
+                                  @if (item.tag) { <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;background:rgba(99,102,241,0.15);color:#818cf8;padding:2.5px 8px;border-radius:999px;border:1px solid rgba(99,102,241,0.25);">{{ item.tag }}</span> }
+                                </div>
+                                <h4 style="margin:0 0 6px 0;font-size:16px;font-weight:700;">{{ item.title || 'Feature Tile' }}</h4>
+                                <p style="font-size:13px;color:var(--text-secondary);margin:0;line-height:1.5;">{{ item.subtitle }}</p>
+                                @if (item.metric) {
+                                  <div style="font-size:26px;font-weight:800;color:var(--text-primary);margin-top:8px;letter-spacing:-0.02em;">{{ item.metric }}</div>
+                                }
                               </div>
-                              <h4 style="margin:8px 0 4px;font-size:14px;">{{ item.title }}</h4>
-                              <p style="font-size:12px;color:var(--text-secondary);margin:0;">{{ item.subtitle }}</p>
-                              @if (item.metric) {
-                                <div style="font-size:20px;font-weight:800;color:#10b981;margin-top:8px;">{{ item.metric }}</div>
+                              @if (item.image) {
+                                <div [style.backgroundImage]="'url(' + item.image + ')'" style="width:100%;height:120px;border-radius:10px;background-size:cover;background-position:center;margin-top:12px;"></div>
                               }
                             </div>
                           }
@@ -734,7 +949,12 @@
                       }
 
                       @case ('divider') {
-                        <hr style="border:none;border-top:1px solid var(--border-subtle);margin:16px 0;" />
+                        <div [style.padding]="(b.props['margin'] != null ? b.props['margin'] : 16) + 'px 0'"
+                             style="display:flex;justify-content:center;width:100%;box-sizing:border-box;">
+                          <hr [style.width]="b.props['width'] || '100%'"
+                              [style.borderTop]="(b.props['thickness'] || 1) + 'px ' + (b.props['style'] || 'solid') + ' ' + (b.props['color'] || 'var(--border-subtle)')"
+                              style="border:none;margin:0;" />
+                        </div>
                       }
 
                       @case ('spacer') {
@@ -772,11 +992,11 @@
                              [style.padding.px]="b.props['padding'] != null ? b.props['padding'] : 16"
                              [style.borderRadius.px]="b.props['borderRadius'] != null ? b.props['borderRadius'] : 8"
                              [style.border]="b.props['border'] ? '1px solid var(--border-subtle)' : 'none'"
-                             [style.gridTemplateColumns]="b.props['mode'] === 'grid' ? 'repeat(' + (b.props['columns'] || 2) + ', minmax(0, 1fr))' : 'none'"
-                             [style.flexDirection]="b.props['mode'] !== 'grid' ? (b.props['direction'] || 'row') : 'row'"
+                             [style.gridTemplateColumns]="b.props['mode'] === 'grid' ? (viewportMode() === 'mobile' && !isLandscape() ? '1fr' : 'repeat(' + (b.props['columns'] || 2) + ', minmax(0, 1fr))') : 'none'"
+                             [style.flexDirection]="b.props['mode'] !== 'grid' ? (viewportMode() === 'mobile' && !isLandscape() && b.props['direction'] === 'row' && (!b.props['wrap'] || b.props['wrap'] === 'nowrap') ? 'column' : (b.props['direction'] || 'row')) : 'row'"
                              [style.justifyContent]="b.props['mode'] !== 'grid' ? (b.props['justify'] || 'flex-start') : 'stretch'"
                              [style.alignItems]="b.props['mode'] !== 'grid' ? (b.props['align'] || 'stretch') : 'stretch'"
-                             [style.flexWrap]="b.props['mode'] !== 'grid' ? (b.props['wrap'] || 'wrap') : 'nowrap'"
+                             [style.flexWrap]="b.props['mode'] !== 'grid' ? (viewportMode() === 'mobile' ? 'wrap' : (b.props['wrap'] || 'wrap')) : 'nowrap'"
                              [style.background]="b.props['bg'] === 'surface' ? 'var(--bg-surface-elevated)' : b.props['bg'] === 'dark' ? '#0f172a' : 'transparent'"
                              class="container-block-preview" [class.drag-target]="isContainerDragOver(b)" [class.drag-over]="isContainerDragOver(b)"
                              style="margin-bottom:12px;position:relative;min-height:50px;"
@@ -1061,15 +1281,29 @@
                   }
                 }
                 @if (draggingOver() && dragInsertIndex() === currentBlocks().length) {
-                  <div class="drop-indicator"></div>
-                }
+                    <div class="drop-indicator"></div>
+                  }
               </div>
+
+              @if (showDeviceFrame() && viewportMode() !== 'desktop') {
+                <div class="device-frame-bottom">
+                  <div class="device-home-bar"></div>
+                </div>
+              }
             </div>
           </div>
         </div>
 
         <!-- Right Sidebar Inspector -->
-        <aside id="cmsPropsPanel" class="cms-props">
+        <aside id="cmsPropsPanel" class="cms-props" [style.width.px]="rightSidebarCollapsed() ? 0 : rightSidebarWidth()">
+          @if (!rightSidebarCollapsed()) {
+            <div class="cms-resizer right-resizer"
+                 (mousedown)="startRightResize($event)"
+                 (dblclick)="resetRightSidebarWidth()"
+                 title="Drag to resize Inspector • Double-click to reset (300px)">
+              <div class="resizer-handle-line"></div>
+            </div>
+          }
           <div class="props-header">
             <div style="display:flex;align-items:center;gap:8px;">
               <label class="section-eyebrow" style="margin:0;">

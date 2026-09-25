@@ -69,7 +69,8 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
     { key: 'color', label: 'Text Color', type: 'color', placeholder: '#ffffff' },
     { key: 'margin', label: 'Bottom Margin (px)', type: 'number', min: 0, max: 120 },
     { key: 'linkUrl', label: 'Link URL (optional)', type: 'text', placeholder: 'https://...' },
-    { key: 'newTab', label: 'Open link in new tab', type: 'toggle', onLabel: 'Yes' }
+    { key: 'newTab', label: 'Open link in new tab', type: 'toggle', onLabel: 'Yes' },
+    { key: 'anchorId', label: 'Section Anchor ID (#hash)', type: 'text', placeholder: 'e.g. pricing, features, faq' }
   ],
 
   paragraph: [
@@ -222,6 +223,8 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
     ] },
     { key: 'border', label: 'Border', type: 'toggle', onLabel: 'Yes' },
     { key: 'shadow', label: 'Shadow', type: 'toggle', onLabel: 'Yes' },
+    { key: 'linkUrl', label: 'Clickable Card URL (optional)', type: 'text', placeholder: 'https://... or /p/slug' },
+    { key: 'anchorId', label: 'Section Anchor ID (#hash)', type: 'text', placeholder: 'e.g. craft, capabilities, testimonials' },
     { key: 'children', label: 'Child Blocks', type: 'children', addLabel: 'Add Child',
       note: 'Children render inside the layout on the published page. Canvas shows them as outlines.' }
   ],
@@ -405,12 +408,14 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
     { key: 'layout', label: 'Layout', type: 'select', options: [
       { value: 'spread', label: 'Spread (links on right)' },
       { value: 'left', label: 'Left Aligned Links' },
-      { value: 'center', label: 'Centered Links' }
+      { value: 'center', label: 'Centered Links' },
+      { value: 'floating', label: 'Floating Pill' }
     ] },
     { key: 'styleVariant', label: 'Style Variant', type: 'select', options: [
       { value: 'glass', label: 'Glass' },
       { value: 'solid', label: 'Solid' },
-      { value: 'transparent', label: 'Transparent' }
+      { value: 'transparent', label: 'Transparent' },
+      { value: 'bordered', label: 'Bordered' }
     ] },
     { key: 'sticky', label: 'Sticky Header', type: 'toggle', onLabel: 'Yes' },
     { key: 'links', label: 'Navigation Links', type: 'objectlist', itemLabel: 'Link', addLabel: 'Add Link',
@@ -431,7 +436,8 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
     { key: 'ctaVariant', label: 'CTA Style', type: 'select', options: [
       { value: 'filled', label: 'Filled' },
       { value: 'outline', label: 'Outline' },
-      { value: 'soft', label: 'Soft' }
+      { value: 'soft', label: 'Soft' },
+      { value: 'glow', label: 'Glow' }
     ] },
     { key: 'logoHeight', label: 'Logo Height (px)', type: 'number', min: 16, max: 120 },
     { key: 'children', label: 'Component Carousel Slides', type: 'children', addLabel: 'Add Child',

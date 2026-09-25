@@ -165,11 +165,37 @@ CREATE TABLE IF NOT EXISTS reusable_blocks (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS automations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  trigger_type TEXT NOT NULL DEFAULT 'checklist_completed',
+  is_active INTEGER NOT NULL DEFAULT 1,
+  nodes_json TEXT NOT NULL DEFAULT '[]',
+  edges_json TEXT NOT NULL DEFAULT '[]',
+  execution_count INTEGER NOT NULL DEFAULT 0,
+  last_executed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS automation_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  automation_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'success',
+  summary TEXT NOT NULL,
+  details_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (automation_id) REFERENCES automations(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_columns_board ON columns(board_id);
 CREATE INDEX IF NOT EXISTS idx_cards_column ON cards(column_id);
 CREATE INDEX IF NOT EXISTS idx_card_labels_card ON card_labels(card_id);
 CREATE INDEX IF NOT EXISTS idx_checklist_card ON checklist_items(card_id);
 CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag);
+CREATE INDEX IF NOT EXISTS idx_automations_active ON automations(is_active);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_auto ON automation_logs(automation_id);
 `);
 
 try {
@@ -338,6 +364,199 @@ function seedIfEmpty() {
   }
 }
 
+function seedAutomationsIfEmpty() {
+  try {
+    const count = db.prepare('SELECT COUNT(*) AS c FROM automations').get()?.c || 0;
+    if (count > 0) return;
+
+    const insertAuto = db.prepare(`
+      INSERT INTO automations (name, description, trigger_type, is_active, nodes_json, edges_json, execution_count, last_executed_at)
+      VALUES (?, ?, ?, 1, ?, ?, ?, datetime('now'))
+    `);
+
+    const auto1Nodes = [
+      {
+        id: 'node_trig_1',
+        type: 'trigger',
+        title: 'Checklist Completed',
+        subtitle: 'When all checklist items on a card are checked',
+        x: 60,
+        y: 160,
+        config: {
+          event: 'checklist_completed',
+          label: 'Card Checklist 100%'
+        }
+      },
+      {
+        id: 'node_cond_1',
+        type: 'condition',
+        title: 'Not in Done Column',
+        subtitle: 'Verify card is not already in Done column',
+        x: 420,
+        y: 160,
+        config: {
+          field: 'column_name',
+          operator: 'not_equals',
+          value: 'Done'
+        }
+      },
+      {
+        id: 'node_act_1',
+        type: 'action',
+        title: 'Promote to Done Column',
+        subtitle: 'Automatically move card into "Done" column and record activity',
+        x: 780,
+        y: 160,
+        config: {
+          action_type: 'move_card_column',
+          target_column: 'Done',
+          add_activity: 'Auto-promoted to Done on checklist 100% completion'
+        }
+      }
+    ];
+    const auto1Edges = [
+      { id: 'edge_1_1', source: 'node_trig_1', target: 'node_cond_1' },
+      { id: 'edge_1_2', source: 'node_cond_1', target: 'node_act_1' }
+    ];
+
+    const auto2Nodes = [
+      {
+        id: 'node_trig_2',
+        type: 'trigger',
+        title: 'Card Created / Updated',
+        subtitle: 'When card details or title are modified',
+        x: 60,
+        y: 160,
+        config: {
+          event: 'card_updated',
+          label: 'Card Updated'
+        }
+      },
+      {
+        id: 'node_cond_2',
+        type: 'condition',
+        title: 'Detect Urgent Bug',
+        subtitle: 'Title or description matches "bug", "urgent", or "critical"',
+        x: 420,
+        y: 160,
+        config: {
+          field: 'title_or_desc',
+          operator: 'contains',
+          value: 'bug'
+        }
+      },
+      {
+        id: 'node_act_2',
+        type: 'action',
+        title: 'Escalate to Urgent Priority',
+        subtitle: 'Set priority to Urgent and elevate card on board',
+        x: 780,
+        y: 160,
+        config: {
+          action_type: 'set_priority',
+          priority: 'urgent',
+          add_activity: 'Escalated to Urgent priority by bug detection rule'
+        }
+      }
+    ];
+    const auto2Edges = [
+      { id: 'edge_2_1', source: 'node_trig_2', target: 'node_cond_2' },
+      { id: 'edge_2_2', source: 'node_cond_2', target: 'node_act_2' }
+    ];
+
+    const auto3Nodes = [
+      {
+        id: 'node_trig_3',
+        type: 'trigger',
+        title: 'CMS Page Published',
+        subtitle: 'When a site page status changes to Published',
+        x: 60,
+        y: 160,
+        config: {
+          event: 'cms_page_published',
+          label: 'Page Published'
+        }
+      },
+      {
+        id: 'node_cond_3',
+        type: 'condition',
+        title: 'Status is Published',
+        subtitle: 'Ensure published status is valid',
+        x: 420,
+        y: 160,
+        config: {
+          field: 'status',
+          operator: 'equals',
+          value: 'published'
+        }
+      },
+      {
+        id: 'node_act_3',
+        type: 'action',
+        title: 'Create Board QA Card',
+        subtitle: 'Auto-create card in "Review" column with checklist',
+        x: 780,
+        y: 160,
+        config: {
+          action_type: 'create_card',
+          target_column: 'Review',
+          title_prefix: 'Verify Live SEO: ',
+          priority: 'high',
+          add_activity: 'Generated QA verification card for newly published CMS page'
+        }
+      }
+    ];
+    const auto3Edges = [
+      { id: 'edge_3_1', source: 'node_trig_3', target: 'node_cond_3' },
+      { id: 'edge_3_2', source: 'node_cond_3', target: 'node_act_3' }
+    ];
+
+    const tx = db.transaction(() => {
+      const id1 = insertAuto.run(
+        'Auto-Move to Done on Checklist Completion',
+        'When all checklist items on a card are checked, automatically transition it into the Done column.',
+        'checklist_completed',
+        JSON.stringify(auto1Nodes),
+        JSON.stringify(auto1Edges),
+        12
+      ).lastInsertRowid;
+
+      const id2 = insertAuto.run(
+        'Urgent Bug Escalator',
+        'Automatically escalates priority to Urgent when any card is tagged or titled as a bug.',
+        'card_updated',
+        JSON.stringify(auto2Nodes),
+        JSON.stringify(auto2Edges),
+        7
+      ).lastInsertRowid;
+
+      const id3 = insertAuto.run(
+        'CMS Publish -> Kanban QA Verification',
+        'When a page is published in Site Builder, automatically create a verification card in the Kanban Review column.',
+        'cms_page_published',
+        JSON.stringify(auto3Nodes),
+        JSON.stringify(auto3Edges),
+        3
+      ).lastInsertRowid;
+
+      const logStmt = db.prepare(`
+        INSERT INTO automation_logs (automation_id, status, summary, details_json, created_at)
+        VALUES (?, ?, ?, ?, datetime('now', ?))
+      `);
+
+      logStmt.run(id1, 'success', 'Card "Deploy landing page" moved to Done (3/3 items complete)', JSON.stringify({ cardId: 1, column: 'Done' }), '-10 minutes');
+      logStmt.run(id1, 'success', 'Card "Fix mobile touch target" moved to Done (2/2 items complete)', JSON.stringify({ cardId: 2, column: 'Done' }), '-45 minutes');
+      logStmt.run(id2, 'success', 'Card "Production SSL expired" priority set to Urgent', JSON.stringify({ cardId: 3, priority: 'urgent' }), '-2 hours');
+      logStmt.run(id3, 'success', 'Created QA card "Verify Live SEO: Product Roadmap" in Review column', JSON.stringify({ page: 'Product Roadmap' }), '-5 hours');
+    });
+
+    tx();
+  } catch (err) {
+    console.error('Failed to seed automations:', err);
+  }
+}
+
 seedIfEmpty();
+seedAutomationsIfEmpty();
 
 module.exports = db;

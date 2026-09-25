@@ -8,6 +8,10 @@
   </div>
 </div>
 
+@if (settingsService.isOpen()) {
+  <app-settings-modal></app-settings-modal>
+}
+
 <div class="toast-container" id="toastContainer">
   @for (t of toasts(); track t.id) {
     <div class="toast toast-{{ t.type }}">
