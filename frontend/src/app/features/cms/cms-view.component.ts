@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, effect, DestroyRef } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, inject, signal, computed, effect, DestroyRef, ViewChild, ElementRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule } from '@angular/cdk/drag-drop';
@@ -19,7 +19,9 @@ import { PROP_SCHEMAS, PropField } from './cms-prop-schema';
   templateUrl: './cms-view.component.html',
   styleUrls: ['./cms-view.component.css']
 })
-export class CmsViewComponent implements OnInit, OnDestroy {
+export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('canvasIframe') canvasIframe?: ElementRef<HTMLIFrameElement>;
+  @ViewChild('cmsCanvas') cmsCanvas?: ElementRef<HTMLElement>;
   cmsService = inject(CmsService);
   toastService = inject(ToastService);
   themeService = inject(ThemeService);
@@ -32,6 +34,13 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   currentBlocks = signal<Block[]>([]);
   selectedBlock = signal<Block | null>(null);
   reusableBlocks = signal<ReusableBlock[]>([]);
+
+  // --- Undo / Redo History Stack ---
+  undoStack = signal<{ blocks: Block[]; settings: Record<string, any>; selectedBlockId: string | null }[]>([]);
+  redoStack = signal<{ blocks: Block[]; settings: Record<string, any>; selectedBlockId: string | null }[]>([]);
+  canUndo = computed(() => this.undoStack().length > 0);
+  canRedo = computed(() => this.redoStack().length > 0);
+  private historyDebounceTimer: any = null;
 
   sidebarTab = signal<'blocks' | 'reusable' | 'tree' | 'settings'>('blocks');
   leftSidebarCollapsed = signal<boolean>(false);
@@ -327,7 +336,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   private setupParallaxVideo() {
     if (this.videoParallaxBound) return;
-    const canvas = document.getElementById('cmsCanvasDropList');
+    const canvas = this.getCanvasElement();
     if (!canvas) return;
     this.videoParallaxBound = true;
     this.videoParallaxCanvas = canvas;
@@ -385,6 +394,8 @@ export class CmsViewComponent implements OnInit, OnDestroy {
       const page = this.activePage();
       if (page && page.id && page.id !== this.lastLoadedPageId) {
         this.lastLoadedPageId = page.id;
+        this.undoStack.set([]);
+        this.redoStack.set([]);
         let blocks = page.blocks || [];
         if (typeof blocks === 'string') {
           try { blocks = JSON.parse(blocks); } catch (_) { blocks = []; }
@@ -905,6 +916,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   addBlock(type: string, index?: number) {
+    this.recordHistory();
     const defaults = BLOCK_DEFAULTS[type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[type])) : {};
     const newBlock: Block = {
       id: 'b' + Math.random().toString(36).slice(2, 10),
@@ -921,6 +933,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   addReusableBlock(r: ReusableBlock, index?: number) {
+    this.recordHistory();
     if (!r || !r.block_data) {
       this.toastService.error('Invalid reusable component data');
       return;
@@ -990,7 +1003,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   onCanvasDragLeave(event: DragEvent) {
     if (!this.dragPayload) return;
-    const canvas = document.getElementById('cmsCanvasDropList');
+    const canvas = this.getCanvasElement();
     if (!canvas) return;
     if (event.relatedTarget && canvas.contains(event.relatedTarget as Node)) return;
     this.draggingOver.set(false);
@@ -1113,6 +1126,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   insertBlockAt(type: string, targetContainerId: string | null, targetIndex: number) {
+    this.recordHistory();
     const defaults = BLOCK_DEFAULTS[type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[type])) : {};
     const newBlock: Block = {
       id: this.newBlockId(),
@@ -1135,6 +1149,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   insertReusableBlockAt(reusableId: number, targetContainerId: string | null, targetIndex: number) {
+    this.recordHistory();
     const r = this.reusableBlocks().find(x => x.id === reusableId);
     if (!r) return;
     const clone = JSON.parse(JSON.stringify(r.block_data));
@@ -1156,6 +1171,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   deleteBlock(id: string, event?: Event) {
     if (event) event.stopPropagation();
+    this.recordHistory();
     const loc = this.findBlockLocation(id);
     if (loc) {
       loc.parentArray.splice(loc.index, 1);
@@ -1170,6 +1186,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   moveBlockUp(blockOrIdx: Block | number, event?: Event) {
     if (event) event.stopPropagation();
+    this.recordHistory();
     let blockId: string | null = null;
     if (typeof blockOrIdx === 'object' && blockOrIdx !== null) {
       blockId = blockOrIdx.id;
@@ -1192,6 +1209,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   moveBlockDown(blockOrIdx: Block | number, event?: Event) {
     if (event) event.stopPropagation();
+    this.recordHistory();
     let blockId: string | null = null;
     if (typeof blockOrIdx === 'object' && blockOrIdx !== null) {
       blockId = blockOrIdx.id;
@@ -1214,6 +1232,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
 
   duplicateBlock(b: Block, event?: Event) {
     if (event) event.stopPropagation();
+    this.recordHistory();
     const cloned: Block = JSON.parse(JSON.stringify(b));
     this.reassignIds(cloned);
 
@@ -1250,34 +1269,47 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   onTreeNodeMouseEnter(blockId: string) {
-    const el = document.querySelector(`.cms-canvas [data-block-id="${blockId}"]`);
+    const iframe = this.canvasIframe?.nativeElement;
+    const doc = iframe?.contentDocument || iframe?.contentWindow?.document || document;
+    const el = doc.querySelector(`[data-block-id="${blockId}"]`);
     if (el) el.classList.add('tree-hover-highlight');
   }
 
   onTreeNodeMouseLeave(blockId: string) {
-    const el = document.querySelector(`.cms-canvas [data-block-id="${blockId}"]`);
+    const iframe = this.canvasIframe?.nativeElement;
+    const doc = iframe?.contentDocument || iframe?.contentWindow?.document || document;
+    const el = doc.querySelector(`[data-block-id="${blockId}"]`);
     if (el) el.classList.remove('tree-hover-highlight');
   }
 
   scrollToBlock(blockId: string) {
     setTimeout(() => {
-      const el = document.querySelector(`.cms-canvas [data-block-id="${blockId}"]`) as HTMLElement;
+      const iframe = this.canvasIframe?.nativeElement;
+      const doc = iframe?.contentDocument || iframe?.contentWindow?.document;
+      const el = (doc?.querySelector(`[data-block-id="${blockId}"]`) || document.querySelector(`[data-block-id="${blockId}"]`)) as HTMLElement;
       if (!el) return;
 
-      const canvasWrap = document.querySelector('.cms-canvas-wrap') as HTMLElement;
-      if (canvasWrap) {
-        const wrapRect = canvasWrap.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        const currentScroll = canvasWrap.scrollTop;
-        const targetScroll = currentScroll + (elRect.top - wrapRect.top) - (wrapRect.height / 2) + (elRect.height / 2);
-        canvasWrap.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
-      } else {
+      try {
         el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      } catch (_) {}
+
+      const canvasWrap = document.querySelector('.cms-canvas-wrap') as HTMLElement;
+      if (canvasWrap && iframe) {
+        try {
+          const wrapRect = canvasWrap.getBoundingClientRect();
+          const iframeRect = iframe.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const absTopInWrap = (iframeRect.top - wrapRect.top) + elRect.top + canvasWrap.scrollTop;
+          const targetScroll = absTopInWrap - (wrapRect.height / 2) + (elRect.height / 2);
+          canvasWrap.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+        } catch (_) {}
       }
 
+      el.classList.remove('pulse-highlight');
+      void el.offsetWidth;
       el.classList.add('pulse-highlight');
-      setTimeout(() => el.classList.remove('pulse-highlight'), 1600);
-    }, 60);
+      setTimeout(() => el.classList.remove('pulse-highlight'), 1800);
+    }, 40);
   }
 
   selectTreeBlock(block: Block, event?: Event) {
@@ -1514,6 +1546,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   private mutateAndSave(fn: () => void) {
+    this.recordHistoryDebounced();
     fn();
     this.currentBlocks.set([...this.currentBlocks()]);
     this.savePageDebounced();
@@ -1778,31 +1811,31 @@ export class CmsViewComponent implements OnInit, OnDestroy {
         bg: isDark ? 'rgba(139, 92, 246, 0.12)' : 'rgba(139, 92, 246, 0.08)',
         border: '#8b5cf6',
         titleColor: isDark ? '#a78bfa' : '#6d28d9',
-        icon: '💡'
+        icon: 'tip'
       },
       info: {
         bg: isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)',
         border: '#3b82f6',
         titleColor: isDark ? '#60a5fa' : '#1d4ed8',
-        icon: 'ℹ️'
+        icon: 'info'
       },
       success: {
         bg: isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
         border: '#10b981',
         titleColor: isDark ? '#34d399' : '#047857',
-        icon: '✅'
+        icon: 'success'
       },
       warning: {
         bg: isDark ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.08)',
         border: '#f59e0b',
         titleColor: isDark ? '#fbbf24' : '#b45309',
-        icon: '⚠️'
+        icon: 'warning'
       },
       danger: {
         bg: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
         border: '#ef4444',
         titleColor: isDark ? '#f87171' : '#b91c1c',
-        icon: '🛑'
+        icon: 'danger'
       }
     };
     return themes[type] || themes['info'];
@@ -1936,6 +1969,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   updateSetting(key: string, value: any) {
+    this.recordHistoryDebounced();
     this.pageSettings.update(s => ({ ...s, [key]: value }));
     this.savePageDebounced();
   }
@@ -2065,7 +2099,7 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   private computeInsertIndex(event: DragEvent): number {
-    const canvas = document.getElementById('cmsCanvasDropList');
+    const canvas = this.getCanvasElement();
     if (!canvas) return 0;
     const wraps = Array.from(canvas.querySelectorAll<HTMLElement>(':scope > .block-wrap'));
     if (!wraps.length) return 0;
@@ -2106,7 +2140,393 @@ export class CmsViewComponent implements OnInit, OnDestroy {
   }
 
   private dragPayloadGetIndex(): number {
-    const canvas = document.getElementById('cmsCanvasDropList');
+    const canvas = this.getCanvasElement();
     return canvas ? canvas.querySelectorAll<HTMLElement>(':scope > .block-wrap').length : 0;
+  }
+
+  ngAfterViewInit() {
+    setTimeout(() => this.setupIframeCanvas(), 50);
+  }
+
+  getCanvasElement(): HTMLElement | null {
+    if (this.cmsCanvas?.nativeElement) return this.cmsCanvas.nativeElement;
+    const iframeDoc = this.canvasIframe?.nativeElement?.contentDocument;
+    return iframeDoc?.getElementById('cmsCanvasDropList') || document.getElementById('cmsCanvasDropList');
+  }
+
+  setupIframeCanvas() {
+    const iframe = this.canvasIframe?.nativeElement;
+    if (!iframe) return;
+
+    let doc: Document | null = null;
+    try {
+      doc = iframe.contentDocument || iframe.contentWindow?.document || null;
+    } catch (err) {
+      console.error('Could not access iframe contentDocument', err);
+      return;
+    }
+    if (!doc || !doc.body) return;
+
+    // 1. Sync typography & Google Fonts into iframe head
+    if (!doc.head.querySelector('link[data-cms-fonts]')) {
+      const fontsLink = doc.createElement('link');
+      fontsLink.rel = 'stylesheet';
+      fontsLink.setAttribute('data-cms-fonts', 'true');
+      fontsLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap';
+      doc.head.appendChild(fontsLink);
+    }
+
+    // 2. Clone stylesheets and styles from host into iframe head
+    doc.head.querySelectorAll('.cloned-style').forEach(el => el.remove());
+    const hostStyles = document.querySelectorAll('link[rel="stylesheet"], style');
+    hostStyles.forEach(node => {
+      if (node.tagName.toLowerCase() === 'link' && (node as HTMLLinkElement).href?.includes('fonts.googleapis.com')) {
+        return;
+      }
+      try {
+        const clone = node.cloneNode(true) as HTMLElement;
+        clone.classList.add('cloned-style');
+        doc!.head.appendChild(clone);
+      } catch (_) {}
+    });
+
+    // 3. Reset and base iframe styling
+    let resetStyle = doc.head.querySelector('#cmsIframeResetStyle') as HTMLStyleElement;
+    if (!resetStyle) {
+      resetStyle = doc.createElement('style');
+      resetStyle.id = 'cmsIframeResetStyle';
+      doc.head.appendChild(resetStyle);
+    }
+    resetStyle.textContent = `
+      html {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+      }
+      body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-height: 100% !important;
+        height: 100% !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        background: transparent !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        -webkit-font-smoothing: antialiased;
+      }
+      #cmsCanvasDropList {
+        width: 100% !important;
+        min-height: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        flex: 1 0 auto !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.16);
+        border-radius: 9999px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.28);
+      }
+      .pulse-highlight {
+        animation: pulseBlockHighlight 1.8s ease-out !important;
+        outline: 2px solid #6366f1 !important;
+        outline-offset: 3px !important;
+        border-radius: 6px !important;
+      }
+      @keyframes pulseBlockHighlight {
+        0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.85); }
+        40% { box-shadow: 0 0 0 12px rgba(99, 102, 241, 0.15); }
+        100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+      }
+      .tree-hover-highlight {
+        outline: 2px dashed rgba(99, 102, 241, 0.75) !important;
+        outline-offset: 2px !important;
+      }
+    `;
+
+    // 4. Sync theme attributes
+    doc.documentElement.setAttribute('data-theme', this.effectiveCanvasTheme());
+    doc.body.className = `theme-${this.effectiveCanvasTheme()}`;
+
+    // 5. Mount cmsCanvas element into iframe body
+    const canvasEl = this.cmsCanvas?.nativeElement;
+    if (canvasEl && canvasEl.parentElement !== doc.body) {
+      doc.body.appendChild(canvasEl);
+    }
+
+    // 6. Bind event listeners on iframe document
+    if (!iframe.getAttribute('data-events-bound')) {
+      iframe.setAttribute('data-events-bound', 'true');
+
+      doc.addEventListener('dragover', (e: DragEvent) => {
+        this.onCanvasDragOver(e);
+      });
+
+      doc.addEventListener('dragleave', (e: DragEvent) => {
+        this.onCanvasDragLeave(e);
+      });
+
+      doc.addEventListener('drop', (e: DragEvent) => {
+        this.onCanvasDrop(e);
+      });
+
+      doc.addEventListener('click', (e: MouseEvent) => {
+        if (e.target === doc?.body || (e.target as HTMLElement)?.id === 'cmsCanvasDropList') {
+          this.deselectBlock();
+        }
+      });
+      doc.addEventListener('keydown', (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement;
+        const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+        if (isInput) return;
+
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            this.redo();
+          } else {
+            this.undo();
+          }
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          this.redo();
+        }
+      });
+    }
+  }
+
+
+  recordHistory() {
+    const snapshot = {
+      blocks: JSON.parse(JSON.stringify(this.currentBlocks())),
+      settings: JSON.parse(JSON.stringify(this.pageSettings())),
+      selectedBlockId: this.selectedBlock()?.id || null
+    };
+    this.undoStack.update(stack => {
+      const next = [...stack, snapshot];
+      if (next.length > 50) next.shift();
+      return next;
+    });
+    this.redoStack.set([]);
+  }
+
+  recordHistoryDebounced() {
+    if (this.historyDebounceTimer) return;
+    this.recordHistory();
+    this.historyDebounceTimer = setTimeout(() => {
+      this.historyDebounceTimer = null;
+    }, 450);
+  }
+
+  undo() {
+    const stack = this.undoStack();
+    if (stack.length === 0) return;
+
+    const previousSnapshot = stack[stack.length - 1];
+    const newUndo = stack.slice(0, stack.length - 1);
+
+    const currentSnapshot = {
+      blocks: JSON.parse(JSON.stringify(this.currentBlocks())),
+      settings: JSON.parse(JSON.stringify(this.pageSettings())),
+      selectedBlockId: this.selectedBlock()?.id || null
+    };
+
+    this.redoStack.update(r => [...r, currentSnapshot]);
+    this.undoStack.set(newUndo);
+
+    this.currentBlocks.set(JSON.parse(JSON.stringify(previousSnapshot.blocks)));
+    this.pageSettings.set({ ...previousSnapshot.settings });
+
+    if (previousSnapshot.selectedBlockId) {
+      const blk = this.findBlock(previousSnapshot.selectedBlockId);
+      this.selectedBlock.set(blk || null);
+    } else {
+      this.selectedBlock.set(null);
+    }
+
+    setTimeout(() => this.setupIframeCanvas(), 0);
+    this.savePageDebounced();
+    this.toastService.info('Undo applied');
+  }
+
+  redo() {
+    const stack = this.redoStack();
+    if (stack.length === 0) return;
+
+    const nextSnapshot = stack[stack.length - 1];
+    const newRedo = stack.slice(0, stack.length - 1);
+
+    const currentSnapshot = {
+      blocks: JSON.parse(JSON.stringify(this.currentBlocks())),
+      settings: JSON.parse(JSON.stringify(this.pageSettings())),
+      selectedBlockId: this.selectedBlock()?.id || null
+    };
+
+    this.undoStack.update(u => [...u, currentSnapshot]);
+    this.redoStack.set(newRedo);
+
+    this.currentBlocks.set(JSON.parse(JSON.stringify(nextSnapshot.blocks)));
+    this.pageSettings.set({ ...nextSnapshot.settings });
+
+    if (nextSnapshot.selectedBlockId) {
+      const blk = this.findBlock(nextSnapshot.selectedBlockId);
+      this.selectedBlock.set(blk || null);
+    } else {
+      this.selectedBlock.set(null);
+    }
+
+    setTimeout(() => this.setupIframeCanvas(), 0);
+    this.savePageDebounced();
+    this.toastService.info('Redo applied');
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  handleWindowKeydown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement;
+    const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+    if (isInput) return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        this.redo();
+      } else {
+        this.undo();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      this.redo();
+    }
+  }
+
+
+  getHeadingStyle(b: Block): Record<string, string | number> {
+    const p = b.props || {};
+    const align = p['align'] || 'left';
+
+    const style: Record<string, string | number> = {
+      margin: 0,
+      textAlign: align,
+      wordBreak: 'break-word',
+      boxSizing: 'border-box'
+    };
+
+    // 1. Custom or Hierarchy Font Size
+    if (p['fontSize']) {
+      style['fontSize'] = p['fontSize'] + 'px';
+      style['lineHeight'] = 1.2;
+    } else {
+      const lvl = String(p['level'] || '2');
+      switch (lvl) {
+        case 'display': style['fontSize'] = '54px'; style['lineHeight'] = 1.08; break;
+        case '1': style['fontSize'] = '36px'; style['lineHeight'] = 1.15; break;
+        case '2': style['fontSize'] = '28px'; style['lineHeight'] = 1.22; break;
+        case '3': style['fontSize'] = '22px'; style['lineHeight'] = 1.28; break;
+        case '4': style['fontSize'] = '18px'; style['lineHeight'] = 1.35; break;
+        case '5': style['fontSize'] = '15px'; style['lineHeight'] = 1.4; break;
+        case '6': style['fontSize'] = '13px'; style['lineHeight'] = 1.4; break;
+        default: style['fontSize'] = '28px'; style['lineHeight'] = 1.22; break;
+      }
+    }
+
+    // 2. Font Weight
+    if (p['fontWeight'] && p['fontWeight'] !== 'default') {
+      style['fontWeight'] = p['fontWeight'];
+    } else {
+      const lvl = String(p['level'] || '2');
+      style['fontWeight'] = (lvl === 'display' || lvl === '1') ? '800' : (lvl === '2' ? '700' : '600');
+    }
+
+    // 3. Letter Spacing
+    if (p['letterSpacing'] && p['letterSpacing'] !== 'default') {
+      switch (p['letterSpacing']) {
+        case 'tightest': style['letterSpacing'] = '-0.05em'; break;
+        case 'tight': style['letterSpacing'] = '-0.025em'; break;
+        case 'normal': style['letterSpacing'] = '0'; break;
+        case 'wide': style['letterSpacing'] = '0.05em'; break;
+        case 'wider': style['letterSpacing'] = '0.1em'; break;
+      }
+    } else {
+      const lvl = String(p['level'] || '2');
+      if (lvl === 'display' || lvl === '1') style['letterSpacing'] = '-0.03em';
+      else if (lvl === '2') style['letterSpacing'] = '-0.02em';
+      else if (lvl === '5' || lvl === '6') style['letterSpacing'] = '0.04em';
+      else style['letterSpacing'] = 'normal';
+    }
+
+    // 4. Text Transform
+    style['textTransform'] = (p['textTransform'] && p['textTransform'] !== 'none') ? p['textTransform'] : 'none';
+
+    // 5. Color, Gradient & Text Mask Clipping
+    if (p['gradient']) {
+      const preset = p['gradientPreset'] || 'electric';
+      let grad = 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)';
+      switch (preset) {
+        case 'sunset': grad = 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)'; break;
+        case 'emerald': grad = 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)'; break;
+        case 'amber': grad = 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)'; break;
+        case 'chrome': grad = 'linear-gradient(180deg, #ffffff 0%, #94a3b8 100%)'; break;
+        case 'custom': grad = p['customGradient'] || grad; break;
+        default: grad = 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)'; break;
+      }
+      style['backgroundImage'] = grad;
+      style['backgroundClip'] = 'text';
+      style['WebkitBackgroundClip'] = 'text';
+      style['-webkit-background-clip'] = 'text';
+      style['WebkitTextFillColor'] = 'transparent';
+      style['-webkit-text-fill-color'] = 'transparent';
+      style['color'] = 'transparent';
+      style['display'] = 'inline-block';
+    } else {
+      style['backgroundImage'] = 'none';
+      style['backgroundClip'] = 'border-box';
+      style['WebkitBackgroundClip'] = 'border-box';
+      style['-webkit-background-clip'] = 'border-box';
+      style['WebkitTextFillColor'] = p['color'] || 'inherit';
+      style['-webkit-text-fill-color'] = p['color'] || 'inherit';
+      style['color'] = p['color'] || 'inherit';
+      style['display'] = 'block';
+    }
+
+    // 6. Text Glow Effect
+    if (p['glow'] && p['glow'] !== 'none') {
+      switch (p['glow']) {
+        case 'subtle':
+          style['textShadow'] = '0 0 20px rgba(99, 102, 241, 0.45)';
+          break;
+        case 'intense':
+          style['textShadow'] = '0 0 12px rgba(99, 102, 241, 0.75), 0 0 32px rgba(99, 102, 241, 0.5)';
+          break;
+        case 'neon':
+          style['textShadow'] = '0 0 8px #06b6d4, 0 0 20px #06b6d4, 0 0 40px #6366f1';
+          break;
+      }
+    } else {
+      style['textShadow'] = 'none';
+    }
+
+    return style;
   }
 }

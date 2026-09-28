@@ -631,7 +631,7 @@ export class AutomationFlowComponent implements OnInit {
       next: (res) => {
         this.showTestModal.set(true);
         this.loadRecentLogs();
-        this.showToast(res.result.passed ? '⚡ Flow executed successfully!' : '⚠️ Flow completed (conditions not met)');
+        this.showToast(res.result.passed ? 'Flow executed successfully' : 'Flow completed (conditions not met)');
       },
       error: (err) => {
         console.error('Error executing flow:', err);

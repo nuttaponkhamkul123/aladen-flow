@@ -207,6 +207,23 @@
   line-height: 1.3;
 }
 
+.nav-item-kbd {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text-tertiary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  line-height: 1.2;
+}
+
+.sidebar-nav-item:hover .nav-item-kbd {
+  color: var(--text-secondary);
+  border-color: var(--border-medium);
+}
+
 .sidebar-nav-item.active .nav-item-badge {
   background: rgba(59, 130, 246, 0.16);
   color: var(--accent-primary);
@@ -256,17 +273,20 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--accent-primary);
   flex-shrink: 0;
 }
 
 .dot-indicator.published {
-  background: #10b981;
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+  background: var(--color-success);
 }
 
 .dot-indicator.draft {
-  background: #f59e0b;
+  background: var(--color-warning);
+}
+
+.dot-indicator.automation {
+  background: #818cf8;
 }
 
 /* Sidebar Footer */

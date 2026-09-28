@@ -2,188 +2,248 @@
   @if (loading()) {
     <div class="dashboard-loading">
       <div class="spinner"></div>
-      <span>Loading workspace...</span>
+      <span>Loading workspace telemetry...</span>
     </div>
   } @else if (overview(); as data) {
-    <!-- Header -->
-    <div class="dash-header">
-      <h1 class="dash-title">Dashboard</h1>
-      <p class="dash-subtitle">Workspace overview</p>
-    </div>
-
-    <!-- Stats Row -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-icon boards-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/>
-          </svg>
+    <!-- Dashboard Header with Live Status & Quick Action Buttons -->
+    <header class="dash-header">
+      <div class="dash-title-group">
+        <div class="dash-eyebrow">
+          <span class="workspace-live-dot"></span>
+          <span class="workspace-kicker">WORKSPACE TELEMETRY</span>
         </div>
-        <div class="stat-body">
+        <h1 class="dash-title">Workspace Overview</h1>
+        <p class="dash-subtitle">Real-time metrics across boards, documents, and team activities</p>
+      </div>
+
+      <div class="dash-header-actions">
+        <a routerLink="/kanban" class="dash-action-btn secondary">
+          <span>Open Boards</span>
+        </a>
+        <a routerLink="/cms" class="dash-action-btn primary">
+          <span>Site Builder</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Key Metrics Grid: Pure Numbers, Zero Decorative Icon Clutter -->
+    <section class="stats-grid" aria-label="Key Workspace Metrics">
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-kicker">TOTAL BOARDS</span>
+        </div>
+        <div class="stat-number-row">
           <span class="stat-value">{{ data.kanban.totalBoards }}</span>
-          <span class="stat-label">Boards</span>
+        </div>
+        <div class="stat-sub-info">
+          <span class="stat-sub-num">{{ (data.kanban.boardProgress || []).length }}</span>
+          <span class="stat-sub-text">active projects configured</span>
+        </div>
+        <div class="stat-footer-bar">
+          <div class="stat-bar-fill" style="width: 100%;"></div>
         </div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon cards-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-          </svg>
+        <div class="stat-card-header">
+          <span class="stat-kicker">TRACKED CARDS</span>
         </div>
-        <div class="stat-body">
+        <div class="stat-number-row">
           <span class="stat-value">{{ data.kanban.totalCards }}</span>
-          <span class="stat-label">Cards</span>
+        </div>
+        <div class="stat-sub-info">
+          <span class="stat-sub-num warning">{{ data.kanban.doingCards }}</span>
+          <span class="stat-sub-text">in progress</span>
+          <span class="stat-sub-sep">/</span>
+          <span class="stat-sub-num success">{{ data.kanban.doneCards }}</span>
+          <span class="stat-sub-text">closed</span>
+        </div>
+        <div class="stat-footer-bar">
+          <div class="stat-bar-fill warning" [style.width.%]="data.kanban.totalCards ? (data.kanban.doingCards / data.kanban.totalCards) * 100 : 0"></div>
         </div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon pages-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-          </svg>
+        <div class="stat-card-header">
+          <span class="stat-kicker">CMS PAGES</span>
         </div>
-        <div class="stat-body">
+        <div class="stat-number-row">
           <span class="stat-value">{{ data.cms.totalPages }}</span>
-          <span class="stat-label">Pages</span>
+        </div>
+        <div class="stat-sub-info">
+          <span class="stat-sub-num purple">{{ data.cms.publishedPages }}</span>
+          <span class="stat-sub-text">published</span>
+          <span class="stat-sub-sep">/</span>
+          <span class="stat-sub-num">{{ data.cms.draftPages }}</span>
+          <span class="stat-sub-text">drafts</span>
+        </div>
+        <div class="stat-footer-bar">
+          <div class="stat-bar-fill purple" [style.width.%]="data.cms.totalPages ? ((data.cms.totalPages - data.cms.draftPages) / data.cms.totalPages) * 100 : 0"></div>
         </div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon published-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
+        <div class="stat-card-header">
+          <span class="stat-kicker">PUBLISHED RATIO</span>
         </div>
-        <div class="stat-body">
-          <span class="stat-value">{{ data.cms.publishedPages }}</span>
-          <span class="stat-label">Published</span>
+        <div class="stat-number-row">
+          <span class="stat-value">{{ data.cms.totalPages ? Math.round((data.cms.publishedPages / data.cms.totalPages) * 100) : 0 }}%</span>
+        </div>
+        <div class="stat-sub-info">
+          <span class="stat-sub-num success">{{ data.cms.publishedPages }}</span>
+          <span class="stat-sub-text">of</span>
+          <span class="stat-sub-num">{{ data.cms.totalPages }}</span>
+          <span class="stat-sub-text">pages live in production</span>
+        </div>
+        <div class="stat-footer-bar">
+          <div class="stat-bar-fill success" [style.width.%]="data.cms.totalPages ? (data.cms.publishedPages / data.cms.totalPages) * 100 : 0"></div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Two Column Layout -->
+    <!-- Main Two-Column Analytics Grid -->
     <div class="dash-grid">
-      <!-- Left Column -->
+      <!-- Left Column: Kanban Analytics & Board Progress -->
       <div class="dash-col">
-        <!-- Card Breakdown -->
-        <div class="dash-panel">
-          <h3 class="panel-title">Card Breakdown</h3>
-          <div class="breakdown-list">
-            <div class="breakdown-item">
-              <span class="breakdown-dot todo"></span>
-              <span class="breakdown-label">To Do</span>
-              <span class="breakdown-count">{{ data.kanban.todoCards }}</span>
+        <!-- Card Distribution Breakdown -->
+        <section class="dash-panel">
+          <div class="panel-header">
+            <h3 class="panel-title">Card Distribution</h3>
+            <span class="panel-metric-num">{{ data.kanban.totalCards }} cards</span>
+          </div>
+
+          <!-- Multi-segment Distribution Bar -->
+          @if (data.kanban.totalCards > 0) {
+            <div class="distribution-stacked-bar">
+              <div class="seg-fill todo" [style.width.%]="(data.kanban.todoCards / data.kanban.totalCards) * 100" title="To Do: {{ data.kanban.todoCards }}"></div>
+              <div class="seg-fill doing" [style.width.%]="(data.kanban.doingCards / data.kanban.totalCards) * 100" title="In Progress: {{ data.kanban.doingCards }}"></div>
+              <div class="seg-fill done" [style.width.%]="(data.kanban.doneCards / data.kanban.totalCards) * 100" title="Done: {{ data.kanban.doneCards }}"></div>
             </div>
+          }
+
+          <div class="breakdown-grid">
             <div class="breakdown-item">
-              <span class="breakdown-dot doing"></span>
-              <span class="breakdown-label">In Progress</span>
-              <span class="breakdown-count">{{ data.kanban.doingCards }}</span>
+              <div class="breakdown-meta">
+                <span class="breakdown-name">To Do</span>
+                <span class="breakdown-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.todoCards / data.kanban.totalCards) * 100) : 0 }}%</span>
+              </div>
+              <span class="breakdown-count todo">{{ data.kanban.todoCards }}</span>
             </div>
+
             <div class="breakdown-item">
-              <span class="breakdown-dot done"></span>
-              <span class="breakdown-label">Done</span>
-              <span class="breakdown-count">{{ data.kanban.doneCards }}</span>
+              <div class="breakdown-meta">
+                <span class="breakdown-name">In Progress</span>
+                <span class="breakdown-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.doingCards / data.kanban.totalCards) * 100) : 0 }}%</span>
+              </div>
+              <span class="breakdown-count doing">{{ data.kanban.doingCards }}</span>
             </div>
+
             <div class="breakdown-item">
-              <span class="breakdown-dot urgent"></span>
-              <span class="breakdown-label">High Priority</span>
-              <span class="breakdown-count">{{ data.kanban.highPriorityCards }}</span>
+              <div class="breakdown-meta">
+                <span class="breakdown-name">Completed</span>
+                <span class="breakdown-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.doneCards / data.kanban.totalCards) * 100) : 0 }}%</span>
+              </div>
+              <span class="breakdown-count done">{{ data.kanban.doneCards }}</span>
+            </div>
+
+            <div class="breakdown-item">
+              <div class="breakdown-meta">
+                <span class="breakdown-name">High Priority</span>
+                <span class="breakdown-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.highPriorityCards / data.kanban.totalCards) * 100) : 0 }}%</span>
+              </div>
+              <span class="breakdown-count urgent">{{ data.kanban.highPriorityCards }}</span>
             </div>
           </div>
-        </div>
+        </section>
 
-        <!-- Board Progress -->
-        <div class="dash-panel">
-          <h3 class="panel-title">Board Progress</h3>
+        <!-- Board Completion Progress -->
+        <section class="dash-panel">
+          <div class="panel-header">
+            <h3 class="panel-title">Board Completion</h3>
+            <span class="panel-metric-num">{{ (data.kanban.boardProgress || []).length }} boards</span>
+          </div>
+
           <div class="progress-list">
             @for (board of data.kanban.boardProgress; track board.id) {
-              <div class="progress-item">
-                <div class="progress-header">
-                  <span class="progress-name">{{ board.name }}</span>
-                  <span class="progress-pct">{{ board.percentage }}%</span>
+              <div class="board-progress-card">
+                <div class="board-progress-top">
+                  <span class="board-title">{{ board.name }}</span>
+                  <div class="board-numbers">
+                    <span class="board-ratio">{{ board.done }} / {{ board.total }}</span>
+                    <span class="board-pct-num" [class.complete]="board.percentage === 100">{{ board.percentage }}%</span>
+                  </div>
                 </div>
-                <div class="progress-bar">
-                  <div class="progress-fill" [style.width.%]="board.percentage"></div>
+                <div class="board-progress-track">
+                  <div class="board-progress-fill" [style.width.%]="board.percentage" [class.complete]="board.percentage === 100"></div>
                 </div>
-                <span class="progress-detail">{{ board.done }} of {{ board.total }} cards done</span>
+              </div>
+            } @empty {
+              <div class="panel-empty-state">
+                <p>No boards configured in workspace</p>
               </div>
             }
-            @if (!data.kanban.boardProgress?.length) {
-              <p class="empty-text">No boards yet</p>
-            }
           </div>
-        </div>
+        </section>
       </div>
 
-      <!-- Right Column -->
+      <!-- Right Column: Recent Activity & Published Documents -->
       <div class="dash-col">
-        <!-- Recent Activity -->
-        <div class="dash-panel">
-          <h3 class="panel-title">Recent Activity</h3>
-          <div class="activity-list">
+        <!-- Recent Activity Feed -->
+        <section class="dash-panel">
+          <div class="panel-header">
+            <h3 class="panel-title">Workspace Activity</h3>
+            <span class="panel-metric-num">{{ data.recentActivities.length }} events</span>
+          </div>
+
+          <div class="activity-feed">
             @for (act of data.recentActivities; track act.id) {
-              <div class="activity-item">
-                <div class="activity-dot"></div>
-                <div class="activity-body">
-                  <span class="activity-msg">{{ act.message }}</span>
-                  <span class="activity-meta">
-                    @if (act.board_name) {
-                      <span class="activity-board">{{ act.board_name }}</span>
-                      <span class="activity-sep">&middot;</span>
-                    }
-                    {{ getTimeAgo(act.created_at) }}
-                  </span>
+              <div class="activity-feed-row">
+                <span class="activity-time-text">{{ getTimeAgo(act.created_at) }}</span>
+                <div class="activity-feed-body">
+                  <p class="activity-message-text">{{ act.message }}</p>
+                  @if (act.board_name) {
+                    <span class="activity-board-tag">{{ act.board_name }}</span>
+                  }
                 </div>
               </div>
-            }
-            @if (!data.recentActivities?.length) {
-              <p class="empty-text">No activity yet</p>
+            } @empty {
+              <div class="panel-empty-state">
+                <p>No recent activity recorded</p>
+              </div>
             }
           </div>
-        </div>
+        </section>
 
-        <!-- Recent Pages -->
-        <div class="dash-panel">
-          <h3 class="panel-title">Recent Pages</h3>
-          <div class="pages-list">
+        <!-- CMS Documents & Pages -->
+        <section class="dash-panel">
+          <div class="panel-header">
+            <h3 class="panel-title">Site Documents</h3>
+            <span class="panel-metric-num">{{ (data.cms.recentPages || []).length }} pages</span>
+          </div>
+
+          <div class="documents-list">
             @for (page of data.cms.recentPages; track page.id) {
-              <a class="page-item" routerLink="/cms">
-                <div class="page-info">
-                  <span class="page-title">{{ page.title }}</span>
-                  <span class="page-slug">/{{ page.slug }}</span>
+              <a class="document-item-row" routerLink="/cms">
+                <div class="document-info">
+                  <span class="document-name">{{ page.title }}</span>
+                  <span class="document-slug">/p/{{ page.slug }}</span>
                 </div>
-                <span class="page-status" [class.published]="page.status === 'published'">
+                <div class="document-status" [class.published]="page.status === 'published'">
                   {{ page.status }}
-                </span>
+                </div>
               </a>
-            }
-            @if (!data.cms.recentPages?.length) {
-              <p class="empty-text">No pages yet</p>
+            } @empty {
+              <div class="panel-empty-state">
+                <p>No site pages created yet</p>
+              </div>
             }
           </div>
-        </div>
+        </section>
       </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-      <a routerLink="/kanban" class="action-btn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/>
-        </svg>
-        Open Boards
-      </a>
-      <a routerLink="/cms" class="action-btn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 5v14"/><path d="M5 12h14"/>
-        </svg>
-        Site Builder
-      </a>
     </div>
   } @else {
     <div class="dashboard-empty">
-      <p>Failed to load workspace data.</p>
+      <p>Failed to connect to workspace database telemetry.</p>
     </div>
   }
 </div>

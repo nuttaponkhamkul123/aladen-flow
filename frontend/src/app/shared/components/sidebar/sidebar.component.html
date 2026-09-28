@@ -118,7 +118,7 @@
       </div>
       @if (!isCollapsed()) {
         <span class="nav-item-label">Settings</span>
-        <span class="nav-item-badge app-badge">⚙</span>
+        <span class="nav-item-kbd">⌘,</span>
       }
     </button>
 
@@ -146,7 +146,7 @@
           <div class="context-pill">
             <span class="context-kicker">AUTOMATION FLOW</span>
             <div class="context-val" [title]="activeFlowName()">
-              <span class="dot-indicator" style="background:#c084fc; box-shadow: 0 0 6px #c084fc;"></span>
+              <span class="dot-indicator automation"></span>
               <span class="val-text">{{ activeFlowName() }}</span>
             </div>
           </div>

@@ -31,7 +31,7 @@
     <div class="modal-body">
       <div class="modal-main">
         <div class="card-badge-row">
-          <span class="badge" [class]="'priority-' + card.priority">{{ card.priority | titlecase }} Priority</span>
+          <span class="badge" [class]="'priority-' + card.priority"><span class="priority-dot"></span>{{ card.priority | titlecase }} Priority</span>
           @if (card.due_date) {
             <span class="meta-date">Due {{ card.due_date }}</span>
           }
@@ -164,14 +164,14 @@
             Card Cover
           </label>
           <div class="cover-gradient-presets">
-            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #1e3a8a, #3b82f6)')"
-              style="background:linear-gradient(135deg, #1e3a8a, #3b82f6);" title="Cobalt Sapphire"></button>
-            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #0f766e, #14b8a6)')"
-              style="background:linear-gradient(135deg, #0f766e, #14b8a6);" title="Teal Emerald"></button>
-            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #4338ca, #6366f1)')"
-              style="background:linear-gradient(135deg, #4338ca, #6366f1);" title="Indigo Violet"></button>
-            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #c2410c, #f97316)')"
-              style="background:linear-gradient(135deg, #c2410c, #f97316);" title="Sunset Amber"></button>
+            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #0f172a, #1e3a8a)')"
+              style="background:linear-gradient(135deg, #1e3a8a, #3b82f6);" title="Midnight Slate"></button>
+            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #064e3b, #047857)')"
+              style="background:linear-gradient(135deg, #0f766e, #14b8a6);" title="Forest Emerald"></button>
+            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #1e1b4b, #3730a3)')"
+              style="background:linear-gradient(135deg, #4338ca, #6366f1);" title="Deep Indigo"></button>
+            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #27272a, #3f3f46)')"
+              style="background:linear-gradient(135deg, #c2410c, #f97316);" title="Zinc Neutral"></button>
             <button type="button" class="cover-preset-dot clear" (click)="setCover('')" title="Remove Cover">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />

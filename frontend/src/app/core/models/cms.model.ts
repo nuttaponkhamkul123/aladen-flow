@@ -70,7 +70,27 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
     text: 'Craft Beautiful Experiences',
     align: 'left',
     color: '',
-    margin: 12
+    fontSize: null,
+    fontWeight: 'default',
+    letterSpacing: 'default',
+    textTransform: 'none',
+    gradient: false,
+    gradientPreset: 'electric',
+    customGradient: '',
+    glow: 'none',
+    kicker: '',
+    kickerStyle: 'subtle',
+    kickerColor: '',
+    subtitle: '',
+    subtitleColor: '',
+    subtitleSize: 'normal',
+    divider: 'none',
+    dividerWidth: 'medium',
+    marginTop: 0,
+    margin: 12,
+    linkUrl: '',
+    newTab: false,
+    anchorId: ''
   },
   paragraph: {
     text: 'Combine visual building with agile workflow tracking in a modern, streamlined workspace.',
@@ -140,7 +160,7 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
   },
   callout: {
     type: 'info',
-    icon: '💡',
+    icon: 'info',
     title: 'Did you know?',
     text: 'You can combine Kanban project tracking with full visual site publishing on one canvas.'
   },
@@ -199,10 +219,10 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
   },
   bento: {
     items: [
-      { title: 'Ultra Fast Engine', subtitle: 'Native node:sqlite queries with sub-millisecond roundtrips.', icon: '⚡', tag: 'Core', metric: '0.4ms', span: 2, tall: false, image: '' },
-      { title: 'Global CDN', subtitle: 'Edge deployed content delivered with zero latency globally.', icon: '🌐', tag: 'Network', metric: '99.99%', span: 1, tall: false, image: '' },
-      { title: 'Deep Analytics', subtitle: 'Real-time telemetry and user interaction telemetry.', icon: '📊', tag: 'Insights', metric: '10M+', span: 1, tall: false, image: '' },
-      { title: 'Design System', subtitle: 'Curated color palettes and sleek glassmorphic surfaces.', icon: '🎨', tag: 'Aesthetics', metric: '60fps', span: 2, tall: false, image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop' }
+      { title: 'Ultra Fast Engine', subtitle: 'Native node:sqlite queries with sub-millisecond roundtrips.', icon: 'zap', tag: 'Core', metric: '0.4ms', span: 2, tall: false, image: '' },
+      { title: 'Global CDN', subtitle: 'Edge deployed content delivered with zero latency globally.', icon: 'globe', tag: 'Network', metric: '99.99%', span: 1, tall: false, image: '' },
+      { title: 'Deep Analytics', subtitle: 'Real-time telemetry and user interaction telemetry.', icon: 'chart', tag: 'Insights', metric: '10M+', span: 1, tall: false, image: '' },
+      { title: 'Design System', subtitle: 'Curated color palettes and sleek glassmorphic surfaces.', icon: 'layers', tag: 'Aesthetics', metric: '60fps', span: 2, tall: false, image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop' }
     ]
   },
   comparison: {
@@ -221,10 +241,10 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
   marquee: {
     speed: 'normal',
     items: [
-      { text: 'TypeScript', icon: '⚡' },
-      { text: 'TailwindCSS', icon: '🎨' },
-      { text: 'Node.js', icon: '🟢' },
-      { text: 'SQLite', icon: '🗄️' },
+      { text: 'TypeScript', icon: 'zap' },
+      { text: 'TailwindCSS', icon: 'layers' },
+      { text: 'Node.js', icon: 'terminal' },
+      { text: 'SQLite', icon: 'database' },
       { text: 'GraphQL', icon: '◈' },
       { text: 'Next.js', icon: '▲' }
     ]

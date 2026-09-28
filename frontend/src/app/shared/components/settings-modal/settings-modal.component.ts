@@ -29,11 +29,11 @@ export class SettingsModalComponent {
 
   // Ambient themes list
   ambientThemes: { id: AmbientTheme; label: string; desc: string }[] = [
-    { id: 'default', label: 'Default Obsidian', desc: 'Minimal clean dark workspace' },
-    { id: 'aurora', label: 'Aurora Borealis', desc: 'Gentle emerald & violet mesh gradient' },
-    { id: 'nebula', label: 'Cosmic Nebula', desc: 'Deep indigo & starlight purple glow' },
-    { id: 'cyberpunk', label: 'Cyberpunk Neon', desc: 'High-contrast cyan & magenta accents' },
-    { id: 'blueprint', label: 'Blueprint Grid', desc: 'Architectural tech blueprint matrix' },
+    { id: 'default', label: 'Default Slate', desc: 'Minimal clean slate surface' },
+    { id: 'aurora', label: 'Subtle Emerald', desc: 'Understated dark emerald atmospheric wash' },
+    { id: 'nebula', label: 'Cobalt Indigo', desc: 'Deep indigo architectural backdrop' },
+    { id: 'cyberpunk', label: 'Obsidian Grid', desc: 'Precision engineered dark grid surface' },
+    { id: 'blueprint', label: 'Blueprint Matrix', desc: 'Refined architectural micro-dots & grid' },
   ];
 
   onProviderChange() {

@@ -49,7 +49,9 @@
                   [class.published]="cmsService.activePage()?.status === 'published'"
                   [class.draft]="cmsService.activePage()?.status !== 'published'"></span>
             @if (cmsService.activePage()?.is_first_page) {
-              <span id="cmsHeaderFirstPageStar" class="header-star-icon" title="Site Homepage">★</span>
+              <svg id="cmsHeaderFirstPageStar" class="header-star-icon" width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5" title="Site Homepage">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+  </svg>
             }
             <svg class="tab-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -58,8 +60,7 @@
             </svg>
             <span id="cmsCurrentPageLabel" class="cms-current-page-name">{{ cmsService.activePage()?.title || 'Pages' }}</span>
             <span id="cmsTopPagesCount" class="tab-badge">{{ cmsService.pages().length }}</span>
-            <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.7;">
+            <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
@@ -76,7 +77,11 @@
                   </svg>
                   <span>Pages & Documents</span>
                 </div>
-                <button type="button" (click)="showPagesPopup = false" class="cms-popup-close-btn" title="Close">&times;</button>
+                <button type="button" (click)="showPagesPopup = false" class="cms-popup-close-btn" title="Close">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
               </div>
 
               <!-- Active Page Settings Card -->
@@ -88,7 +93,17 @@
                     </div>
                     <button type="button" (click)="toggleFirstPage(page)" class="btn ghost btn-xs"
                             [style.color]="page.is_first_page ? '#f59e0b' : 'inherit'" title="Set as Site Homepage">
-                      <span>{{ page.is_first_page ? '★ Homepage' : '☆ Make Homepage' }}</span>
+                      @if (page.is_first_page) {
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+    <span>Homepage</span>
+  } @else {
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+    <span>Make Homepage</span>
+  }
                     </button>
                   </div>
 
@@ -125,7 +140,10 @@
 
               <div style="padding:6px 14px;display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;">All Pages ({{ cmsService.pages().length }})</span>
-                <button type="button" (click)="createPage()" class="btn primary btn-xs">+ New Page</button>
+                <button type="button" (click)="createPage()" class="btn primary btn-xs">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span>New Page</span>
+  </button>
               </div>
 
               <div class="cms-pages-list" style="padding:0 14px 14px;max-height:220px;overflow-y:auto;">
@@ -134,7 +152,9 @@
                     <div class="page-node-info">
                       <div style="display:flex;align-items:center;gap:4px;">
                         @if (p.is_first_page) {
-                          <span style="color:#f59e0b;font-size:11px;">★</span>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                          </svg>
                         }
                         <span class="p-title">{{ p.title }}</span>
                       </div>
@@ -210,11 +230,11 @@
             <path d="m9.17 14.83-4.24 4.24" />
           </svg>
           <select [value]="themeService.ambientTheme()" (change)="onAmbientChange($event)">
-            <option value="default">Canvas: Default Dark</option>
-            <option value="aurora">Canvas: Aurora Mesh</option>
-            <option value="nebula">Canvas: Cosmic Nebula</option>
-            <option value="cyberpunk">Canvas: Cyberpunk Night</option>
-            <option value="blueprint">Canvas: Blueprint Grid</option>
+            <option value="default">Canvas: Default Slate</option>
+            <option value="aurora">Canvas: Subtle Emerald</option>
+            <option value="nebula">Canvas: Cobalt Indigo</option>
+            <option value="cyberpunk">Canvas: Obsidian Grid</option>
+            <option value="blueprint">Canvas: Blueprint Matrix</option>
           </select>
           <svg class="chevron-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">

@@ -52,25 +52,106 @@ export interface PropField {
 
 export const PROP_SCHEMAS: Record<string, PropField[]> = {
   heading: [
-    { key: 'level', label: 'Level', type: 'select', options: [
-      { value: '1', label: 'H1 - Main Headline' },
-      { value: '2', label: 'H2 - Section Header' },
-      { value: '3', label: 'H3 - Sub-section' },
-      { value: '4', label: 'H4 - Card Header' },
-      { value: '5', label: 'H5 - Small Label' },
-      { value: '6', label: 'H6 - Auxiliary' }
+    { key: 'level', label: 'Hierarchy Level', type: 'select', options: [
+      { value: 'display', label: 'Hero Display (54px+)' },
+      { value: '1', label: 'H1 - Main Headline (36px)' },
+      { value: '2', label: 'H2 - Section Header (28px)' },
+      { value: '3', label: 'H3 - Sub-section (22px)' },
+      { value: '4', label: 'H4 - Card Header (18px)' },
+      { value: '5', label: 'H5 - Small Label (15px)' },
+      { value: '6', label: 'H6 - Auxiliary (13px)' }
     ] },
-    { key: 'text', label: 'Text Content', type: 'textarea', placeholder: 'Heading text...' },
+    { key: 'text', label: 'Heading Text', type: 'textarea', placeholder: 'Heading text...' },
     { key: 'align', label: 'Alignment', type: 'select', options: [
-      { value: 'left', label: 'Left' },
-      { value: 'center', label: 'Center' },
-      { value: 'right', label: 'Right' }
+      { value: 'left', label: 'Left Aligned' },
+      { value: 'center', label: 'Centered' },
+      { value: 'right', label: 'Right Aligned' }
     ] },
+
+    // Typography
+    { key: 'fontSize', label: 'Custom Font Size (px)', type: 'number', min: 12, max: 140, placeholder: 'Auto / Default' },
+    { key: 'fontWeight', label: 'Font Weight', type: 'select', options: [
+      { value: 'default', label: 'Default for Level' },
+      { value: '400', label: '400 - Normal' },
+      { value: '500', label: '500 - Medium' },
+      { value: '600', label: '600 - Semi Bold' },
+      { value: '700', label: '700 - Bold' },
+      { value: '800', label: '800 - Extra Bold' },
+      { value: '900', label: '900 - Black' }
+    ] },
+    { key: 'letterSpacing', label: 'Letter Spacing', type: 'select', options: [
+      { value: 'default', label: 'Default' },
+      { value: 'tightest', label: 'Tightest (-0.05em)' },
+      { value: 'tight', label: 'Tight (-0.025em)' },
+      { value: 'normal', label: 'Normal (0)' },
+      { value: 'wide', label: 'Wide (+0.05em)' },
+      { value: 'wider', label: 'Wider (+0.1em)' }
+    ] },
+    { key: 'textTransform', label: 'Text Transform', type: 'select', options: [
+      { value: 'none', label: 'None (As Typed)' },
+      { value: 'uppercase', label: 'UPPERCASE' },
+      { value: 'capitalize', label: 'Capitalize Every Word' },
+      { value: 'lowercase', label: 'lowercase' }
+    ] },
+
+    // Colors & Gradient Visuals
     { key: 'color', label: 'Text Color', type: 'color', placeholder: '#ffffff' },
-    { key: 'margin', label: 'Bottom Margin (px)', type: 'number', min: 0, max: 120 },
-    { key: 'linkUrl', label: 'Link URL (optional)', type: 'text', placeholder: 'https://...' },
+    { key: 'gradient', label: 'Enable Gradient Text', type: 'toggle', onLabel: 'Gradient On' },
+    { key: 'gradientPreset', label: 'Gradient Palette', type: 'select', options: [
+      { value: 'electric', label: 'Linear Electric (Indigo → Cyan)' },
+      { value: 'sunset', label: 'Sunset Glow (Purple → Pink)' },
+      { value: 'emerald', label: 'Cyber Emerald (Green → Teal)' },
+      { value: 'amber', label: 'Amber Flame (Orange → Red)' },
+      { value: 'chrome', label: 'Silver Chrome (White → Slate)' },
+      { value: 'custom', label: 'Custom Gradient CSS' }
+    ] },
+    { key: 'customGradient', label: 'Custom Gradient CSS', type: 'text', placeholder: 'linear-gradient(135deg, #6366f1, #a855f7)' },
+    { key: 'glow', label: 'Text Glow Effect', type: 'select', options: [
+      { value: 'none', label: 'None' },
+      { value: 'subtle', label: 'Subtle Accent Glow' },
+      { value: 'intense', label: 'Intense Glow' },
+      { value: 'neon', label: 'Cyber Neon' }
+    ] },
+
+    // Eyebrow / Kicker Badge
+    { key: 'kicker', label: 'Eyebrow / Kicker Text (Above Heading)', type: 'text', placeholder: 'e.g. WORKSPACE TELEMETRY, v2.0, NEW' },
+    { key: 'kickerStyle', label: 'Kicker Style', type: 'select', options: [
+      { value: 'subtle', label: 'Subtle Monospace Kicker' },
+      { value: 'pill', label: 'Badge Pill' },
+      { value: 'dot', label: 'Live Pulsing Dot + Label' }
+    ] },
+    { key: 'kickerColor', label: 'Kicker Accent Color', type: 'color', placeholder: '#6366f1' },
+
+    // Subtitle / Description Below Heading
+    { key: 'subtitle', label: 'Subtitle / Description (Below Heading)', type: 'textarea', placeholder: 'Optional supporting description text...' },
+    { key: 'subtitleColor', label: 'Subtitle Color', type: 'color', placeholder: '#94a3b8' },
+    { key: 'subtitleSize', label: 'Subtitle Size', type: 'select', options: [
+      { value: 'small', label: 'Small (13px)' },
+      { value: 'normal', label: 'Normal (15px)' },
+      { value: 'large', label: 'Large (18px)' }
+    ] },
+
+    // Decorative Accent Line / Divider
+    { key: 'divider', label: 'Decorative Accent Line', type: 'select', options: [
+      { value: 'none', label: 'None' },
+      { value: 'solid', label: 'Solid Accent Hairline' },
+      { value: 'gradient', label: 'Gradient Accent Bar' },
+      { value: 'dots', label: '3-Dot Milestone (• • •)' }
+    ] },
+    { key: 'dividerWidth', label: 'Divider Width', type: 'select', options: [
+      { value: 'short', label: 'Short (48px)' },
+      { value: 'medium', label: 'Medium (96px)' },
+      { value: 'long', label: 'Long (180px)' }
+    ] },
+
+    // Spacing
+    { key: 'marginTop', label: 'Top Margin (px)', type: 'number', min: 0, max: 120, placeholder: '0' },
+    { key: 'margin', label: 'Bottom Margin (px)', type: 'number', min: 0, max: 120, placeholder: '12' },
+
+    // Interactive Navigation
+    { key: 'linkUrl', label: 'Link URL (optional)', type: 'text', placeholder: 'https://... or /p/...' },
     { key: 'newTab', label: 'Open link in new tab', type: 'toggle', onLabel: 'Yes' },
-    { key: 'anchorId', label: 'Section Anchor ID (#hash)', type: 'text', placeholder: 'e.g. pricing, features, faq' }
+    { key: 'anchorId', label: 'Section Anchor ID (#hash)', type: 'text', placeholder: 'e.g. features, pricing, faq' }
   ],
 
   paragraph: [
@@ -237,7 +318,7 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
       { value: 'warning', label: 'Warning' },
       { value: 'danger', label: 'Danger' }
     ] },
-    { key: 'icon', label: 'Icon (emoji)', type: 'text', placeholder: '💡' },
+    { key: 'icon', label: 'Icon / Symbol', type: 'text', placeholder: 'info, zap, star...' },
     { key: 'title', label: 'Title', type: 'text', placeholder: 'Optional header' },
     { key: 'text', label: 'Text', type: 'textarea', placeholder: 'Callout body text...' }
   ],
@@ -286,7 +367,7 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
       { value: 'up', label: 'Up (green)' },
       { value: 'down', label: 'Down (red)' }
     ] },
-    { key: 'icon', label: 'Icon (emoji)', type: 'text', placeholder: '⚡' }
+    { key: 'icon', label: 'Icon / Symbol', type: 'text', placeholder: 'zap, chart, trend...' }
   ],
 
   testimonial: [
@@ -321,11 +402,11 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
 
   bento: [
     { key: 'items', label: 'Bento Tiles', type: 'objectlist', itemLabel: 'Tile', addLabel: 'Add Tile',
-      itemDefault: { title: 'New Tile', subtitle: '', icon: '✨', tag: '', metric: '', span: 1, tall: false, image: '', bg: '' },
+      itemDefault: { title: 'New Tile', subtitle: '', icon: 'sparkles', tag: '', metric: '', span: 1, tall: false, image: '', bg: '' },
       subFields: [
         { key: 'title', label: 'Title', type: 'text', placeholder: 'Feature title' },
         { key: 'subtitle', label: 'Subtitle', type: 'textarea', placeholder: 'Short description' },
-        { key: 'icon', label: 'Icon (emoji)', type: 'text', placeholder: '⚡' },
+        { key: 'icon', label: 'Icon / Symbol', type: 'text', placeholder: 'zap, globe, layers...' },
         { key: 'tag', label: 'Tag', type: 'text', placeholder: 'Optional tag' },
         { key: 'metric', label: 'Metric', type: 'text', placeholder: '99.9%' },
         { key: 'image', label: 'Background Image URL', type: 'text', placeholder: 'Optional' },
@@ -359,10 +440,10 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
       { value: 'fast', label: 'Fast' }
     ] },
     { key: 'items', label: 'Marquee Items', type: 'objectlist', itemLabel: 'Item', addLabel: 'Add Item',
-      itemDefault: { text: 'New Item', icon: '✦' },
+      itemDefault: { text: 'New Item', icon: 'star' },
       subFields: [
         { key: 'text', label: 'Text', type: 'text', placeholder: 'Item label' },
-        { key: 'icon', label: 'Icon (emoji)', type: 'text', placeholder: '✦' }
+        { key: 'icon', label: 'Icon / Symbol', type: 'text', placeholder: 'star, zap...' }
       ] }
   ],
 
@@ -404,7 +485,7 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
     { key: 'brandName', label: 'Brand Name', type: 'text', placeholder: 'Aladen Studio' },
     { key: 'brandUrl', label: 'Brand Link URL', type: 'text', placeholder: '#' },
     { key: 'brandLogo', label: 'Brand Logo URL', type: 'text', placeholder: 'Optional image' },
-    { key: 'brandIcon', label: 'Brand Icon (emoji)', type: 'text', placeholder: '✦' },
+    { key: 'brandIcon', label: 'Brand Icon', type: 'text', placeholder: 'star, shield, logo...' },
     { key: 'layout', label: 'Layout', type: 'select', options: [
       { value: 'spread', label: 'Spread (links on right)' },
       { value: 'left', label: 'Left Aligned Links' },
@@ -451,7 +532,7 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
       { value: 'transparent', label: 'Transparent' }
     ] },
     { key: 'brandName', label: 'Brand Name', type: 'text', placeholder: 'Aladen Platform' },
-    { key: 'brandIcon', label: 'Brand Icon (emoji)', type: 'text', placeholder: '✦' },
+    { key: 'brandIcon', label: 'Brand Icon', type: 'text', placeholder: 'star, shield, logo...' },
     { key: 'tagline', label: 'Tagline', type: 'textarea', placeholder: 'Short description' },
     { key: 'showColumns', label: 'Show Link Columns', type: 'toggle', onLabel: 'Yes' },
     { key: 'columns', label: 'Link Columns', type: 'objectlist', itemLabel: 'Column', addLabel: 'Add Column',

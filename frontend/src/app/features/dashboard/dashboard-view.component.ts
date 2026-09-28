@@ -12,6 +12,7 @@ import { BoardService } from '../../core/services/board.service';
   styleUrls: ['./dashboard-view.component.css']
 })
 export class DashboardViewComponent implements OnInit {
+  Math = Math;
   boardService = inject(BoardService);
   private destroyRef = inject(DestroyRef);
 

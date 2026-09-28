@@ -284,150 +284,189 @@
     </button>
 
     <div id="cmsEditorWrap" class="cms-editor-wrap">
-      <!-- Editor Top Bar -->
-      <div class="cms-page-bar">
-        <div class="cms-meta-inputs">
-          <div class="input-with-label">
+      <!-- Modern Studio Header Toolbar -->
+      <header class="cms-page-bar">
+        <!-- Zone 1: Document Identity & Save Status -->
+        <div class="cms-bar-zone left">
+          <div class="doc-identity-group">
             <input id="cmsTitle" class="cms-title" [value]="activePage()?.title || ''"
-                   (change)="updateActiveTitle($event)" placeholder="Untitled Document" />
+                   (change)="updateActiveTitle($event)" placeholder="Untitled Document"
+                   title="Click to edit document title" />
+            <div class="doc-save-indicator" [class.saved]="isSaved()" [class.saving]="isSaving()"
+                 [title]="isSaved() ? 'All changes saved' : (isSaving() ? 'Saving changes...' : 'Unsaved changes')">
+              <span class="save-status-dot"></span>
+              <span class="save-status-label">{{ isSaved() ? 'Saved' : (isSaving() ? 'Saving' : 'Edited') }}</span>
+            </div>
+
+            <div class="toolbar-sep"></div>
+
+            <!-- Undo / Redo History Controls -->
+            <div class="cms-history-controls" role="group" aria-label="Undo and Redo">
+              <button type="button" id="cmsUndoBtn" class="toolbar-icon-btn history-btn"
+                      (click)="undo()" [disabled]="!canUndo()"
+                      title="Undo (Ctrl+Z)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 7v6h6" />
+                  <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                </svg>
+              </button>
+              <button type="button" id="cmsRedoBtn" class="toolbar-icon-btn history-btn"
+                      (click)="redo()" [disabled]="!canRedo()"
+                      title="Redo (Ctrl+Y / Ctrl+Shift+Z)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 7v6h-6" />
+                  <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Viewport Device Switcher Toolbar -->
-        <div class="cms-viewport-toolbar">
-          <div class="viewport-segmented-control" role="group" aria-label="Device viewport size">
-            <button id="cmsViewportDesktopBtn" class="viewport-btn" [class.active]="viewportMode() === 'desktop'"
-                    (click)="setViewport('desktop')" title="Desktop View (Press 1)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
-              <span class="viewport-btn-text">Desktop</span>
-            </button>
+        <!-- Zone 2: Viewport Device & Dimensions (Centered) -->
+        <div class="cms-bar-zone center">
+          <div class="cms-viewport-toolbar">
+            <div class="viewport-segmented-control" role="group" aria-label="Device viewport size">
+              <button id="cmsViewportDesktopBtn" class="viewport-btn" [class.active]="viewportMode() === 'desktop'"
+                      (click)="setViewport('desktop')" title="Desktop View (1280px) • Press 1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </button>
 
-            <button id="cmsViewportTabletBtn" class="viewport-btn" [class.active]="viewportMode() === 'tablet'"
-                    (click)="setViewport('tablet')" title="Tablet View (Press 2)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
-              </svg>
-              <span class="viewport-btn-text">Tablet</span>
-            </button>
+              <button id="cmsViewportTabletBtn" class="viewport-btn" [class.active]="viewportMode() === 'tablet'"
+                      (click)="setViewport('tablet')" title="Tablet View (768px) • Press 2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
+                </svg>
+              </button>
 
-            <button id="cmsViewportMobileBtn" class="viewport-btn" [class.active]="viewportMode() === 'mobile'"
-                    (click)="setViewport('mobile')" title="Mobile View (Press 3)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
-              </svg>
-              <span class="viewport-btn-text">Mobile</span>
-            </button>
-          </div>
+              <button id="cmsViewportMobileBtn" class="viewport-btn" [class.active]="viewportMode() === 'mobile'"
+                      (click)="setViewport('mobile')" title="Mobile View (375px) • Press 3">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
+                </svg>
+              </button>
+            </div>
 
-          @if (viewportMode() !== 'desktop') {
-            <button id="cmsViewportRotateBtn" class="viewport-tool-btn" (click)="toggleOrientation()"
-                    title="Rotate Orientation (Portrait / Landscape)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21.5 2v6h-6" /><path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-              </svg>
-            </button>
-            <button id="cmsViewportFrameToggle" class="viewport-tool-btn" [class.active]="showDeviceFrame()"
-                    (click)="toggleDeviceFrame()" title="Toggle Device Bezel/Frame">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="3" /><path d="M9 3v18" /><path d="M15 3v18" />
-              </svg>
-            </button>
-          }
+            @if (viewportMode() !== 'desktop') {
+              <button id="cmsViewportRotateBtn" class="viewport-tool-btn" (click)="toggleOrientation()"
+                      title="Rotate Orientation (Portrait / Landscape)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21.5 2v6h-6" /><path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                </svg>
+              </button>
+              <button id="cmsViewportFrameToggle" class="viewport-tool-btn" [class.active]="showDeviceFrame()"
+                      (click)="toggleDeviceFrame()" title="Toggle Device Bezel/Frame">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="3" /><path d="M9 3v18" /><path d="M15 3v18" />
+                </svg>
+              </button>
+            }
 
-          <div id="cmsViewportBadge" class="viewport-dimension-badge">
-            <span id="cmsViewportDimText">{{ getViewportWidthDisplay() }}</span>
+            <div class="toolbar-sep"></div>
+
+            <div id="cmsViewportBadge" class="viewport-dimension-badge">
+              <span id="cmsViewportDimText">{{ getViewportWidthDisplay() }}</span>
+            </div>
           </div>
         </div>
 
-        <!-- Page Actions -->
-        <div class="cms-page-actions">
+        <!-- Zone 3: Modes, Tools & Actions (Right) -->
+        <div class="cms-bar-zone right">
+          <!-- Mode Switch (Edit vs Preview) -->
           <div class="cms-mode-switch" role="group" aria-label="Editor Mode">
             <button id="cmsEditModeBtn" class="mode-switch-btn" [class.active]="!isPreviewMode()"
                     (click)="isPreviewMode.set(false)" title="Editor Mode">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
               </svg>
               <span>Edit</span>
             </button>
             <button id="cmsPreviewModeBtn" class="mode-switch-btn" [class.active]="isPreviewMode()"
                     (click)="isPreviewMode.set(true)" title="Interactive Preview">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
               </svg>
               <span>Preview</span>
             </button>
           </div>
 
-          <!-- Layers Panel Toggle -->
-          <button type="button" id="cmsToggleLayersBtn" class="btn ghost btn-sm layers-btn"
-                  [class.active]="showLayersPanel()" (click)="toggleLayersPanel()"
-                  title="Toggle Draggable Layers Tree in Editor">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
-            <span>Layers</span>
-            <span class="layers-count-badge">{{ getTotalBlockCount() }}</span>
-          </button>
+          <div class="toolbar-sep"></div>
 
-          <button id="cmsAiGenerateBtn" class="btn btn-sm btn-ai-sparkle" (click)="showAiModal = true"
-                  title="Generate Website or Components with AI">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
-            </svg>
-            <span>AI Generate</span>
-          </button>
+          <!-- Studio Tools Cluster -->
+          <div class="cms-tools-cluster">
+            <!-- Layers Panel Toggle -->
+            <button type="button" id="cmsToggleLayersBtn" class="toolbar-icon-btn layers-btn"
+                    [class.active]="showLayersPanel()" (click)="toggleLayersPanel()"
+                    title="Toggle Layers Tree ({{ getTotalBlockCount() }} blocks)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                <polyline points="2 17 12 22 22 17" />
+                <polyline points="2 12 12 17 22 12" />
+              </svg>
+              <span class="layers-count-badge">{{ getTotalBlockCount() }}</span>
+            </button>
 
-          <button type="button" class="btn ghost btn-sm theme-mode-btn" (click)="toggleActiveModeTheme()"
-                  [title]="(isPreviewMode() ? 'Preview Theme: ' : 'Editor Theme: ') + (currentModeTheme() | titlecase) + ' (Effective: ' + (effectiveCanvasTheme() | titlecase) + ') — Click to cycle Dark / Light / Auto'">
-            @if (currentModeTheme() === 'auto') {
-              <svg class="auto-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-              </svg>
-              <span>{{ isPreviewMode() ? 'Preview: Auto' : 'Editor: Auto' }}</span>
-            } @else if (currentModeTheme() === 'dark') {
-              <svg class="moon-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-              <span>{{ isPreviewMode() ? 'Preview: Dark' : 'Editor: Dark' }}</span>
-            } @else {
-              <svg class="sun-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
-              </svg>
-              <span>{{ isPreviewMode() ? 'Preview: Light' : 'Editor: Light' }}</span>
-            }
-          </button>
+            <!-- Theme Mode Toggle -->
+            <button type="button" class="toolbar-icon-btn theme-mode-btn" (click)="toggleActiveModeTheme()"
+                    [title]="'Canvas Theme: ' + (currentModeTheme() | titlecase) + ' • Click to cycle Auto / Dark / Light'">
+              @if (currentModeTheme() === 'auto') {
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+              } @else if (currentModeTheme() === 'dark') {
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              } @else {
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+                </svg>
+              }
+            </button>
 
-          <a id="cmsPreviewLink" class="btn ghost btn-sm" [href]="'/p/' + (activePage()?.slug || '')" target="_blank">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-            <span>Live Page</span>
-          </a>
+            <!-- AI Generator -->
+            <button id="cmsAiGenerateBtn" class="toolbar-ai-btn" (click)="showAiModal = true"
+                    title="Generate Website or Components with AI">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+              </svg>
+              <span>AI</span>
+            </button>
+          </div>
 
-          <button id="cmsSaveBtn" class="btn primary btn-sm" (click)="savePageNow()" [disabled]="isSaving() || isSaved()">
-            @if (isSaved()) {
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12" />
+          <div class="toolbar-sep"></div>
+
+          <!-- Primary Actions (Live & Save) -->
+          <div class="cms-actions-cluster">
+            <a id="cmsPreviewLink" class="toolbar-icon-btn live-page-link" [href]="'/p/' + (activePage()?.slug || '')" target="_blank"
+               title="Open Live Public Route (/p/{{ activePage()?.slug }})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
               </svg>
-              <span>Saved</span>
-            } @else if (isSaving()) {
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite;">
-                <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12" />
-              </svg>
-              <span>Saving...</span>
-            } @else {
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
-              </svg>
-              <span>Save</span>
-            }
-          </button>
+            </a>
+
+            <button id="cmsSaveBtn" class="btn-studio-save" (click)="savePageNow()" [disabled]="isSaving() || isSaved()">
+              @if (isSaved()) {
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>Saved</span>
+              } @else if (isSaving()) {
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation: spin 0.8s linear infinite;">
+                  <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12" />
+                </svg>
+                <span>Saving</span>
+              } @else {
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+                </svg>
+                <span>Save</span>
+              }
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       <!-- Recursive Tree Node Template for Layers -->
       <ng-template #treeNodeTemplate let-block="block">
@@ -593,8 +632,15 @@
                 </div>
               }
 
-              <!-- Rendered Blocks Container -->
-              <div id="cmsCanvasDropList" #cmsCanvas class="cms-canvas"
+              <!-- The Canvas Isolated Iframe -->
+              <iframe #canvasIframe id="cmsCanvasIframe" class="cms-canvas-iframe"
+                      title="CMS Isolated Canvas"
+                      (load)="setupIframeCanvas()">
+              </iframe>
+
+              <!-- Source Canvas Container (Mounted into iframe body upon initialization) -->
+              <div id="canvasMountHost" style="display: none;">
+                <div id="cmsCanvasDropList" #cmsCanvas class="cms-canvas"
                    [class.theme-dark]="effectiveCanvasTheme() === 'dark'"
                    [class.theme-light]="effectiveCanvasTheme() === 'light'"
                    [attr.data-theme]="effectiveCanvasTheme()"
@@ -607,7 +653,7 @@
                    [style.minWidth]="viewportMode() === 'desktop' ? (pageSettings()['minWidth'] || '0px') : null"
                    [style.maxWidth]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] || '820px') : null"
                    [style.margin]="pageSettings()['align'] === 'left' && viewportMode() === 'desktop' ? '0 auto 0 0' : '0 auto'"
-                   style="overflow-y:auto;height:100%;transition:background 0.2s ease, padding 0.2s ease, border-radius 0.2s ease, max-width 0.2s ease;"
+                   style="min-height:100%;height:auto;overflow:visible;display:flex;flex-direction:column;box-sizing:border-box;transition:background 0.2s ease, padding 0.2s ease, border-radius 0.2s ease, max-width 0.2s ease;"
                    (click)="deselectBlock()"
                    (dragover)="onCanvasDragOver($event)"
                    (dragleave)="onCanvasDragLeave($event)"
@@ -762,18 +808,193 @@
                       }
 
                       @case ('heading') {
-                        <div [style.textAlign]="b.props['align'] || 'left'"
-                             [style.color]="b.props['color'] || 'inherit'"
-                             [style.marginTop.px]="isChild ? 0 : 18"
+                        <div class="cms-heading-block"
+                             [id]="b.props['anchorId'] || null"
+                             [style.textAlign]="b.props['align'] || 'left'"
+                             [style.alignItems]="b.props['align'] === 'center' ? 'center' : (b.props['align'] === 'right' ? 'flex-end' : 'flex-start')"
+                             [style.marginTop.px]="b.props['marginTop'] != null ? b.props['marginTop'] : (isChild ? 0 : 18)"
                              [style.marginBottom.px]="b.props['margin'] != null ? b.props['margin'] : 12">
-                          @switch (b.props['level'] || 2) {
-                            @case (1) { <h1 style="font-size:32px;font-weight:800;letter-spacing:-0.03em;margin:0;">{{ b.props['text'] || 'Heading 1' }}</h1> }
-                            @case (2) { <h2 style="font-size:24px;font-weight:700;letter-spacing:-0.02em;margin:0;">{{ b.props['text'] || 'Heading 2' }}</h2> }
-                            @case (3) { <h3 style="font-size:20px;font-weight:600;margin:0;">{{ b.props['text'] || 'Heading 3' }}</h3> }
-                            @case (4) { <h4 style="font-size:16px;font-weight:600;margin:0;">{{ b.props['text'] || 'Heading 4' }}</h4> }
-                            @case (5) { <h5 style="font-size:14px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;margin:0;">{{ b.props['text'] || 'Heading 5' }}</h5> }
-                            @case (6) { <h6 style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;margin:0;">{{ b.props['text'] || 'Heading 6' }}</h6> }
-                            @default { <h2 style="font-size:24px;font-weight:700;margin:0;">{{ b.props['text'] || 'Heading 2' }}</h2> }
+
+                          <!-- Eyebrow / Kicker Badge -->
+                          @if (b.props['kicker']) {
+                            <div class="heading-kicker-wrap"
+                                 [style.justifyContent]="b.props['align'] === 'center' ? 'center' : (b.props['align'] === 'right' ? 'flex-end' : 'flex-start')">
+                              @if (b.props['kickerStyle'] === 'pill') {
+                                <span class="heading-kicker-pill" [style.color]="b.props['kickerColor'] || null">
+                                  {{ b.props['kicker'] }}
+                                </span>
+                              } @else if (b.props['kickerStyle'] === 'dot') {
+                                <div class="heading-kicker-dot-wrap">
+                                  <span class="heading-kicker-dot" [style.background]="b.props['kickerColor'] || '#10b981'"></span>
+                                  <span class="heading-kicker-subtle" [style.color]="b.props['kickerColor'] || null">{{ b.props['kicker'] }}</span>
+                                </div>
+                              } @else {
+                                <span class="heading-kicker-subtle" [style.color]="b.props['kickerColor'] || null">{{ b.props['kicker'] }}</span>
+                              }
+                            </div>
+                          }
+
+                          <!-- Heading Title with Direct Tag Rendering (Guarantees Instant Change-Detection) -->
+                          @switch (b.props['level']) {
+                            @case ('display') {
+                              <div class="heading-display-title" [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Display Headline' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Display Headline' }}
+                                }
+                              </div>
+                            }
+                            @case (1) {
+                              <h1 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 1' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 1' }}
+                                }
+                              </h1>
+                            }
+                            @case ('1') {
+                              <h1 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 1' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 1' }}
+                                }
+                              </h1>
+                            }
+                            @case (2) {
+                              <h2 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 2' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 2' }}
+                                }
+                              </h2>
+                            }
+                            @case ('2') {
+                              <h2 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 2' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 2' }}
+                                }
+                              </h2>
+                            }
+                            @case (3) {
+                              <h3 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 3' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 3' }}
+                                }
+                              </h3>
+                            }
+                            @case ('3') {
+                              <h3 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 3' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 3' }}
+                                }
+                              </h3>
+                            }
+                            @case (4) {
+                              <h4 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 4' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 4' }}
+                                }
+                              </h4>
+                            }
+                            @case ('4') {
+                              <h4 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 4' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 4' }}
+                                }
+                              </h4>
+                            }
+                            @case (5) {
+                              <h5 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 5' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 5' }}
+                                }
+                              </h5>
+                            }
+                            @case ('5') {
+                              <h5 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 5' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 5' }}
+                                }
+                              </h5>
+                            }
+                            @case (6) {
+                              <h6 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 6' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 6' }}
+                                }
+                              </h6>
+                            }
+                            @case ('6') {
+                              <h6 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 6' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 6' }}
+                                }
+                              </h6>
+                            }
+                            @default {
+                              <h2 [ngStyle]="getHeadingStyle(b)">
+                                @if (b.props['linkUrl']) {
+                                  <a [href]="b.props['linkUrl']" [target]="b.props['newTab'] ? '_blank' : '_self'" class="heading-link-wrapper" (click)="!isPreviewMode() ? $event.preventDefault() : null">{{ b.props['text'] || 'Heading 2' }}</a>
+                                } @else {
+                                  {{ b.props['text'] || 'Heading 2' }}
+                                }
+                              </h2>
+                            }
+                          }
+
+                          <!-- Subtitle / Description Below Heading -->
+                          @if (b.props['subtitle']) {
+                            <p class="heading-subtitle-text"
+                               [class.size-sm]="b.props['subtitleSize'] === 'small'"
+                               [class.size-lg]="b.props['subtitleSize'] === 'large'"
+                               [style.textAlign]="b.props['align'] || 'left'"
+                               [style.color]="b.props['subtitleColor'] || null">
+                              {{ b.props['subtitle'] }}
+                            </p>
+                          }
+
+                          <!-- Decorative Divider / Accent Line -->
+                          @if (b.props['divider'] && b.props['divider'] !== 'none') {
+                            <div class="heading-divider-wrap"
+                                 [style.justifyContent]="b.props['align'] === 'center' ? 'center' : (b.props['align'] === 'right' ? 'flex-end' : 'flex-start')">
+                              @if (b.props['divider'] === 'dots') {
+                                <div class="heading-divider-dots"
+                                     [class.w-sm]="b.props['dividerWidth'] === 'short'"
+                                     [class.w-lg]="b.props['dividerWidth'] === 'long'">
+                                  <span></span><span></span><span></span>
+                                </div>
+                              } @else if (b.props['divider'] === 'gradient') {
+                                <div class="heading-divider-gradient"
+                                     [class.w-sm]="b.props['dividerWidth'] === 'short'"
+                                     [class.w-lg]="b.props['dividerWidth'] === 'long'"></div>
+                              } @else {
+                                <div class="heading-divider-solid"
+                                     [class.w-sm]="b.props['dividerWidth'] === 'short'"
+                                     [class.w-lg]="b.props['dividerWidth'] === 'long'"></div>
+                              }
+                            </div>
                           }
                         </div>
                       }
@@ -876,7 +1097,7 @@
                           <p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px;">{{ b.props['description'] }}</p>
                           <ul style="list-style:none;padding:0;margin:0 0 16px;display:flex;flex-direction:column;gap:7px;font-size:12.5px;">
                             @for (f of b.props['features'] || []; track $index) {
-                              <li><span style="color:#10b981;font-weight:700;margin-right:6px;">✓</span>{{ f }}</li>
+                              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;flex-shrink:0;vertical-align:-1px;"><polyline points="20 6 9 17 4 12"/></svg>{{ f }}</li>
                             }
                           </ul>
                           <a [href]="b.props['buttonUrl'] || '#'" class="btn primary" style="width:100%;text-align:center;display:block;box-sizing:border-box;">
@@ -925,7 +1146,19 @@
                         <div [style.borderLeft]="'4px solid ' + theme.border" [style.background]="theme.bg"
                              [style.borderRadius]="'0 10px 10px 0'"
                              style="display:flex;gap:14px;padding:14px 18px;margin-bottom:12px;align-items:flex-start;">
-                          <span style="font-size:20px;line-height:1;">{{ b.props['icon'] || theme.icon }}</span>
+                          <div class="callout-icon-badge" [style.color]="theme.border" style="flex-shrink:0;margin-top:2px;">
+                            @if (b.props['type'] === 'tip') {
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                            } @else if (b.props['type'] === 'success') {
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            } @else if (b.props['type'] === 'warning') {
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            } @else if (b.props['type'] === 'danger') {
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                            } @else {
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            }
+                          </div>
                           <div style="flex:1;">
                             @if (b.props['title']) {
                               <strong style="font-size:15px;display:block;margin-bottom:4px;" [style.color]="theme.titleColor">{{ b.props['title'] }}</strong>
@@ -1117,12 +1350,12 @@
                                [style.animationDuration]="b.props['speed'] === 'slow' ? '34s' : b.props['speed'] === 'fast' ? '12s' : '20s'">
                             @for (item of marqueeItems; track $index) {
                               <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:999px;font-size:12.5px;font-weight:600;margin-right:12px;white-space:nowrap;">
-                                <span>{{ item.icon || '✦' }}</span> {{ item.text || 'Item' }}
+                                @if (item.icon) { <span>{{ item.icon }}</span> } @else { <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="opacity:0.6;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> } {{ item.text || 'Item' }}
                               </span>
                             }
                             @for (item of marqueeItems; track $index) {
                               <span aria-hidden="true" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:999px;font-size:12.5px;font-weight:600;margin-right:12px;white-space:nowrap;">
-                                <span>{{ item.icon || '✦' }}</span> {{ item.text || 'Item' }}
+                                @if (item.icon) { <span>{{ item.icon }}</span> } @else { <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="opacity:0.6;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> } {{ item.text || 'Item' }}
                               </span>
                             }
                           </div>
@@ -1194,13 +1427,13 @@
                           @if (b.props['cover']) {
                             <img [src]="b.props['cover']" [alt]="b.props['title']" style="width:48px;height:48px;border-radius:10px;object-fit:cover;" />
                           } @else {
-                            <div style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">🎵</div>
+                            <div style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#1e1b4b,#312e81);display:flex;align-items:center;justify-content:center;color:#818cf8;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
                           }
                           <div style="flex:1;overflow:hidden;">
                             <h4 style="margin:0 0 3px;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ b.props['title'] }}</h4>
                             <div style="font-size:11.5px;color:var(--text-secondary);">{{ b.props['artist'] }} <span style="color:var(--accent-primary);">• {{ b.props['duration'] }}</span></div>
                           </div>
-                          <button style="width:38px;height:38px;border-radius:50%;background:#6366f1;border:none;color:#fff;font-size:14px;">▶</button>
+                          <button style="width:38px;height:38px;border-radius:50%;background:var(--accent-primary);border:none;color:#fff;display:grid;place-items:center;cursor:pointer;"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></button>
                         </div>
                       }
 
@@ -1283,6 +1516,7 @@
                 @if (draggingOver() && dragInsertIndex() === currentBlocks().length) {
                     <div class="drop-indicator"></div>
                   }
+              </div>
               </div>
 
               @if (showDeviceFrame() && viewportMode() !== 'desktop') {
@@ -1760,9 +1994,15 @@
                 <div class="first-page-card" [class.is-first]="!!activePage()?.is_first_page">
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                     <div style="display:flex;align-items:center;gap:6px;">
-                      <span [style.color]="activePage()?.is_first_page ? '#f59e0b' : 'var(--text-tertiary)'" style="font-size:15px;">
-                        {{ activePage()?.is_first_page ? '★' : '☆' }}
-                      </span>
+                      @if (activePage()?.is_first_page) {
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
+                      } @else {
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
+                      }
                       <strong [style.color]="activePage()?.is_first_page ? '#fbbf24' : 'var(--text-primary)'" style="font-size:12.5px;">
                         First Page (Homepage)
                       </strong>
@@ -1784,7 +2024,7 @@
                     <button type="button" class="btn primary btn-sm"
                             style="width:100%;justify-content:center;background:#f59e0b;border-color:#f59e0b;color:#1e1b4b;font-weight:700;"
                             (click)="toggleFirstPage()">
-                      ★ Set as First Page
+                      Set as First Page
                     </button>
                   }
                 </div>
