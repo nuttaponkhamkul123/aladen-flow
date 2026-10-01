@@ -1,23 +1,24 @@
 <div class="modal-wrapper" (click)="onBackdropClick($event)">
   <div class="modal-backdrop"></div>
-  <div class="modal-panel settings-panel" (click)="$event.stopPropagation()">
-    
-    <!-- Modal Header -->
+  <div class="modal-panel settings-panel" role="dialog" aria-modal="true"
+       aria-labelledby="settings-title" (click)="$event.stopPropagation()">
+
     <div class="settings-header">
       <div class="header-title-group">
-        <div class="settings-icon-badge">
+        <div class="settings-icon-badge" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
             <circle cx="12" cy="12" r="3"/>
           </svg>
         </div>
         <div>
-          <h2 class="settings-title">Aladenflow Settings</h2>
+          <h2 class="settings-title" id="settings-title">Aladenflow Settings</h2>
           <p class="settings-subtitle">Manage workspace preferences, AI engines, themes, and sidebar layout</p>
         </div>
       </div>
 
-      <button type="button" class="btn-icon ghost close-btn" (click)="settingsService.close()" title="Close Settings">
+      <button type="button" class="btn-icon ghost close-btn" (click)="settingsService.close()"
+              title="Close Settings (Esc)" aria-label="Close settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
@@ -28,97 +29,95 @@
     <!-- Modal Body: Tabs & Content -->
     <div class="settings-body">
       <!-- Tabs Nav -->
-      <div class="settings-nav">
-        <button type="button" class="settings-nav-btn" [class.active]="settingsService.activeTab() === 'general'"
-                (click)="settingsService.activeTab.set('general')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/>
-          </svg>
-          <span>Appearance</span>
-        </button>
-
-        <button type="button" class="settings-nav-btn" [class.active]="settingsService.activeTab() === 'ai'"
-                (click)="settingsService.activeTab.set('ai')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-          </svg>
-          <span>AI Engine</span>
-        </button>
-
-        <button type="button" class="settings-nav-btn" [class.active]="settingsService.activeTab() === 'canvas'"
-                (click)="settingsService.activeTab.set('canvas')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/>
-          </svg>
-          <span>Sidebars & Layout</span>
-        </button>
-
-        <button type="button" class="settings-nav-btn" [class.active]="settingsService.activeTab() === 'storage'"
-                (click)="settingsService.activeTab.set('storage')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
-          </svg>
-          <span>Storage</span>
-        </button>
+      <div class="settings-nav" role="tablist" aria-orientation="vertical" aria-label="Settings sections">
+        @for (tab of tabs; track tab.id) {
+          <button type="button"
+                  class="settings-nav-btn"
+                  role="tab"
+                  [id]="'tab-' + tab.id"
+                  [attr.aria-selected]="settingsService.activeTab() === tab.id"
+                  [attr.aria-controls]="'panel-' + tab.id"
+                  [tabindex]="settingsService.activeTab() === tab.id ? 0 : -1"
+                  [class.active]="settingsService.activeTab() === tab.id"
+                  (click)="selectTab(tab.id)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              @switch (tab.icon) {
+                @case ('appearance') {
+                  <circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/>
+                }
+                @case ('ai') {
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                }
+                @case ('layout') {
+                  <rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/>
+                }
+                @case ('storage') {
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
+                }
+              }
+            </svg>
+            <span>{{ tab.label }}</span>
+          </button>
+        }
       </div>
 
       <!-- Tab Content Area -->
       <div class="settings-content">
-        
+
         <!-- GENERAL / APPEARANCE TAB -->
         @if (settingsService.activeTab() === 'general') {
-          <div class="tab-pane">
+          <div class="tab-pane" role="tabpanel" id="panel-general" aria-labelledby="tab-general">
             <h3 class="pane-title">Workspace Appearance</h3>
-            
+
             <div class="setting-group">
-              <label class="setting-label">Theme Mode</label>
+              <span class="setting-label" id="theme-mode-label">Theme Mode</span>
               <p class="setting-desc">Choose between dark aesthetic, light mode, or automatic system match</p>
-              <div class="theme-options-grid">
-                <button type="button" class="theme-option-card" [class.selected]="themeService.themeMode() === 'auto'"
-                        (click)="themeService.setThemeMode('auto')">
-                  <div class="theme-preview auto-preview">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-                    </svg>
-                  </div>
-                  <span class="theme-name">Auto (System)</span>
-                </button>
-                <button type="button" class="theme-option-card" [class.selected]="themeService.themeMode() === 'dark'"
-                        (click)="themeService.setThemeMode('dark')">
-                  <div class="theme-preview dark-preview">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                    </svg>
-                  </div>
-                  <span class="theme-name">Dark Mode</span>
-                </button>
-                <button type="button" class="theme-option-card" [class.selected]="themeService.themeMode() === 'light'"
-                        (click)="themeService.setThemeMode('light')">
-                  <div class="theme-preview light-preview">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
-                    </svg>
-                  </div>
-                  <span class="theme-name">Light Mode</span>
-                </button>
+              <div class="theme-options-grid" role="radiogroup" aria-labelledby="theme-mode-label">
+                @for (mode of themeModes; track mode.id) {
+                  <button type="button"
+                          class="theme-option-card"
+                          role="radio"
+                          [attr.aria-checked]="themeService.themeMode() === mode.id"
+                          [class.selected]="themeService.themeMode() === mode.id"
+                          (click)="themeService.setThemeMode(mode.id)">
+                    <div class="theme-preview" [class]="'theme-preview ' + mode.preview" aria-hidden="true">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        @switch (mode.icon) {
+                          @case ('auto') {
+                            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                          }
+                          @case ('dark') {
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                          }
+                          @case ('light') {
+                            <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+                          }
+                        }
+                      </svg>
+                    </div>
+                    <span class="theme-name">{{ mode.label }}</span>
+                  </button>
+                }
               </div>
             </div>
 
-            <div class="setting-group" style="margin-top:24px;">
-              <label class="setting-label">Canvas Ambient Preset</label>
+            <div class="setting-group setting-group--spaced">
+              <span class="setting-label" id="ambient-label">Canvas Ambient Preset</span>
               <p class="setting-desc">Background gradient and backdrop atmosphere for boards and studio</p>
-              <div class="ambient-list">
+              <div class="ambient-list" role="radiogroup" aria-labelledby="ambient-label">
                 @for (amb of ambientThemes; track amb.id) {
-                  <div class="ambient-item" [class.active]="themeService.ambientTheme() === amb.id"
-                       (click)="themeService.setAmbientTheme(amb.id)">
-                    <div class="ambient-radio">
-                      <div class="radio-dot"></div>
-                    </div>
-                    <div class="ambient-info">
-                      <span class="ambient-label">{{ amb.label }}</span>
+                  <label class="ambient-item" [class.active]="themeService.ambientTheme() === amb.id">
+                    <input type="radio" name="ambientTheme"
+                           [checked]="themeService.ambientTheme() === amb.id"
+                           (change)="themeService.setAmbientTheme(amb.id)" />
+                    <span class="ambient-radio" aria-hidden="true">
+                      <span class="radio-dot"></span>
+                    </span>
+                    <span class="ambient-info">
+                      <span class="ambient-text">{{ amb.label }}</span>
                       <span class="ambient-desc">{{ amb.desc }}</span>
-                    </div>
-                  </div>
+                    </span>
+                  </label>
                 }
               </div>
             </div>
@@ -127,59 +126,71 @@
 
         <!-- AI CONFIGURATION TAB -->
         @if (settingsService.activeTab() === 'ai') {
-          <div class="tab-pane">
+          <div class="tab-pane" role="tabpanel" id="panel-ai" aria-labelledby="tab-ai">
             <h3 class="pane-title">AI Engine Settings</h3>
             <p class="pane-subtitle">Power intelligent website generation and layout creation with your preferred LLM provider</p>
 
             <div class="form-field">
-              <label class="field-label">AI Provider</label>
-              <select class="form-select" [ngModel]="provider()" (ngModelChange)="provider.set($event); onProviderChange()">
+              <label class="field-label" for="set-provider">AI Provider</label>
+              <select id="set-provider" class="form-select" [ngModel]="provider()" (ngModelChange)="provider.set($event); onProviderChange()">
                 <option value="opencode">OpenCode / Groq Cloud (Recommended, Ultra Fast)</option>
                 <option value="gemini">Google Gemini AI</option>
-                <option value="ollama">Local Ollama (Private & Offline)</option>
+                <option value="ollama">Local Ollama (Private &amp; Offline)</option>
               </select>
             </div>
 
             @if (provider() !== 'ollama') {
               <div class="form-field">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                  <label class="field-label">API Key</label>
-                  <button type="button" class="btn-link" (click)="showApiKey.set(!showApiKey())">
+                <div class="field-label-row">
+                  <label class="field-label field-label--flush" for="set-apikey">API Key</label>
+                  <button type="button" class="btn-link" (click)="showApiKey.set(!showApiKey())"
+                          [attr.aria-pressed]="showApiKey()">
                     {{ showApiKey() ? 'Hide Key' : 'Reveal Key' }}
                   </button>
                 </div>
-                <input [type]="showApiKey() ? 'text' : 'password'" class="form-input"
+                <input id="set-apikey" [type]="showApiKey() ? 'text' : 'password'" class="form-input"
+                       autocomplete="off" spellcheck="false"
                        [ngModel]="apiKey()" (ngModelChange)="apiKey.set($event)"
-                       placeholder="Enter API Key (saved securely in local browser storage)" />
+                       placeholder="Enter API Key (saved in this browser only)" />
               </div>
 
               <div class="form-grid-2">
                 <div class="form-field">
-                  <label class="field-label">Base URL</label>
-                  <input type="text" class="form-input" [ngModel]="baseUrl()" (ngModelChange)="baseUrl.set($event)" />
+                  <label class="field-label" for="set-baseurl">Base URL</label>
+                  <input id="set-baseurl" type="text" class="form-input" spellcheck="false"
+                         [ngModel]="baseUrl()" (ngModelChange)="baseUrl.set($event)" />
                 </div>
                 <div class="form-field">
-                  <label class="field-label">Model Name</label>
-                  <input type="text" class="form-input" [ngModel]="model()" (ngModelChange)="model.set($event)" />
+                  <label class="field-label" for="set-model">Model Name</label>
+                  <input id="set-model" type="text" class="form-input" spellcheck="false"
+                         [ngModel]="model()" (ngModelChange)="model.set($event)" />
                 </div>
               </div>
             } @else {
               <div class="form-grid-2">
                 <div class="form-field">
-                  <label class="field-label">Ollama Host URL</label>
-                  <input type="text" class="form-input" [ngModel]="ollamaBaseUrl()" (ngModelChange)="ollamaBaseUrl.set($event)"
+                  <label class="field-label" for="set-ollama-url">Ollama Host URL</label>
+                  <input id="set-ollama-url" type="text" class="form-input" spellcheck="false"
+                         [ngModel]="ollamaBaseUrl()" (ngModelChange)="ollamaBaseUrl.set($event)"
                          placeholder="http://localhost:11434" />
                 </div>
                 <div class="form-field">
-                  <label class="field-label">Ollama Model</label>
-                  <input type="text" class="form-input" [ngModel]="ollamaModel()" (ngModelChange)="ollamaModel.set($event)"
+                  <label class="field-label" for="set-ollama-model">Ollama Model</label>
+                  <input id="set-ollama-model" type="text" class="form-input" spellcheck="false"
+                         [ngModel]="ollamaModel()" (ngModelChange)="ollamaModel.set($event)"
                          placeholder="llama3.2, mistral, qwen2.5:coder" />
                 </div>
               </div>
             }
 
-            <div class="pane-actions" style="margin-top:20px;">
-              <button type="button" class="btn btn-primary" (click)="saveAi()">
+            <div class="pane-actions">
+              @if (isDirty()) {
+                <span class="dirty-hint">Unsaved changes</span>
+              }
+              <button type="button" class="btn ghost" (click)="revertAi()" [disabled]="!isDirty()">
+                Revert
+              </button>
+              <button type="button" class="btn btn-primary" (click)="saveAi()" [disabled]="!isDirty()">
                 Save AI Configuration
               </button>
             </div>
@@ -188,30 +199,30 @@
 
         <!-- SIDEBARS & CANVAS LAYOUT TAB -->
         @if (settingsService.activeTab() === 'canvas') {
-          <div class="tab-pane">
-            <h3 class="pane-title">Sidebars & Studio Layout</h3>
+          <div class="tab-pane" role="tabpanel" id="panel-canvas" aria-labelledby="tab-canvas">
+            <h3 class="pane-title">Sidebars &amp; Studio Layout</h3>
             <p class="pane-subtitle">Manage collapsible drawers and custom sidebar drag widths</p>
 
             <div class="setting-group">
-              <label class="setting-label">CMS Studio Resizable Sidebars</label>
-              <p class="setting-desc">The Left Sidebar (Blocks & Palette) and Right Sidebar (Inspector) support live drag-resizing with mouse grips and remember their dimensions.</p>
+              <span class="setting-label">CMS Studio Resizable Sidebars</span>
+              <p class="setting-desc">The Left Sidebar (Blocks &amp; Palette) and Right Sidebar (Inspector) support live drag-resizing with mouse grips and remember their dimensions.</p>
 
               <div class="info-card">
                 <div class="info-item">
-                  <span class="info-title">Left Sidebar:</span>
-                  <span class="info-val">Drag right edge (200px - 560px, default 280px)</span>
+                  <span class="info-title">Left Sidebar</span>
+                  <span class="info-val">Drag right edge (200px – 560px, default 280px)</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-title">Right Inspector:</span>
-                  <span class="info-val">Drag left edge (220px - 600px, default 300px)</span>
+                  <span class="info-title">Right Inspector</span>
+                  <span class="info-val">Drag left edge (220px – 600px, default 300px)</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-title">Quick Reset:</span>
+                  <span class="info-title">Quick Reset</span>
                   <span class="info-val">Double-click any drag handle to reset width</span>
                 </div>
               </div>
 
-              <div style="margin-top:16px;">
+              <div class="setting-group--spaced">
                 <button type="button" class="btn btn-secondary" (click)="resetSidebars()">
                   Reset Sidebars to Default Widths
                 </button>
@@ -222,18 +233,18 @@
 
         <!-- STORAGE & CACHE TAB -->
         @if (settingsService.activeTab() === 'storage') {
-          <div class="tab-pane">
-            <h3 class="pane-title">Storage & Local Data</h3>
+          <div class="tab-pane" role="tabpanel" id="panel-storage" aria-labelledby="tab-storage">
+            <h3 class="pane-title">Storage &amp; Local Data</h3>
             <p class="pane-subtitle">Inspect local browser data cached by Aladenflow Studio</p>
 
             <div class="setting-group">
               <div class="danger-box">
                 <div>
-                  <h4 style="margin:0 0 4px;font-size:13px;color:#ef4444;font-weight:700;">Reset Workspace Data</h4>
-                  <p style="margin:0;font-size:12px;color:var(--text-secondary);">Clear cached UI preferences and sidebar state. Your cards, boards, and CMS pages saved on the server database are untouched.</p>
+                  <h4 class="danger-title">Reset Workspace Data</h4>
+                  <p class="danger-desc">Clear cached UI preferences and sidebar state. Your cards, boards, and CMS pages saved on the server database are untouched.</p>
                 </div>
                 <button type="button" class="btn btn-danger" (click)="settingsService.clearWorkspaceCache()">
-                  Clear UI Cache & Reload
+                  Clear UI Cache &amp; Reload
                 </button>
               </div>
             </div>

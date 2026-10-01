@@ -226,8 +226,18 @@
 .block-wrap.is-sticky-header {
   position: sticky !important;
   top: 0 !important;
-  z-index: 50 !important;
+  /* Below --z-editor-affix so a hovered block's floating toolbar is not covered
+     by a sticky header scrolling over it. */
+  z-index: var(--z-sticky) !important;
   margin-top: 0 !important;
+}
+
+/* Declared after the base rule on purpose: both carry !important, so source
+   order decides. This one lifts the block above sticky chrome while hovered so
+   its floating toolbar is never covered. */
+.block-wrap.is-sticky-header:hover,
+.block-wrap.is-sticky-header.selected {
+  z-index: var(--z-editor-affix) !important;
 }
 
 /* CMS Header Component Fidelity (Matches Live Page) */
@@ -641,7 +651,9 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
   background: var(--bg-surface-elevated);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-sm);
-  z-index: 25;
+  /* Same treatment as .block-toolbar — it is absolutely positioned above its
+     container and must not be occluded by later siblings. */
+  z-index: var(--z-editor-affix);
   box-shadow: var(--shadow-md);
   animation: scaleIn 0.12s var(--ease-spring);
 }
@@ -649,6 +661,14 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
 .container-child:hover > .container-child-bar,
 .container-child.selected > .container-child-bar {
   display: flex;
+}
+
+/* Same promotion as .block-wrap: the bar is absolutely positioned outside its
+   container, so the container itself must be lifted to clear sibling blocks. */
+.container-child:hover,
+.container-child.selected {
+  position: relative;
+  z-index: var(--z-editor-affix);
 }
 
 .container-child-bar .container-child-handle,
@@ -983,14 +1003,13 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
    ========================================================================== */
 
 /* Viewport width & height - Always fixed for mobile (portrait: 390x844, landscape: 844x390) */
-:host ::ng-deep .canvas-viewport.is-mobile-viewport,
 .canvas-viewport.is-mobile-viewport {
-  width: 390px !important;
-  max-width: 390px !important;
-  min-width: 390px !important;
+  width: var(--device-mobile-w) !important;
+  max-width: var(--device-mobile-w) !important;
+  min-width: var(--device-mobile-w) !important;
   height: 100% !important;
   min-height: 0 !important;
-  max-height: min(844px, calc(100% - 12px)) !important;
+  max-height: min(var(--device-mobile-h), calc(100% - 12px)) !important;
   margin: 0 auto !important;
   flex: 0 1 auto !important;
   overflow: hidden !important;
@@ -1000,30 +1019,28 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
   transition: width 0.25s ease, max-width 0.25s ease, height 0.25s ease;
 }
 
-:host ::ng-deep .canvas-viewport.is-mobile-viewport.is-landscape,
 .canvas-viewport.is-mobile-viewport.is-landscape {
-  width: min(844px, calc(100% - 12px)) !important;
-  max-width: min(844px, calc(100% - 12px)) !important;
+  width: min(var(--device-mobile-h), calc(100% - 12px)) !important;
+  max-width: min(var(--device-mobile-h), calc(100% - 12px)) !important;
   min-width: 0 !important;
   height: 100% !important;
   min-height: 0 !important;
-  max-height: min(390px, calc(100% - 12px)) !important;
+  max-height: min(var(--device-mobile-w), calc(100% - 12px)) !important;
 }
 
 /* Framed Device Shell */
-:host ::ng-deep .canvas-viewport.has-device-frame.is-mobile-viewport,
 .canvas-viewport.has-device-frame.is-mobile-viewport {
-  border-radius: 46px !important;
+  border-radius: var(--device-frame-radius) !important;
   padding: 10px 10px 12px 10px !important;
   background: #0b0f19 !important;
   border: 4px solid #334155 !important;
   box-shadow: 0 25px 70px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 0 0 2px rgba(0, 0, 0, 0.9) !important;
-  width: 390px !important;
-  min-width: 390px !important;
-  max-width: 390px !important;
+  width: var(--device-mobile-w) !important;
+  min-width: var(--device-mobile-w) !important;
+  max-width: var(--device-mobile-w) !important;
   height: 100% !important;
   min-height: 0 !important;
-  max-height: min(844px, calc(100% - 12px)) !important;
+  max-height: min(var(--device-mobile-h), calc(100% - 12px)) !important;
   box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
@@ -1031,28 +1048,26 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
   flex: 0 1 auto !important;
 }
 
-:host ::ng-deep .canvas-viewport.has-device-frame.is-mobile-viewport.is-landscape,
 .canvas-viewport.has-device-frame.is-mobile-viewport.is-landscape {
-  width: min(844px, calc(100% - 12px)) !important;
+  width: min(var(--device-mobile-h), calc(100% - 12px)) !important;
   min-width: 0 !important;
-  max-width: min(844px, calc(100% - 12px)) !important;
+  max-width: min(var(--device-mobile-h), calc(100% - 12px)) !important;
   height: 100% !important;
   min-height: 0 !important;
-  max-height: min(390px, calc(100% - 12px)) !important;
+  max-height: min(var(--device-mobile-w), calc(100% - 12px)) !important;
 }
 
 /* Unframed Device Shell (Direct phone screen preview) */
-:host ::ng-deep .canvas-viewport.is-mobile-viewport:not(.has-device-frame),
 .canvas-viewport.is-mobile-viewport:not(.has-device-frame) {
   border-radius: 24px !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45) !important;
-  width: 390px !important;
-  min-width: 390px !important;
-  max-width: 390px !important;
+  width: var(--device-mobile-w) !important;
+  min-width: var(--device-mobile-w) !important;
+  max-width: var(--device-mobile-w) !important;
   height: 100% !important;
   min-height: 0 !important;
-  max-height: min(844px, calc(100% - 12px)) !important;
+  max-height: min(var(--device-mobile-h), calc(100% - 12px)) !important;
   box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
@@ -1060,14 +1075,13 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
   flex: 0 1 auto !important;
 }
 
-:host ::ng-deep .canvas-viewport.is-mobile-viewport.is-landscape:not(.has-device-frame),
 .canvas-viewport.is-mobile-viewport.is-landscape:not(.has-device-frame) {
-  width: min(844px, calc(100% - 12px)) !important;
+  width: min(var(--device-mobile-h), calc(100% - 12px)) !important;
   min-width: 0 !important;
-  max-width: min(844px, calc(100% - 12px)) !important;
+  max-width: min(var(--device-mobile-h), calc(100% - 12px)) !important;
   height: 100% !important;
   min-height: 0 !important;
-  max-height: min(390px, calc(100% - 12px)) !important;
+  max-height: min(var(--device-mobile-w), calc(100% - 12px)) !important;
 }
 
 /* Speaker notch & home bar */
@@ -1105,9 +1119,7 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
 }
 
 /* Canvas element & iframe inside mobile viewport */
-:host ::ng-deep .canvas-viewport.is-mobile-viewport .cms-canvas,
 .canvas-viewport.is-mobile-viewport .cms-canvas,
-:host ::ng-deep .canvas-viewport.is-mobile-viewport .cms-canvas-iframe,
 .canvas-viewport.is-mobile-viewport .cms-canvas-iframe {
   width: 100% !important;
   max-width: 100% !important;
@@ -1122,20 +1134,17 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
   overscroll-behavior: contain;
 }
 
-:host ::ng-deep .canvas-viewport.has-device-frame.is-mobile-viewport .cms-canvas,
 .canvas-viewport.has-device-frame.is-mobile-viewport .cms-canvas {
   padding: 16px 12px !important;
   border-radius: 28px !important;
 }
 
-:host ::ng-deep .canvas-viewport.is-mobile-viewport:not(.has-device-frame) .cms-canvas,
 .canvas-viewport.is-mobile-viewport:not(.has-device-frame) .cms-canvas {
   padding: 16px 12px !important;
   border-radius: 24px !important;
 }
 
 /* Collapse multi-column grid containers to single column on mobile portrait */
-:host ::ng-deep .canvas-viewport.is-mobile-viewport:not(.is-landscape) .container-block-preview,
 .canvas-viewport.is-mobile-viewport:not(.is-landscape) .container-block-preview {
   grid-template-columns: 1fr !important;
   padding: 12px 10px !important;
@@ -1145,14 +1154,12 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
 }
 
 /* Allow flex row items to wrap naturally */
-:host ::ng-deep .canvas-viewport.is-mobile-viewport .container-block-preview {
+.canvas-viewport.is-mobile-viewport .container-block-preview {
   flex-wrap: wrap !important;
 }
 
 /* Ensure container children never exceed container width */
-:host ::ng-deep .canvas-viewport.is-mobile-viewport .container-child,
 .canvas-viewport.is-mobile-viewport .container-child,
-:host ::ng-deep .canvas-viewport.is-mobile-viewport .block-wrap,
 .canvas-viewport.is-mobile-viewport .block-wrap {
   max-width: 100% !important;
   min-width: 0 !important;
@@ -1162,20 +1169,17 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
 }
 
 /* Heading font scaling on mobile */
-:host ::ng-deep .canvas-viewport.is-mobile-viewport h1,
 .canvas-viewport.is-mobile-viewport h1 {
   font-size: 24px !important;
   line-height: 1.25 !important;
 }
 
-:host ::ng-deep .canvas-viewport.is-mobile-viewport h2,
 .canvas-viewport.is-mobile-viewport h2 {
   font-size: 20px !important;
   line-height: 1.3 !important;
 }
 
 /* Tablet Viewport rules */
-:host ::ng-deep .canvas-viewport.is-tablet-viewport,
 .canvas-viewport.is-tablet-viewport {
   width: 768px !important;
   max-width: 768px !important;
@@ -1183,14 +1187,12 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
   margin: 0 auto !important;
 }
 
-:host ::ng-deep .canvas-viewport.is-tablet-viewport.is-landscape,
 .canvas-viewport.is-tablet-viewport.is-landscape {
   width: 1024px !important;
   max-width: 1024px !important;
   min-width: 1024px !important;
 }
 
-:host ::ng-deep .canvas-viewport.has-device-frame.is-tablet-viewport,
 .canvas-viewport.has-device-frame.is-tablet-viewport {
   border-radius: 36px !important;
   padding: 16px 14px 18px 14px !important;
@@ -1204,13 +1206,11 @@ body.theme-light .cms-header-block.variant-glass .cms-header-link:hover {
   flex-direction: column !important;
 }
 
-:host ::ng-deep .canvas-viewport.has-device-frame.is-tablet-viewport.is-landscape,
 .canvas-viewport.has-device-frame.is-tablet-viewport.is-landscape {
   height: 680px !important;
   max-height: 680px !important;
 }
 
-:host ::ng-deep .canvas-viewport.is-tablet-viewport .cms-canvas,
 .canvas-viewport.is-tablet-viewport .cms-canvas {
   width: 100% !important;
   max-width: 100% !important;
