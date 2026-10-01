@@ -264,6 +264,14 @@ app.post('/api/columns/:id/cards', (req, res) => {
 
   const boardId = db.prepare('SELECT board_id AS b FROM columns WHERE id = ?').get(columnId)?.b;
   logActivity(cardId, boardId, `Card created: "${title.trim()}"`);
+
+  try {
+    runAutomationsForTrigger('card_created', { card_id: cardId });
+    runAutomationsForTrigger('card_updated', { card_id: cardId });
+  } catch (e) {
+    console.error('Automation error on card creation:', e);
+  }
+
   res.json({ id: cardId });
 });
 
@@ -318,6 +326,13 @@ app.patch('/api/cards/:id', (req, res) => {
     }
   });
   tx();
+
+  try {
+    runAutomationsForTrigger('card_updated', { card_id: id });
+  } catch (e) {
+    console.error('Automation error on card update:', e);
+  }
+
   res.json({ ok: true });
 });
 
@@ -342,6 +357,14 @@ app.post('/api/cards/:id/move', (req, res) => {
       db.prepare("UPDATE cards SET updated_at = datetime('now') WHERE id = ?").run(id);
     });
     tx();
+
+    try {
+      runAutomationsForTrigger('card_moved', { card_id: id });
+      runAutomationsForTrigger('card_updated', { card_id: id });
+    } catch (e) {
+      console.error('Automation error on card reorder/move:', e);
+    }
+
     return res.json({ ok: true });
   }
 
@@ -357,8 +380,17 @@ app.post('/api/cards/:id/move', (req, res) => {
     db.prepare("UPDATE cards SET updated_at = datetime('now') WHERE id = ?").run(id);
   });
   tx();
+
+  try {
+    runAutomationsForTrigger('card_moved', { card_id: id });
+    runAutomationsForTrigger('card_updated', { card_id: id });
+  } catch (e) {
+    console.error('Automation error on card move:', e);
+  }
+
   res.json({ ok: true });
 });
+
 
 app.get('/api/cards/:id/activity', (req, res) => {
   const items = db
@@ -450,9 +482,12 @@ app.delete('/api/checklist/:id', (req, res) => {
 // AUTOMATION FLOW ENGINE & API ENDPOINTS
 // ==========================================
 
+const activeAutomationStack = new Set();
+
 function getAutomationCardContext(cardId) {
+  let card = null;
   if (!cardId) {
-    return db.prepare(`
+    card = db.prepare(`
       SELECT c.*, col.name as column_name, col.board_id, b.name as board_name
       FROM cards c
       JOIN columns col ON col.id = c.column_id
@@ -460,14 +495,34 @@ function getAutomationCardContext(cardId) {
       WHERE c.archived = 0
       ORDER BY c.updated_at DESC LIMIT 1
     `).get() || null;
+  } else {
+    card = db.prepare(`
+      SELECT c.*, col.name as column_name, col.board_id, b.name as board_name
+      FROM cards c
+      JOIN columns col ON col.id = c.column_id
+      JOIN boards b ON b.id = col.board_id
+      WHERE c.id = ?
+    `).get(cardId) || null;
   }
-  return db.prepare(`
-    SELECT c.*, col.name as column_name, col.board_id, b.name as board_name
-    FROM cards c
-    JOIN columns col ON col.id = c.column_id
-    JOIN boards b ON b.id = col.board_id
-    WHERE c.id = ?
-  `).get(cardId) || null;
+
+  if (card) {
+    try {
+      const labels = db.prepare(`
+        SELECT l.id, l.name, l.color FROM card_labels cl
+        JOIN labels l ON l.id = cl.label_id WHERE cl.card_id = ?
+      `).all(card.id) || [];
+      card.labels = labels;
+      card.label_names = labels.map(l => (l.name || '').toLowerCase()).join(' ');
+
+      const checklist = db.prepare('SELECT * FROM checklist_items WHERE card_id = ? ORDER BY position ASC').all(card.id) || [];
+      card.checklist = checklist;
+      card.checklist_total = checklist.length;
+      card.checklist_done = checklist.filter(c => c.checked).length;
+      card.checklist_pct = checklist.length > 0 ? Math.round((card.checklist_done / checklist.length) * 100) : 0;
+    } catch (_) { }
+  }
+
+  return card;
 }
 
 function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
@@ -477,12 +532,13 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
 
   const triggerNode = nodes.find(n => n.type === 'trigger') || nodes[0];
   const conditionNodes = nodes.filter(n => n.type === 'condition');
-  const actionNodes = nodes.filter(n => n.type === 'action');
+  // Both 'action' and 'ai' nodes count as actionable steps
+  const actionNodes = nodes.filter(n => n.type === 'action' || n.type === 'ai');
 
   let cardContext = inputContext.card || getAutomationCardContext(inputContext.card_id);
   let pageContext = inputContext.page || (inputContext.page_id ? db.prepare('SELECT * FROM pages WHERE id = ?').get(inputContext.page_id) : null);
 
-  // Trigger step
+  // Trigger step trace
   if (triggerNode) {
     steps.push({
       nodeId: triggerNode.id,
@@ -509,6 +565,10 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
       actualVal = String(cardContext?.priority || '').toLowerCase().trim();
     } else if (field === 'title_or_desc') {
       actualVal = `${cardContext?.title || ''} ${cardContext?.description || ''}`.toLowerCase();
+    } else if (field === 'labels' || field === 'label') {
+      actualVal = String(cardContext?.label_names || '').toLowerCase();
+    } else if (field === 'checklist_pct') {
+      actualVal = String(cardContext?.checklist_pct || 0);
     } else if (field === 'status') {
       actualVal = String(pageContext?.status || 'published').toLowerCase().trim();
     } else {
@@ -523,6 +583,10 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
       passed = actualVal.includes(expectedVal);
     } else if (operator === 'not_contains') {
       passed = !actualVal.includes(expectedVal);
+    } else if (operator === 'greater_than') {
+      passed = parseFloat(actualVal) > parseFloat(expectedVal);
+    } else if (operator === 'less_than') {
+      passed = parseFloat(actualVal) < parseFloat(expectedVal);
     }
 
     steps.push({
@@ -531,8 +595,8 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
       title: cond.title || 'Condition Evaluated',
       status: passed ? 'passed' : 'failed',
       message: passed
-        ? `Condition passed: "${field}" ${operator} "${expectedVal}" (Actual: "${actualVal || 'none'}")`
-        : `Condition failed: "${field}" ${operator} "${expectedVal}" (Actual: "${actualVal || 'none'}")`
+        ? `Condition met: "${field}" ${operator} "${expectedVal}" (Actual: "${actualVal || 'none'}")`
+        : `Condition not met: "${field}" ${operator} "${expectedVal}" (Actual: "${actualVal || 'none'}")`
     });
 
     if (!passed) {
@@ -541,12 +605,12 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
     }
   }
 
-  // Action execution
+  // Action / AI execution
   const actionMessages = [];
   if (conditionsPassed && actionNodes.length > 0) {
     for (const act of actionNodes) {
       const cfg = act.config || {};
-      const actionType = cfg.action_type || 'move_card_column';
+      const actionType = cfg.action_type || (act.type === 'ai' ? 'ai_triage' : 'move_card_column');
 
       if (actionType === 'move_card_column') {
         const targetColName = cfg.target_column || 'Done';
@@ -563,6 +627,8 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
             const msg = cfg.add_activity || `Auto-moved to "${targetCol.name}" via automation flow`;
             logActivity(cardContext.id, cardContext.board_id, msg);
             actionMessages.push(`Moved card "${cardContext.title}" to column "${targetCol.name}"`);
+            cardContext.column_id = targetCol.id;
+            cardContext.column_name = targetCol.name;
           } else {
             actionMessages.push(`Card "${cardContext.title}" already in target column "${targetColName}"`);
           }
@@ -577,8 +643,23 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
           const msg = cfg.add_activity || `Priority set to ${prio} by automation`;
           logActivity(cardContext.id, cardContext.board_id, msg);
           actionMessages.push(`Card "${cardContext.title}" priority set to "${prio.toUpperCase()}"`);
+          cardContext.priority = prio;
         } else {
           actionMessages.push(`[Preview] Would set priority of "${cardContext?.title || 'Selected Card'}" to "${prio.toUpperCase()}"`);
+        }
+      } else if (actionType === 'add_label') {
+        const labelName = (cfg.label_name || 'bug').trim();
+        const labelColor = cfg.label_color || '#ef4444';
+        if (cardContext && commit) {
+          let label = db.prepare('SELECT id, name FROM labels WHERE board_id = ? AND LOWER(name) = LOWER(?)').get(cardContext.board_id, labelName);
+          if (!label) {
+            const lInfo = db.prepare('INSERT INTO labels (board_id, name, color) VALUES (?, ?, ?)').run(cardContext.board_id, labelName, labelColor);
+            label = { id: lInfo.lastInsertRowid, name: labelName };
+          }
+          db.prepare('INSERT OR IGNORE INTO card_labels (card_id, label_id) VALUES (?, ?)').run(cardContext.id, label.id);
+          actionMessages.push(`Added label "${labelName}" to card "${cardContext.title}"`);
+        } else {
+          actionMessages.push(`[Preview] Would assign label "${labelName}" to "${cardContext?.title || 'Card'}"`);
         }
       } else if (actionType === 'create_card') {
         const targetColName = cfg.target_column || 'Review';
@@ -597,20 +678,90 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
               VALUES (?, ?, ?, ?, ?)
             `).run(col.id, cardTitle, 'Auto-generated QA task from automation flow.', cfg.priority || 'high', maxPos + 1);
 
-            logActivity(newCard.lastInsertRowid, board.id, cfg.add_activity || 'Created via automation');
+            // Add standard verification checklist items
+            const cId = newCard.lastInsertRowid;
+            db.prepare('INSERT INTO checklist_items (card_id, text, position) VALUES (?, ?, 0)').run(cId, 'Verify live responsive layout (Mobile/Desktop)');
+            db.prepare('INSERT INTO checklist_items (card_id, text, position) VALUES (?, ?, 1)').run(cId, 'Confirm SEO meta tags & social cards');
+
+            logActivity(cId, board.id, cfg.add_activity || 'Created via automation');
             actionMessages.push(`Created verification card "${cardTitle}" in column #${col.id}`);
           }
         } else {
           actionMessages.push(`[Preview] Would create QA card in "${targetColName}" column`);
         }
+      } else if (actionType === 'publish_cms_page') {
+        if (commit) {
+          const page = pageContext || db.prepare("SELECT id, title FROM pages WHERE status != 'published' ORDER BY updated_at DESC LIMIT 1").get();
+          if (page) {
+            db.prepare("UPDATE pages SET status = 'published', updated_at = datetime('now') WHERE id = ?").run(page.id);
+            actionMessages.push(`Published CMS page "${page.title}" (ID: ${page.id})`);
+          } else {
+            actionMessages.push('No draft CMS page found to publish');
+          }
+        } else {
+          actionMessages.push(`[Preview] Would publish CMS page "${pageContext?.title || 'Draft Page'}"`);
+        }
+      } else if (actionType === 'ai_triage') {
+        const textToAnalyze = `${cardContext?.title || ''} ${cardContext?.description || ''}`.toLowerCase();
+        let determinedPriority = 'medium';
+        let suggestedTag = 'feature';
+
+        if (/bug|crash|error|fatal|exception|broken|critical|urgent|fail|security/.test(textToAnalyze)) {
+          determinedPriority = 'urgent';
+          suggestedTag = 'bug';
+        } else if (/feat|add|implement|support|new|enhance|redesign/.test(textToAnalyze)) {
+          determinedPriority = 'high';
+          suggestedTag = 'feature';
+        } else if (/doc|readme|guide|spec|manual/.test(textToAnalyze)) {
+          determinedPriority = 'low';
+          suggestedTag = 'docs';
+        }
+
+        if (cardContext && commit) {
+          db.prepare('UPDATE cards SET priority = ?, updated_at = datetime("now") WHERE id = ?').run(determinedPriority, cardContext.id);
+
+          let label = db.prepare('SELECT id, name FROM labels WHERE board_id = ? AND LOWER(name) = LOWER(?)').get(cardContext.board_id, suggestedTag);
+          if (!label) {
+            const color = suggestedTag === 'bug' ? '#ef4444' : suggestedTag === 'docs' ? '#10b981' : '#3b82f6';
+            const lInfo = db.prepare('INSERT INTO labels (board_id, name, color) VALUES (?, ?, ?)').run(cardContext.board_id, suggestedTag, color);
+            label = { id: lInfo.lastInsertRowid, name: suggestedTag };
+          }
+          db.prepare('INSERT OR IGNORE INTO card_labels (card_id, label_id) VALUES (?, ?)').run(cardContext.id, label.id);
+          logActivity(cardContext.id, cardContext.board_id, `AI Triage: Set priority "${determinedPriority}" and tagged [${suggestedTag}]`);
+          actionMessages.push(`AI Smart Triage: Assessed "${cardContext.title}" -> ${determinedPriority.toUpperCase()} [${suggestedTag}]`);
+        } else {
+          actionMessages.push(`[Preview AI] Would assess sentiment, assign "${determinedPriority.toUpperCase()}" priority and tag "${suggestedTag}"`);
+        }
+      } else if (actionType === 'ai_generate_checklist') {
+        if (cardContext && commit) {
+          const currentCount = db.prepare('SELECT COUNT(*) as c FROM checklist_items WHERE card_id = ?').get(cardContext.id)?.c || 0;
+          if (currentCount === 0) {
+            const items = [
+              `Analyze requirements & scope for: ${cardContext.title}`,
+              'Implement core solution and handle edge cases',
+              'Validate with tests & user acceptance criteria'
+            ];
+            items.forEach((itemText, idx) => {
+              db.prepare('INSERT INTO checklist_items (card_id, text, position) VALUES (?, ?, ?)').run(cardContext.id, itemText, idx);
+            });
+            logActivity(cardContext.id, cardContext.board_id, 'AI generated 3 checklist items for this task');
+            actionMessages.push(`AI Checklist Generator: Created 3 subtasks for "${cardContext.title}"`);
+          } else {
+            actionMessages.push(`Card already has ${currentCount} checklist items; skipping checklist generation`);
+          }
+        } else {
+          actionMessages.push(`[Preview AI] Would generate 3 structured checklist items for "${cardContext?.title || 'Card'}"`);
+        }
+      } else {
+        actionMessages.push(`Action "${actionType}" executed`);
       }
 
       steps.push({
         nodeId: act.id,
-        type: 'action',
-        title: act.title || 'Action Executed',
+        type: act.type || 'action',
+        title: act.title || 'Step Executed',
         status: conditionsPassed ? 'executed' : 'skipped',
-        message: actionMessages[actionMessages.length - 1] || 'Action completed successfully'
+        message: actionMessages[actionMessages.length - 1] || 'Completed successfully'
       });
     }
   }
@@ -660,8 +811,15 @@ function runAutomationsForTrigger(triggerType, context = {}) {
     const activeRules = db.prepare('SELECT * FROM automations WHERE is_active = 1 AND trigger_type = ?').all(triggerType);
     const results = [];
     for (const rule of activeRules) {
-      const res = evaluateAutomationFlow(rule, context, true);
-      results.push(res);
+      // Re-entrancy guard to avoid infinite recursive triggers
+      if (activeAutomationStack.has(rule.id)) continue;
+      activeAutomationStack.add(rule.id);
+      try {
+        const res = evaluateAutomationFlow(rule, context, true);
+        results.push(res);
+      } finally {
+        activeAutomationStack.delete(rule.id);
+      }
     }
     return results;
   } catch (err) {
@@ -669,6 +827,7 @@ function runAutomationsForTrigger(triggerType, context = {}) {
     return [];
   }
 }
+
 
 // REST Endpoints for Automations
 app.get('/api/automations', (req, res) => {
@@ -964,6 +1123,15 @@ app.patch('/api/pages/:id', (req, res) => {
     }
   });
   tx();
+
+  if (status === 'published' && existing.status !== 'published') {
+    try {
+      runAutomationsForTrigger('cms_page_published', { page_id: id });
+    } catch (e) {
+      console.error('Automation error on page publish:', e);
+    }
+  }
+
   const updated = db.prepare('SELECT * FROM pages WHERE id = ?').get(id);
   updated.tags = db.prepare('SELECT tag FROM page_tags WHERE page_id = ?').all(id).map(r => r.tag);
   try { updated.blocks = JSON.parse(updated.blocks || '[]'); }
@@ -972,6 +1140,7 @@ app.patch('/api/pages/:id', (req, res) => {
   catch { updated.settings = {}; }
   res.json(updated);
 });
+
 
 app.post('/api/pages/:id/set-first', (req, res) => {
   const id = Number(req.params.id);

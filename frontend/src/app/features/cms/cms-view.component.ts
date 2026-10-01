@@ -11,11 +11,12 @@ import { SettingsService } from '../../core/services/settings.service';
 import { CmsPage, ReusableBlock, Block, BlockCategory, BLOCK_DEFAULTS } from '../../core/models/cms.model';
 import { AiModalComponent } from './components/ai-modal/ai-modal.component';
 import { PROP_SCHEMAS, PropField } from './cms-prop-schema';
+import { CustomSelectComponent, SelectOption } from '../../shared/components/custom-select/custom-select.component';
 
 @Component({
   selector: 'app-cms-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, AiModalComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, AiModalComponent, CustomSelectComponent],
   templateUrl: './cms-view.component.html',
   styleUrls: ['./cms-view.component.css']
 })
@@ -28,6 +29,147 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   settingsService = inject(SettingsService);
   private destroyRef = inject(DestroyRef);
   private sanitizer = inject(DomSanitizer);
+
+  // Common Custom Select Options
+  readonly bgPresetOptions: SelectOption[] = [
+    { value: 'default', label: 'Default Dark' },
+    { value: 'gradient', label: 'Deep Gradient' },
+    { value: 'grid', label: 'Grid Pattern' },
+    { value: 'dots', label: 'Dot Matrix' },
+    { value: 'mesh', label: 'Mesh Gradient' },
+    { value: 'cyber', label: 'Cyber Glow' },
+    { value: 'pure', label: 'Pure Black' }
+  ];
+
+  readonly maxWidthOptions: SelectOption[] = [
+    { value: '820px', label: 'Standard (820px)' },
+    { value: '640px', label: 'Narrow (640px)' },
+    { value: '1024px', label: 'Wide (1024px)' },
+    { value: '1200px', label: 'Full Width (1200px)' },
+    { value: '100%', label: '100% Fluid' }
+  ];
+
+  readonly minWidthOptions: SelectOption[] = [
+    { value: '0px', label: 'None (0px)' },
+    { value: '320px', label: 'Mobile (320px)' },
+    { value: '640px', label: 'Narrow (640px)' },
+    { value: '768px', label: 'Tablet (768px)' }
+  ];
+
+  readonly alignOptions: SelectOption[] = [
+    { value: 'center', label: 'Centered' },
+    { value: 'left', label: 'Left Aligned' }
+  ];
+
+  readonly fontFamilyOptions: SelectOption[] = [
+    { value: 'system', label: 'Inter (Modern Sans)' },
+    { value: 'outfit', label: 'Outfit (Futuristic Display)' },
+    { value: 'roboto', label: 'Roboto (Clean Sans)' },
+    { value: 'mono', label: 'JetBrains Mono (Code)' },
+    { value: 'serif', label: 'Georgia (Editorial Serif)' }
+  ];
+
+  readonly themeModeOptions: SelectOption[] = [
+    { value: 'auto', label: 'Auto (Sync Browser)' },
+    { value: 'dark', label: 'Dark Mode' },
+    { value: 'light', label: 'Light Mode' }
+  ];
+
+  readonly childTypeOptions: SelectOption[] = [
+    { value: 'paragraph', label: 'Paragraph' },
+    { value: 'button', label: 'Button' },
+    { value: 'heading', label: 'Heading' },
+    { value: 'image', label: 'Image' },
+    { value: 'callout', label: 'Callout' },
+    { value: 'accordion', label: 'Accordion' }
+  ];
+
+  readonly bgTypeOptions: SelectOption[] = [
+    { value: 'none', label: 'None (Transparent / Theme)' },
+    { value: 'color', label: 'Solid Color' },
+    { value: 'gradient', label: 'Gradient' },
+    { value: 'image', label: 'Image (with Parallax)' },
+    { value: 'video', label: 'Video Background (with Parallax)' }
+  ];
+
+  readonly bgSizeOptions: SelectOption[] = [
+    { value: 'cover', label: 'Cover (Full Fill)' },
+    { value: 'contain', label: 'Contain (Fit Inside)' },
+    { value: 'auto', label: 'Auto (Native Size)' }
+  ];
+
+  readonly bgPositionOptions: SelectOption[] = [
+    { value: 'center', label: 'Center' },
+    { value: 'top', label: 'Top' },
+    { value: 'bottom', label: 'Bottom' },
+    { value: 'left', label: 'Left' },
+    { value: 'right', label: 'Right' }
+  ];
+
+  readonly bgRepeatOptions: SelectOption[] = [
+    { value: 'no-repeat', label: 'No Repeat' },
+    { value: 'repeat', label: 'Repeat (Tiles)' },
+    { value: 'repeat-x', label: 'Repeat Horizontal' },
+    { value: 'repeat-y', label: 'Repeat Vertical' }
+  ];
+
+  readonly bgOverlayOptions: SelectOption[] = [
+    { value: 'none', label: 'None (Pure / Clear)' },
+    { value: 'rgba(0,0,0,0.35)', label: 'Subtle Dark (35%)' },
+    { value: 'rgba(0,0,0,0.55)', label: 'Medium Dark (55%)' },
+    { value: 'rgba(0,0,0,0.75)', label: 'Deep Dark (75%)' },
+    { value: 'rgba(15,23,42,0.65)', label: 'Navy Tint' },
+    { value: 'rgba(99,102,241,0.25)', label: 'Indigo Glow (25%)' }
+  ];
+
+  readonly pageStatusOptions: SelectOption[] = [
+    { value: 'draft', label: 'Draft (Private)' },
+    { value: 'published', label: 'Published (Live)' },
+    { value: 'archived', label: 'Archived' }
+  ];
+
+  readonly previewThemeOptions: SelectOption[] = [
+    { value: 'light', label: 'Light (Default)' },
+    { value: 'dark', label: 'Dark' },
+    { value: 'auto', label: 'Auto Detect' }
+  ];
+
+  readonly reusableCategoryOptions: SelectOption[] = [
+    { value: 'hero', label: 'Hero Sections' },
+    { value: 'features', label: 'Feature Grids' },
+    { value: 'cta', label: 'Calls to Action' },
+    { value: 'pricing', label: 'Pricing Tables' },
+    { value: 'faq', label: 'FAQ / Accordions' },
+    { value: 'footer', label: 'Footers' },
+    { value: 'other', label: 'Other Elements' }
+  ];
+
+  get allBlockTypeOptions(): SelectOption[] {
+    const opts: SelectOption[] = [];
+    for (const cat of this.blockCategories) {
+      for (const item of cat.items) {
+        opts.push({ value: item.type, label: item.label });
+      }
+    }
+    return opts;
+  }
+
+  get reusableModalCategoryOptions(): SelectOption[] {
+    const list: SelectOption[] = [];
+    const target = this.targetReusableBlock();
+    if (target?.type) {
+      list.push({ value: target.type, label: this.getBlockLabel(target.type) });
+    }
+    list.push(
+      { value: 'container', label: 'Container / Section' },
+      { value: 'hero', label: 'Hero Section' },
+      { value: 'card', label: 'Card / Grid' },
+      { value: 'navigation', label: 'Navigation' },
+      { value: 'callout', label: 'Callout / Banner' },
+      { value: 'custom', label: 'Custom' }
+    );
+    return list;
+  }
 
   pages = this.cmsService.pages;
   activePage = this.cmsService.activePage;
@@ -92,6 +234,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   isLandscape = signal<boolean>(false);
   showDeviceFrame = signal<boolean>(true);
   isPreviewMode = signal<boolean>(false);
+  mobileMenuOpenMap = signal<Set<string>>(new Set());
 
   showPagesPopup = false;
   showAiModal = false;
@@ -110,11 +253,11 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
     borderRadius: 16,
     paddingX: 36,
     paddingY: 44,
-    editorTheme: 'dark',
+    editorTheme: 'auto',
     previewTheme: 'light'
   });
 
-  storedEditorTheme = signal<ThemeMode>(this.loadStoredTheme('cms_editor_theme', 'dark'));
+  storedEditorTheme = signal<ThemeMode>(this.loadStoredTheme('cms_editor_theme', 'auto'));
   storedPreviewTheme = signal<ThemeMode>(this.loadStoredTheme('cms_preview_theme', 'light'));
 
   private loadStoredTheme(key: string, fallback: ThemeMode): ThemeMode {
@@ -143,7 +286,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
     const mode = this.isPreviewMode() ? this.previewTheme() : this.editorTheme();
     if (mode === 'dark') return 'dark';
     if (mode === 'light') return 'light';
-    return this.themeService.systemIsDark() ? 'dark' : 'light';
+    return this.themeService.isDark() ? 'dark' : 'light';
   });
 
   currentModeTheme = computed<ThemeMode>(() => {
@@ -152,7 +295,14 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   toggleActiveModeTheme() {
     const current = this.currentModeTheme();
-    const next: ThemeMode = current === 'dark' ? 'light' : current === 'light' ? 'auto' : 'dark';
+    let next: ThemeMode;
+    if (current === 'auto') {
+      next = this.effectiveCanvasTheme() === 'dark' ? 'light' : 'dark';
+    } else if (current === 'dark') {
+      next = 'light';
+    } else {
+      next = 'auto';
+    }
     if (this.isPreviewMode()) {
       this.setPreviewTheme(next);
     } else {
@@ -390,6 +540,18 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   private dragOverContainers = signal<Set<string>>(new Set());
 
   constructor() {
+    effect(() => {
+      const theme = this.effectiveCanvasTheme();
+      this.syncIframeTheme(theme);
+    });
+
+    effect(() => {
+      const mode = this.viewportMode();
+      const landscape = this.isLandscape();
+      const frame = this.showDeviceFrame();
+      this.syncIframeViewport(mode, landscape, frame);
+    });
+
     effect(() => {
       const page = this.activePage();
       if (page && page.id && page.id !== this.lastLoadedPageId) {
@@ -908,6 +1070,26 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
     this.showDeviceFrame.set(!this.showDeviceFrame());
   }
 
+  isMobileMenuOpen(blockId: string): boolean {
+    return this.mobileMenuOpenMap().has(blockId);
+  }
+
+  toggleMobileMenu(blockId: string, event?: Event) {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    this.mobileMenuOpenMap.update(set => {
+      const next = new Set(set);
+      if (next.has(blockId)) {
+        next.delete(blockId);
+      } else {
+        next.add(blockId);
+      }
+      return next;
+    });
+  }
+
   getViewportWidthDisplay(): string {
     const mode = this.viewportMode();
     if (mode === 'desktop') return '100%';
@@ -915,7 +1097,23 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.isLandscape() ? '844px' : '390px';
   }
 
+  setPreviewMode(preview: boolean) {
+    this.isPreviewMode.set(preview);
+    if (preview) {
+      this.selectedBlock.set(null);
+      this.draggingOver.set(false);
+      this.dragPayload = null;
+      this.dragInsertIndex.set(null);
+      this.containerDropTarget.set(null);
+      this.containerDropOffset.set(null);
+      this.treeDragTarget.set(null);
+      document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+    }
+    this.syncIframeTheme(this.effectiveCanvasTheme());
+  }
+
   addBlock(type: string, index?: number) {
+    if (this.isPreviewMode()) return;
     this.recordHistory();
     const defaults = BLOCK_DEFAULTS[type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[type])) : {};
     const newBlock: Block = {
@@ -933,6 +1131,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   addReusableBlock(r: ReusableBlock, index?: number) {
+    if (this.isPreviewMode()) return;
     this.recordHistory();
     if (!r || !r.block_data) {
       this.toastService.error('Invalid reusable component data');
@@ -954,6 +1153,10 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   private dragFormat = 'application/x-cms-block';
 
   onPaletteDragStart(event: DragEvent, type: string) {
+    if (this.isPreviewMode()) {
+      event.preventDefault();
+      return;
+    }
     this.dragPayload = JSON.stringify({ kind: 'type', value: type });
     event.dataTransfer!.setData(this.dragFormat, this.dragPayload);
     event.dataTransfer!.setData('text/plain', type);
@@ -962,6 +1165,10 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onReusableDragStart(event: DragEvent, r: ReusableBlock) {
+    if (this.isPreviewMode()) {
+      event.preventDefault();
+      return;
+    }
     this.dragPayload = JSON.stringify({ kind: 'reusable', value: r.id });
     event.dataTransfer!.setData(this.dragFormat, this.dragPayload);
     event.dataTransfer!.setData('text/plain', String(r.id));
@@ -970,6 +1177,10 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onBlockDragStart(event: DragEvent, b: Block) {
+    if (this.isPreviewMode()) {
+      event.preventDefault();
+      return;
+    }
     event.stopPropagation();
     this.dragPayload = JSON.stringify({ kind: 'block', id: b.id });
     event.dataTransfer!.setData(this.dragFormat, this.dragPayload);
@@ -992,7 +1203,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onCanvasDragOver(event: DragEvent) {
-    if (!this.dragPayload) return;
+    if (this.isPreviewMode() || !this.dragPayload) return;
     event.preventDefault();
     event.dataTransfer!.dropEffect = this.dragPayload.includes('"block"') ? 'move' : 'copy';
     this.draggingOver.set(true);
@@ -1013,7 +1224,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onCanvasDrop(event: DragEvent) {
-    if (!this.dragPayload) return;
+    if (this.isPreviewMode() || !this.dragPayload) return;
     event.preventDefault();
     const index = this.dragInsertIndex() ?? this.dragPayloadGetIndex();
     try {
@@ -1038,6 +1249,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   selectBlock(b: Block, event?: Event) {
+    if (this.isPreviewMode()) return;
     if (event) event.stopPropagation();
     this.selectedBlock.set(b);
   }
@@ -1313,6 +1525,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   selectTreeBlock(block: Block, event?: Event) {
+    if (this.isPreviewMode()) return;
     if (event) event.stopPropagation();
     this.selectBlock(block, event);
     this.scrollToBlock(block.id);
@@ -2058,6 +2271,13 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
     this.savePageNow();
   }
 
+  updateActiveStatusValue(val: string) {
+    const page = this.activePage();
+    if (!page) return;
+    page.status = val as 'draft' | 'published';
+    this.savePageNow();
+  }
+
   updateActiveTitle(event: Event) {
     const page = this.activePage();
     if (!page) return;
@@ -2204,6 +2424,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
         width: 100% !important;
         height: 100% !important;
         min-height: 100% !important;
+        max-height: 100% !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
         box-sizing: border-box !important;
@@ -2214,6 +2435,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
         width: 100% !important;
         min-height: 100% !important;
         height: 100% !important;
+        max-height: 100% !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
         background: transparent !important;
@@ -2266,9 +2488,9 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     `;
 
-    // 4. Sync theme attributes
-    doc.documentElement.setAttribute('data-theme', this.effectiveCanvasTheme());
-    doc.body.className = `theme-${this.effectiveCanvasTheme()}`;
+    // 4. Sync theme and viewport attributes
+    this.syncIframeTheme(this.effectiveCanvasTheme());
+    this.syncIframeViewport(this.viewportMode(), this.isLandscape(), this.showDeviceFrame());
 
     // 5. Mount cmsCanvas element into iframe body
     const canvasEl = this.cmsCanvas?.nativeElement;
@@ -2315,6 +2537,40 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       });
     }
+  }
+
+  syncIframeTheme(theme: 'dark' | 'light') {
+    try {
+      const iframeDoc = this.canvasIframe?.nativeElement?.contentDocument;
+      if (!iframeDoc || !iframeDoc.documentElement) return;
+      iframeDoc.documentElement.setAttribute('data-theme', theme);
+      iframeDoc.documentElement.classList.remove('theme-dark', 'theme-light');
+      iframeDoc.documentElement.classList.add(`theme-${theme}`);
+      if (iframeDoc.body) {
+        iframeDoc.body.setAttribute('data-theme', theme);
+        iframeDoc.body.classList.remove('theme-dark', 'theme-light');
+        iframeDoc.body.classList.add(`theme-${theme}`);
+      }
+    } catch (_) {}
+  }
+
+  syncIframeViewport(mode: 'desktop' | 'tablet' | 'mobile', landscape: boolean, frame: boolean) {
+    try {
+      const iframeDoc = this.canvasIframe?.nativeElement?.contentDocument;
+      if (!iframeDoc || !iframeDoc.documentElement) return;
+      const root = iframeDoc.documentElement;
+      const body = iframeDoc.body;
+      const dropList = iframeDoc.getElementById('cmsCanvasDropList');
+
+      [root, body, dropList].forEach(el => {
+        if (!el) return;
+        el.classList.toggle('is-mobile-viewport', mode === 'mobile');
+        el.classList.toggle('is-tablet-viewport', mode === 'tablet');
+        el.classList.toggle('is-desktop-viewport', mode === 'desktop');
+        el.classList.toggle('is-landscape', landscape);
+        el.classList.toggle('has-device-frame', frame && mode !== 'desktop');
+      });
+    } catch (_) {}
   }
 
 

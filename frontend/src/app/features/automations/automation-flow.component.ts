@@ -27,12 +27,21 @@ export class AutomationFlowComponent implements OnInit {
   cmsService = inject(CmsService);
 
   // Canvas State
+  // Modals & Panels
   selectedNode = signal<FlowNode | null>(null);
   selectedEdge = signal<FlowEdge | null>(null);
   showLogsDrawer = signal<boolean>(false);
   showTemplateModal = signal<boolean>(false);
   showTestModal = signal<boolean>(false);
+  showCreateModal = signal<boolean>(false);
+  showPaletteDrawer = signal<boolean>(true);
   saveSuccessToast = signal<string | null>(null);
+
+  // New Flow Form State
+  newFlowName = signal<string>('New Automation Flow');
+  newFlowDescription = signal<string>('Autonomous workspace trigger & action pipeline');
+  newFlowTrigger = signal<string>('checklist_completed');
+  newFlowTemplate = signal<string>('checklist');
 
   // Dragging state
   draggingNodeId: string | null = null;
@@ -45,7 +54,139 @@ export class AutomationFlowComponent implements OnInit {
   hoveredTargetNode = signal<FlowNode | null>(null);
   targetSelectForNode = '';
 
-  // Template Library
+  // Helpers
+  availableColumns = ['Backlog', 'In Progress', 'Review', 'Done'];
+  availablePriorities = ['low', 'medium', 'high', 'urgent'];
+
+  // Blueprints catalog for left drawer
+  blueprints = [
+    // Triggers
+    {
+      category: 'trigger' as const,
+      type: 'trigger' as FlowNodeType,
+      title: 'Checklist 100% Done',
+      subtitle: 'When all card checklist items are checked',
+      badge: 'EVENT',
+      config: { event: 'checklist_completed' }
+    },
+    {
+      category: 'trigger' as const,
+      type: 'trigger' as FlowNodeType,
+      title: 'Card Created',
+      subtitle: 'When a new card is added to board',
+      badge: 'EVENT',
+      config: { event: 'card_created' }
+    },
+    {
+      category: 'trigger' as const,
+      type: 'trigger' as FlowNodeType,
+      title: 'Card Updated / Moved',
+      subtitle: 'When card details or column change',
+      badge: 'EVENT',
+      config: { event: 'card_updated' }
+    },
+    {
+      category: 'trigger' as const,
+      type: 'trigger' as FlowNodeType,
+      title: 'CMS Page Published',
+      subtitle: 'When web page status becomes Published',
+      badge: 'EVENT',
+      config: { event: 'cms_page_published' }
+    },
+    // Conditions
+    {
+      category: 'condition' as const,
+      type: 'condition' as FlowNodeType,
+      title: 'Column Filter',
+      subtitle: 'Verify if card is in a specific column',
+      badge: 'RULE',
+      config: { field: 'column_name', operator: 'not_equals', value: 'Done' }
+    },
+    {
+      category: 'condition' as const,
+      type: 'condition' as FlowNodeType,
+      title: 'Priority Check',
+      subtitle: 'Check if priority is urgent or high',
+      badge: 'RULE',
+      config: { field: 'priority', operator: 'equals', value: 'urgent' }
+    },
+    {
+      category: 'condition' as const,
+      type: 'condition' as FlowNodeType,
+      title: 'Keyword Match',
+      subtitle: 'Title or description contains text',
+      badge: 'RULE',
+      config: { field: 'title_or_desc', operator: 'contains', value: 'bug' }
+    },
+    {
+      category: 'condition' as const,
+      type: 'condition' as FlowNodeType,
+      title: 'Label Filter',
+      subtitle: 'Card contains a specific label tag',
+      badge: 'RULE',
+      config: { field: 'labels', operator: 'contains', value: 'urgent' }
+    },
+    // Actions
+    {
+      category: 'action' as const,
+      type: 'action' as FlowNodeType,
+      title: 'Move to Column',
+      subtitle: 'Transition card to Done or Review',
+      badge: 'ACTION',
+      config: { action_type: 'move_card_column', target_column: 'Done', add_activity: 'Auto-moved by flow' }
+    },
+    {
+      category: 'action' as const,
+      type: 'action' as FlowNodeType,
+      title: 'Set Card Priority',
+      subtitle: 'Escalate or set priority level',
+      badge: 'ACTION',
+      config: { action_type: 'set_priority', priority: 'urgent', add_activity: 'Priority escalated via flow' }
+    },
+    {
+      category: 'action' as const,
+      type: 'action' as FlowNodeType,
+      title: 'Attach Label',
+      subtitle: 'Apply label tag (bug, urgent, qa)',
+      badge: 'ACTION',
+      config: { action_type: 'add_label', label_name: 'bug', label_color: '#ef4444' }
+    },
+    {
+      category: 'action' as const,
+      type: 'action' as FlowNodeType,
+      title: 'Create Board QA Task',
+      subtitle: 'Create verification card with checklist',
+      badge: 'ACTION',
+      config: { action_type: 'create_card', target_column: 'Review', title_prefix: 'Verify Live SEO: ', priority: 'high' }
+    },
+    {
+      category: 'action' as const,
+      type: 'action' as FlowNodeType,
+      title: 'Publish CMS Page',
+      subtitle: 'Publish latest draft page',
+      badge: 'ACTION',
+      config: { action_type: 'publish_cms_page' }
+    },
+    // AI Intelligence
+    {
+      category: 'ai' as const,
+      type: 'ai' as FlowNodeType,
+      title: 'Gemini AI Auto-Triage',
+      subtitle: 'Analyze sentiment, set priority & tags',
+      badge: 'AI GEMINI',
+      config: { action_type: 'ai_triage', add_activity: 'AI categorized priority and labels' }
+    },
+    {
+      category: 'ai' as const,
+      type: 'ai' as FlowNodeType,
+      title: 'AI Checklist Generator',
+      subtitle: 'Generate 3 structured subtasks',
+      badge: 'AI GEMINI',
+      config: { action_type: 'ai_generate_checklist' }
+    }
+  ];
+
+  // Full Template Library
   templates: FlowTemplate[] = [
     {
       name: 'Auto-Move to Done on Checklist Completion',
@@ -88,8 +229,8 @@ export class AutomationFlowComponent implements OnInit {
       ]
     },
     {
-      name: 'Urgent Bug Escalator',
-      description: 'Detects bug reports or urgent tags and raises priority to Urgent at top of Backlog.',
+      name: 'Urgent Bug Escalator & Triage',
+      description: 'Detects bug reports or urgent keywords and raises priority to Urgent at top of Backlog.',
       trigger_type: 'card_updated',
       category: 'kanban',
       badge: 'RECOMMENDED',
@@ -125,6 +266,46 @@ export class AutomationFlowComponent implements OnInit {
       edges: [
         { id: 'b_e_1', source: 'b_node_1', target: 'b_node_2' },
         { id: 'b_e_2', source: 'b_node_2', target: 'b_node_3' }
+      ]
+    },
+    {
+      name: 'AI Smart Triage & Prioritization',
+      description: 'Uses Gemini AI to inspect new cards, classify urgency sentiment, and auto-assign tags.',
+      trigger_type: 'card_created',
+      category: 'ai',
+      badge: 'AI POWERED',
+      nodes: [
+        {
+          id: 'ai_trig_1',
+          type: 'trigger',
+          title: 'New Card Created',
+          subtitle: 'When card is added to any column',
+          x: 60,
+          y: 160,
+          config: { event: 'card_created' }
+        },
+        {
+          id: 'ai_cond_1',
+          type: 'condition',
+          title: 'Has Description',
+          subtitle: 'Verify card has actionable text',
+          x: 420,
+          y: 160,
+          config: { field: 'title_or_desc', operator: 'not_equals', value: '' }
+        },
+        {
+          id: 'ai_act_1',
+          type: 'ai',
+          title: 'Gemini AI Auto-Triage',
+          subtitle: 'Detects urgency & applies labels',
+          x: 780,
+          y: 160,
+          config: { action_type: 'ai_triage', add_activity: 'AI categorized priority and labels' }
+        }
+      ],
+      edges: [
+        { id: 'ai_e_1', source: 'ai_trig_1', target: 'ai_cond_1' },
+        { id: 'ai_e_2', source: 'ai_cond_1', target: 'ai_act_1' }
       ]
     },
     {
@@ -166,6 +347,46 @@ export class AutomationFlowComponent implements OnInit {
         { id: 'c_e_1', source: 'c_node_1', target: 'c_node_2' },
         { id: 'c_e_2', source: 'c_node_2', target: 'c_node_3' }
       ]
+    },
+    {
+      name: 'AI Subtask Checklist Generator',
+      description: 'Automatically creates 3 structured subtasks for new complex tasks that lack checklists.',
+      trigger_type: 'card_created',
+      category: 'ai',
+      badge: 'AI PRODUCTIVITY',
+      nodes: [
+        {
+          id: 'ck_node_1',
+          type: 'trigger',
+          title: 'New Card Created',
+          subtitle: 'When a new card is added',
+          x: 60,
+          y: 160,
+          config: { event: 'card_created' }
+        },
+        {
+          id: 'ck_node_2',
+          type: 'condition',
+          title: 'Checklist Empty',
+          subtitle: 'Card has no checklist items yet',
+          x: 420,
+          y: 160,
+          config: { field: 'checklist_pct', operator: 'equals', value: '0' }
+        },
+        {
+          id: 'ck_node_3',
+          type: 'ai',
+          title: 'AI Checklist Generator',
+          subtitle: 'Creates 3 actionable subtasks',
+          x: 780,
+          y: 160,
+          config: { action_type: 'ai_generate_checklist' }
+        }
+      ],
+      edges: [
+        { id: 'ck_e_1', source: 'ck_node_1', target: 'ck_node_2' },
+        { id: 'ck_e_2', source: 'ck_node_2', target: 'ck_node_3' }
+      ]
     }
   ];
 
@@ -206,59 +427,95 @@ export class AutomationFlowComponent implements OnInit {
     });
   }
 
-  createNewFlow() {
-    const name = prompt('Automation Flow Name:', 'New Automation Flow');
-    if (!name || !name.trim()) return;
+  togglePalette() {
+    this.showPaletteDrawer.set(!this.showPaletteDrawer());
+  }
 
-    const initialNodes: FlowNode[] = [
-      {
-        id: `node_${Date.now()}_1`,
-        type: 'trigger',
-        title: 'Checklist Completed',
-        subtitle: 'When card checklist reaches 100%',
-        x: 80,
-        y: 160,
-        config: { event: 'checklist_completed' }
-      },
-      {
-        id: `node_${Date.now()}_2`,
-        type: 'condition',
-        title: 'Column Filter',
-        subtitle: 'Card not yet in Done',
-        x: 440,
-        y: 160,
-        config: { field: 'column_name', operator: 'not_equals', value: 'Done' }
-      },
-      {
-        id: `node_${Date.now()}_3`,
-        type: 'action',
-        title: 'Move to Done Column',
-        subtitle: 'Transition card to Done',
-        x: 800,
-        y: 160,
-        config: { action_type: 'move_card_column', target_column: 'Done' }
-      }
-    ];
+  openCreateFlowModal() {
+    const nextNum = this.automationService.automations().length + 1;
+    this.newFlowName.set(`Workflow #${nextNum}`);
+    this.newFlowDescription.set('Autonomous workspace trigger & action pipeline');
+    this.newFlowTrigger.set('checklist_completed');
+    this.newFlowTemplate.set('checklist');
+    this.showCreateModal.set(true);
+  }
 
-    const initialEdges: FlowEdge[] = [
-      { id: `edge_${Date.now()}_1`, source: initialNodes[0].id, target: initialNodes[1].id },
-      { id: `edge_${Date.now()}_2`, source: initialNodes[1].id, target: initialNodes[2].id }
-    ];
+  confirmCreateFlow() {
+    const name = this.newFlowName().trim();
+    if (!name) return;
+
+    let initialNodes: FlowNode[] = [];
+    let initialEdges: FlowEdge[] = [];
+
+    const tmplKey = this.newFlowTemplate();
+    const matched = this.templates.find(t => {
+      if (tmplKey === 'checklist') return t.trigger_type === 'checklist_completed';
+      if (tmplKey === 'ai') return t.category === 'ai';
+      if (tmplKey === 'bug') return t.name.includes('Bug');
+      if (tmplKey === 'cms') return t.category === 'cross_platform';
+      return false;
+    });
+
+    if (matched && tmplKey !== 'blank') {
+      initialNodes = JSON.parse(JSON.stringify(matched.nodes));
+      initialEdges = JSON.parse(JSON.stringify(matched.edges));
+    } else {
+      initialNodes = [
+        {
+          id: `node_${Date.now()}_1`,
+          type: 'trigger',
+          title: 'Trigger Event',
+          subtitle: 'When workspace event occurs',
+          x: 60,
+          y: 160,
+          config: { event: this.newFlowTrigger() }
+        },
+        {
+          id: `node_${Date.now()}_2`,
+          type: 'condition',
+          title: 'Condition Filter',
+          subtitle: 'Verify criteria',
+          x: 420,
+          y: 160,
+          config: { field: 'column_name', operator: 'not_equals', value: 'Done' }
+        },
+        {
+          id: `node_${Date.now()}_3`,
+          type: 'action',
+          title: 'Target Action',
+          subtitle: 'Execute transition',
+          x: 780,
+          y: 160,
+          config: { action_type: 'move_card_column', target_column: 'Done' }
+        }
+      ];
+      initialEdges = [
+        { id: `edge_${Date.now()}_1`, source: initialNodes[0].id, target: initialNodes[1].id },
+        { id: `edge_${Date.now()}_2`, source: initialNodes[1].id, target: initialNodes[2].id }
+      ];
+    }
 
     this.automationService.createAutomation({
-      name: name.trim(),
-      description: 'Custom automated rule',
-      trigger_type: 'checklist_completed',
+      name,
+      description: this.newFlowDescription().trim(),
+      trigger_type: this.newFlowTrigger(),
       is_active: true,
       nodes: initialNodes,
       edges: initialEdges
     }).subscribe({
       next: (res) => {
+        this.showCreateModal.set(false);
         this.loadAutomations();
-        this.showToast('Created new automation flow');
-      }
+        this.showToast(`Created flow "${name}"`);
+      },
+      error: (err) => alert('Failed to create flow')
     });
   }
+
+  createNewFlow() {
+    this.openCreateFlowModal();
+  }
+
 
   deleteCurrentFlow() {
     const flow = this.automationService.activeFlow();
@@ -310,6 +567,11 @@ export class AutomationFlowComponent implements OnInit {
       subtitle = 'Verify criteria';
       config = { field: 'column_name', operator: 'equals', value: 'In Progress' };
       defaultX = 430;
+    } else if (type === 'ai') {
+      title = 'Gemini AI Auto-Triage';
+      subtitle = 'Analyze sentiment & assign tags';
+      config = { action_type: 'ai_triage', add_activity: 'AI categorized priority and labels' };
+      defaultX = 800;
     } else {
       title = 'Execute Action';
       subtitle = 'Perform target action';
@@ -330,6 +592,65 @@ export class AutomationFlowComponent implements OnInit {
     flow.nodes.push(newNode);
     this.selectedNode.set(newNode);
     this.saveCurrentFlow();
+  }
+
+  addBlueprint(bp: typeof this.blueprints[0]) {
+    const flow = this.automationService.activeFlow();
+    if (!flow) {
+      this.openCreateFlowModal();
+      return;
+    }
+
+    const count = flow.nodes.filter(n => n.type === bp.type).length;
+    let defaultX = 200;
+    if (bp.type === 'trigger') defaultX = 60;
+    else if (bp.type === 'condition') defaultX = 420;
+    else defaultX = 800;
+
+    const defaultY = 160 + count * 70;
+
+    const newNode: FlowNode = {
+      id: `node_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type: bp.type,
+      title: bp.title,
+      subtitle: bp.subtitle,
+      x: defaultX,
+      y: defaultY,
+      config: JSON.parse(JSON.stringify(bp.config))
+    };
+
+    flow.nodes.push(newNode);
+    this.selectedNode.set(newNode);
+    this.saveCurrentFlow();
+    this.showToast(`Added ${bp.title}`);
+  }
+
+  applyRecipe(template: FlowTemplate) {
+    const flow = this.automationService.activeFlow();
+    if (!flow) {
+      this.automationService.createAutomation({
+        name: template.name,
+        description: template.description,
+        trigger_type: template.trigger_type,
+        is_active: true,
+        nodes: JSON.parse(JSON.stringify(template.nodes)),
+        edges: JSON.parse(JSON.stringify(template.edges))
+      }).subscribe({
+        next: () => {
+          this.loadAutomations();
+          this.showToast(`Created flow from recipe: "${template.name}"`);
+        }
+      });
+      return;
+    }
+
+    flow.name = template.name;
+    flow.description = template.description;
+    flow.trigger_type = template.trigger_type;
+    flow.nodes = JSON.parse(JSON.stringify(template.nodes));
+    flow.edges = JSON.parse(JSON.stringify(template.edges));
+    this.saveCurrentFlow();
+    this.selectedNode.set(flow.nodes.length > 0 ? flow.nodes[0] : null);
   }
 
   deleteNode(node: FlowNode) {

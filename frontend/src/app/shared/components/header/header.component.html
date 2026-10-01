@@ -215,7 +215,7 @@
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.3-4.3" />
         </svg>
-        <input [value]="boardService.searchQuery()" (input)="onSearchInput($event)" placeholder="Search cards..." />
+        <input id="searchInput" [value]="boardService.searchQuery()" (input)="onSearchInput($event)" placeholder="Search cards..." />
         <kbd class="shortcut-tag">⌘K</kbd>
       </div>
 

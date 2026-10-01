@@ -1,6 +1,9 @@
 <main class="cms" [class.left-collapsed]="leftSidebarCollapsed()" [class.is-resizing]="isResizingLeft() || isResizingRight()" [style.gridTemplateColumns]="leftSidebarCollapsed() ? '0px 1fr' : (leftSidebarWidth() + 'px 1fr')">
   <!-- Left Sidebar (Blocks & Palette) -->
-  <aside id="cmsSidebar" class="cms-sidebar" [style.width.px]="leftSidebarCollapsed() ? 0 : leftSidebarWidth()">
+  <aside id="cmsSidebar" class="cms-sidebar"
+         [class.is-preview-disabled]="isPreviewMode()"
+         [attr.aria-disabled]="isPreviewMode()"
+         [style.width.px]="leftSidebarCollapsed() ? 0 : leftSidebarWidth()">
     <div class="cms-sidebar-header-row">
       <div class="cms-sidebar-tabs">
         <button type="button" class="cms-sidebar-tab" [class.active]="sidebarTab() === 'blocks'"
@@ -92,8 +95,8 @@
 
             <div class="palette-list">
               @for (item of cat.items; track item.type) {
-                <div class="palette-item" draggable="true"
-                     (click)="addBlock(item.type)"
+                <div class="palette-item" [attr.draggable]="!isPreviewMode()"
+                     (click)="!isPreviewMode() && addBlock(item.type)"
                      (dragstart)="onPaletteDragStart($event, item.type)"
                      (dragend)="onDragEnd()">
                   <div class="palette-icon-wrap" [class]="item.type + '-icon'" [innerHTML]="iconSafe(item.iconSvg)"></div>
@@ -112,8 +115,8 @@
     } @else if (sidebarTab() === 'reusable') {
       <div class="palette-list custom-blocks-list" style="overflow-y:auto;flex:1;padding:4px 0;">
         @for (r of filteredReusableBlocks(); track r.id) {
-          <div class="palette-item" draggable="true"
-               (click)="addReusableBlock(r)"
+          <div class="palette-item" [attr.draggable]="!isPreviewMode()"
+               (click)="!isPreviewMode() && addReusableBlock(r)"
                (dragstart)="onReusableDragStart($event, r)"
                (dragend)="onDragEnd()">
             <div class="palette-icon-wrap layout-icon">
@@ -154,15 +157,10 @@
         <!-- Canvas Background -->
         <div class="setting-row" style="margin-bottom:12px;">
           <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Canvas Background</label>
-          <div class="select-wrapper">
-            <select [ngModel]="pageSettings()['bg'] || 'default'" (ngModelChange)="updateSetting('bg', $event)" class="prop-input" style="font-size:11.5px;padding:5px 8px;">
-              <option value="default">Default Surface</option>
-              <option value="dark">Obsidian Dark (#0b0f19)</option>
-              <option value="light">Clean Light (#f8fafc)</option>
-              <option value="slate">Slate Navy (#1e293b)</option>
-              <option value="custom">Custom Color...</option>
-            </select>
-          </div>
+          <app-custom-select [options]="bgPresetOptions"
+                             [ngModel]="pageSettings()['bg'] || 'default'"
+                             (ngModelChange)="updateSetting('bg', $event)">
+          </app-custom-select>
           @if (pageSettings()['bg'] === 'custom') {
             <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
               <input type="color" [value]="pageSettings()['customBg'] || '#0f172a'"
@@ -176,42 +174,28 @@
         <!-- Page Max Width -->
         <div class="setting-row" style="margin-bottom:12px;">
           <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Page Max Width</label>
-          <div class="select-wrapper">
-            <select [ngModel]="pageSettings()['maxWidth'] || '820px'" (ngModelChange)="updateSetting('maxWidth', $event)" class="prop-input" style="font-size:11.5px;padding:5px 8px;">
-              <option value="640px">Narrow (640px)</option>
-              <option value="820px">Standard (820px)</option>
-              <option value="960px">Medium (960px)</option>
-              <option value="1100px">Wide (1100px)</option>
-              <option value="1280px">Expanded (1280px)</option>
-              <option value="100%">Full Width (100%)</option>
-            </select>
-          </div>
+          <app-custom-select [options]="maxWidthOptions"
+                             [ngModel]="pageSettings()['maxWidth'] || '820px'"
+                             (ngModelChange)="updateSetting('maxWidth', $event)">
+          </app-custom-select>
         </div>
 
         <!-- Page Alignment -->
         <div class="setting-row" style="margin-bottom:12px;">
           <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Page Alignment</label>
-          <div class="select-wrapper">
-            <select [ngModel]="pageSettings()['align'] || 'center'" (ngModelChange)="updateSetting('align', $event)" class="prop-input" style="font-size:11.5px;padding:5px 8px;">
-              <option value="center">Centered</option>
-              <option value="left">Left Aligned</option>
-            </select>
-          </div>
+          <app-custom-select [options]="alignOptions"
+                             [ngModel]="pageSettings()['align'] || 'center'"
+                             (ngModelChange)="updateSetting('align', $event)">
+          </app-custom-select>
         </div>
 
         <!-- Font Family -->
         <div class="setting-row" style="margin-bottom:12px;">
           <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Font Family</label>
-          <div class="select-wrapper">
-            <select [ngModel]="pageSettings()['fontFamily'] || 'system'" (ngModelChange)="updateSetting('fontFamily', $event)" class="prop-input" style="font-size:11.5px;padding:5px 8px;">
-              <option value="system">System Default</option>
-              <option value="inter">Inter (Clean Modern)</option>
-              <option value="roboto">Roboto (Geometric)</option>
-              <option value="outfit">Outfit (Display Sans)</option>
-              <option value="serif">Playfair Display (Serif)</option>
-              <option value="mono">JetBrains Mono (Code)</option>
-            </select>
-          </div>
+          <app-custom-select [options]="fontFamilyOptions"
+                             [ngModel]="pageSettings()['fontFamily'] || 'system'"
+                             (ngModelChange)="updateSetting('fontFamily', $event)">
+          </app-custom-select>
         </div>
 
         <!-- Theme Mode -->
@@ -275,6 +259,7 @@
   <section class="cms-main">
     <!-- Edge Expand Trigger for Left Sidebar -->
     <button type="button" id="cmsExpandLeftSidebarBtn" class="cms-edge-expand-btn left"
+            [class.is-preview-disabled]="isPreviewMode()"
             (click)="toggleLeftSidebar()" title="Expand Sidebar (Blocks & Layers)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <rect width="18" height="18" x="3" y="3" rx="2" />
@@ -376,14 +361,14 @@
           <!-- Mode Switch (Edit vs Preview) -->
           <div class="cms-mode-switch" role="group" aria-label="Editor Mode">
             <button id="cmsEditModeBtn" class="mode-switch-btn" [class.active]="!isPreviewMode()"
-                    (click)="isPreviewMode.set(false)" title="Editor Mode">
+                    (click)="setPreviewMode(false)" title="Editor Mode">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
               </svg>
               <span>Edit</span>
             </button>
             <button id="cmsPreviewModeBtn" class="mode-switch-btn" [class.active]="isPreviewMode()"
-                    (click)="isPreviewMode.set(true)" title="Interactive Preview">
+                    (click)="setPreviewMode(true)" title="Interactive Preview">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
               </svg>
@@ -409,17 +394,17 @@
 
             <!-- Theme Mode Toggle -->
             <button type="button" class="toolbar-icon-btn theme-mode-btn" (click)="toggleActiveModeTheme()"
-                    [title]="'Canvas Theme: ' + (currentModeTheme() | titlecase) + ' • Click to cycle Auto / Dark / Light'">
+                    [title]="'Canvas Theme: ' + (currentModeTheme() | titlecase) + ' (' + (effectiveCanvasTheme() | titlecase) + ') • Click to switch'">
               @if (currentModeTheme() === 'auto') {
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="auto-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
                 </svg>
               } @else if (currentModeTheme() === 'dark') {
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <svg class="moon-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
               } @else {
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="sun-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
                 </svg>
               }
@@ -476,8 +461,8 @@
                [class.drag-target-before]="treeDragTarget()?.id === block.id && treeDragTarget()?.pos === 'before'"
                [class.drag-target-after]="treeDragTarget()?.id === block.id && treeDragTarget()?.pos === 'after'"
                [class.drag-target-inside]="treeDragTarget()?.id === block.id && treeDragTarget()?.pos === 'inside'"
-               draggable="true"
-               (click)="selectTreeBlock(block, $event)"
+               [attr.draggable]="!isPreviewMode()"
+               (click)="!isPreviewMode() && selectTreeBlock(block, $event)"
                (mouseenter)="onTreeNodeMouseEnter(block.id)"
                (mouseleave)="onTreeNodeMouseLeave(block.id)"
                (dragstart)="onTreeDragStart($event, block)"
@@ -534,6 +519,7 @@
       <!-- Floating Draggable Layers Panel (Draggable to anywhere inside Editor) -->
       @if (showLayersPanel()) {
         <div id="cmsFloatingLayersPanel" class="cms-floating-layers-panel"
+             [class.is-preview-disabled]="isPreviewMode()"
              [class.minimized]="isLayersPanelMinimized()"
              cdkDrag cdkDragBoundary=".cms-editor-wrap">
           <!-- Panel Header & Drag Handle -->
@@ -601,6 +587,7 @@
       <div class="cms-workspace" [class.right-collapsed]="rightSidebarCollapsed()" [style.gridTemplateColumns]="rightSidebarCollapsed() ? '1fr 0px' : ('1fr ' + rightSidebarWidth() + 'px')">
         <!-- Edge Expand Trigger for Right Sidebar -->
         <button type="button" id="cmsExpandRightSidebarBtn" class="cms-edge-expand-btn right"
+                [class.is-preview-disabled]="isPreviewMode()"
                 (click)="toggleRightSidebar()" title="Expand Inspector">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect width="18" height="18" x="3" y="3" rx="2" />
@@ -610,9 +597,14 @@
         </button>
 
         <!-- Center Canvas Frame -->
-        <div class="cms-canvas-wrap">
+        <div class="cms-canvas-wrap"
+             [class.is-mobile-view]="viewportMode() === 'mobile'"
+             [class.is-tablet-view]="viewportMode() === 'tablet'">
           <div id="canvasViewportContainer" class="canvas-viewport-container"
-               [style.justifyContent]="pageSettings()['align'] === 'left' ? 'flex-start' : 'center'">
+               [class.is-mobile]="viewportMode() === 'mobile'"
+               [class.is-tablet]="viewportMode() === 'tablet'"
+               [style.justifyContent]="pageSettings()['align'] === 'left' ? 'flex-start' : 'center'"
+               [style.alignItems]="viewportMode() === 'desktop' ? 'stretch' : 'center'">
             <div class="canvas-viewport"
                  [class.theme-dark]="effectiveCanvasTheme() === 'dark'"
                  [class.theme-light]="effectiveCanvasTheme() === 'light'"
@@ -622,9 +614,15 @@
                  [class.is-mobile-viewport]="viewportMode() === 'mobile'"
                  [class.is-tablet-viewport]="viewportMode() === 'tablet'"
                  [class.is-landscape]="isLandscape()"
-                 [style.maxWidth]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] || '820px') : null"
-                 [style.minWidth]="viewportMode() === 'desktop' ? (pageSettings()['minWidth'] || '0px') : null"
-                 [style.width]="viewportMode() === 'desktop' ? (pageSettings()['maxWidth'] === '100%' ? '100%' : (pageSettings()['maxWidth'] || '820px')) : null">
+                 [style.width]="viewportMode() === 'mobile' ? (isLandscape() ? 'min(844px, calc(100% - 16px))' : '390px') : (viewportMode() === 'tablet' ? (isLandscape() ? '1024px' : '768px') : (pageSettings()['maxWidth'] === '100%' ? '100%' : (pageSettings()['maxWidth'] || '820px')))"
+                 [style.minWidth]="viewportMode() === 'mobile' ? (isLandscape() ? 'min(844px, calc(100% - 16px))' : '390px') : (viewportMode() === 'tablet' ? (isLandscape() ? '1024px' : '768px') : (pageSettings()['minWidth'] || '0px'))"
+                 [style.maxWidth]="viewportMode() === 'mobile' ? (isLandscape() ? '844px' : '390px') : (viewportMode() === 'tablet' ? (isLandscape() ? '1024px' : '768px') : (pageSettings()['maxWidth'] || '820px'))"
+                 [style.height]="viewportMode() === 'mobile' ? (isLandscape() ? 'min(390px, calc(100% - 16px))' : 'min(844px, calc(100% - 16px))') : (viewportMode() === 'tablet' ? (isLandscape() ? 'min(680px, calc(100% - 16px))' : 'min(960px, calc(100% - 16px))') : null)"
+                 [style.minHeight]="'0px'"
+                 [style.maxHeight]="viewportMode() === 'mobile' ? (isLandscape() ? 'min(390px, calc(100% - 16px))' : 'min(844px, calc(100% - 16px))') : (viewportMode() === 'tablet' ? (isLandscape() ? 'min(680px, calc(100% - 16px))' : 'min(960px, calc(100% - 16px))') : null)"
+                 [style.overflow]="viewportMode() !== 'desktop' ? 'hidden' : null"
+                 [style.flexShrink]="viewportMode() !== 'desktop' ? '0' : null"
+                 [style.flexGrow]="viewportMode() !== 'desktop' ? '0' : null">
 
               @if (showDeviceFrame() && viewportMode() !== 'desktop') {
                 <div class="device-frame-top">
@@ -635,6 +633,12 @@
               <!-- The Canvas Isolated Iframe -->
               <iframe #canvasIframe id="cmsCanvasIframe" class="cms-canvas-iframe"
                       title="CMS Isolated Canvas"
+                      [style.width]="'100%'"
+                      [style.height]="'100%'"
+                      [style.minHeight]="'0px'"
+                      [style.maxHeight]="'100%'"
+                      [style.flex]="'1 1 0%'"
+                      [style.overflow]="'hidden'"
                       (load)="setupIframeCanvas()">
               </iframe>
 
@@ -671,7 +675,7 @@
                        [attr.draggable]="!isPreviewMode()"
                        (dragstart)="onBlockDragStart($event, b)"
                        (dragend)="onDragEnd()"
-                       (click)="selectBlock(b, $event)"
+                       (click)="!isPreviewMode() && selectBlock(b, $event)"
                        style="position:relative;"
                        [style.marginBottom.px]="(isChild && parent?.props?.['mode'] !== 'grid' && parent?.props?.['direction'] === 'row') ? 0 : (isChild ? (b.type === 'container' ? 10 : 6) : 12)">
 
@@ -785,7 +789,7 @@
                             </nav>
                             <div class="cms-header-actions">
                               @if (b.props['showSearch']) {
-                                <div class="cms-header-search">
+                                <div class="cms-header-search" [style.display]="viewportMode() === 'mobile' ? 'none' : 'flex'">
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                     <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
                                   </svg>
@@ -795,6 +799,49 @@
                               @if (b.props['showCta'] !== false) {
                                 <a [href]="b.props['ctaUrl'] || '#'"
                                    class="cms-header-cta-btn"
+                                   [style.display]="viewportMode() === 'mobile' ? 'none' : 'inline-flex'"
+                                   [class.cta-filled]="!b.props['ctaVariant'] || b.props['ctaVariant'] === 'filled'"
+                                   [class.cta-outline]="b.props['ctaVariant'] === 'outline'"
+                                   [class.cta-soft]="b.props['ctaVariant'] === 'soft'"
+                                   [class.cta-glow]="b.props['ctaVariant'] === 'glow'">
+                                  {{ b.props['ctaLabel'] || 'Get Started' }}
+                                </a>
+                              }
+
+                              <!-- Mobile Hamburger Toggle Button -->
+                              <button type="button"
+                                      class="cms-header-burger"
+                                      [class.is-active]="isMobileMenuOpen(b.id)"
+                                      [style.display]="viewportMode() === 'mobile' ? 'flex' : null"
+                                      (click)="toggleMobileMenu(b.id, $event)"
+                                      aria-label="Toggle navigation menu">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <!-- Mobile Navigation Drawer / Dropdown Menu -->
+                          @if (viewportMode() === 'mobile' && isMobileMenuOpen(b.id)) {
+                            <div class="cms-header-mobile-drawer is-open">
+                              <nav class="cms-header-mobile-nav" style="display:flex; flex-direction:column; gap:4px;">
+                                @for (lnk of b.props['links'] || []; track lnk.label) {
+                                  <a [href]="lnk.url || '#'" class="cms-header-link" style="padding:10px 14px; font-size:14px; border-radius:8px;">{{ lnk.label }}</a>
+                                }
+                              </nav>
+                              @if (b.props['showSearch']) {
+                                <div class="cms-header-search" style="margin-top:8px; width:100%; display:flex;">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                                  </svg>
+                                  <input type="text" class="cms-header-search-input" [placeholder]="b.props['searchPlaceholder'] || 'Search...'" style="width:100%;" />
+                                </div>
+                              }
+                              @if (b.props['showCta'] !== false) {
+                                <a [href]="b.props['ctaUrl'] || '#'"
+                                   class="cms-header-cta-btn"
+                                   style="width:100%; justify-content:center; text-align:center; margin-top:8px; box-sizing:border-box; display:inline-flex;"
                                    [class.cta-filled]="!b.props['ctaVariant'] || b.props['ctaVariant'] === 'filled'"
                                    [class.cta-outline]="b.props['ctaVariant'] === 'outline'"
                                    [class.cta-soft]="b.props['ctaVariant'] === 'soft'"
@@ -803,7 +850,7 @@
                                 </a>
                               }
                             </div>
-                          </div>
+                          }
                         </header>
                       }
 
@@ -1529,7 +1576,10 @@
         </div>
 
         <!-- Right Sidebar Inspector -->
-        <aside id="cmsPropsPanel" class="cms-props" [style.width.px]="rightSidebarCollapsed() ? 0 : rightSidebarWidth()">
+        <aside id="cmsPropsPanel" class="cms-props"
+               [class.is-preview-disabled]="isPreviewMode()"
+               [attr.aria-disabled]="isPreviewMode()"
+               [style.width.px]="rightSidebarCollapsed() ? 0 : rightSidebarWidth()">
           @if (!rightSidebarCollapsed()) {
             <div class="cms-resizer right-resizer"
                  (mousedown)="startRightResize($event)"
@@ -1589,11 +1639,10 @@
                                   class="prop-input" [placeholder]="field.placeholder || ''"></textarea>
                       }
                       @case ('select') {
-                        <select [ngModel]="selectValue(b, field.key)" (ngModelChange)="setProp(b, field.key, $event)" class="prop-input">
-                          @for (o of field.options || []; track o.value) {
-                            <option [value]="o.value">{{ o.label }}</option>
-                          }
-                        </select>
+                        <app-custom-select [options]="field.options || []"
+                                           [ngModel]="selectValue(b, field.key)"
+                                           (ngModelChange)="setProp(b, field.key, $event)">
+                        </app-custom-select>
                       }
                       @case ('toggle') {
                         <label class="prop-toggle">
@@ -1646,11 +1695,10 @@
                                                 class="prop-input" [placeholder]="sf.placeholder || ''"></textarea>
                                     }
                                     @case ('select') {
-                                      <select [ngModel]="selectSubValue(item, sf.key)" (ngModelChange)="setNestedProp(b, field.key, ix, sf.key, $event)" class="prop-input">
-                                        @for (o of sf.options || []; track o.value) {
-                                          <option [value]="o.value">{{ o.label }}</option>
-                                        }
-                                      </select>
+                                      <app-custom-select [options]="sf.options || []"
+                                                         [ngModel]="selectSubValue(item, sf.key)"
+                                                         (ngModelChange)="setNestedProp(b, field.key, ix, sf.key, $event)">
+                                      </app-custom-select>
                                     }
                                     @case ('toggle') {
                                       <label class="prop-toggle">
@@ -1729,14 +1777,8 @@
                                 <div style="font-size:10px;color:var(--text-tertiary);">Renders as a nested block on the published page.</div>
                               </div>
                             }
-                            <div style="display:flex;gap:4px;margin-top:6px;">
-                              <select [ngModel]="childTypeOf(b)" (ngModelChange)="setChildType(b, $event)" class="prop-input" style="flex:1;min-width:0;">
-                                @for (cat of blockCategories; track cat.id) {
-                                  @for (item of cat.items; track item.type) {
-                                    <option [value]="item.type">{{ item.label }}</option>
-                                  }
-                                }
-                              </select>
+                            <div style="display:flex;gap:4px;margin-top:6px;align-items:center;">
+                              <app-custom-select [options]="allBlockTypeOptions" [ngModel]="childTypeOf(b)" (ngModelChange)="setChildType(b, $event)" style="flex:1;min-width:0;"></app-custom-select>
                               <button class="props-add-btn" style="width:auto;white-space:nowrap;" (click)="addChild(b, field.key, childTypeOf(b))">+ {{ field.addLabel || 'Add' }}</button>
                             </div>
                           </div>
@@ -1775,14 +1817,8 @@
                   <div class="props-section-body" style="padding-top:10px;">
                     <label class="prop-field-label">
                       <span class="prop-field-title">Background Type</span>
-                      <select class="prop-input" [ngModel]="b.props['bgType'] || 'none'"
-                              (ngModelChange)="setBlockBgType(b, $event)">
-                        <option value="none">None (Transparent / Theme)</option>
-                        <option value="color">Solid Color</option>
-                        <option value="gradient">Gradient</option>
-                        <option value="image">Image (with Parallax)</option>
-                        <option value="video">Video Background (with Parallax)</option>
-                      </select>
+                      <app-custom-select [options]="bgTypeOptions" [ngModel]="b.props['bgType'] || 'none'"
+                                         (ngModelChange)="setBlockBgType(b, $event)"></app-custom-select>
                     </label>
 
                     <!-- Solid Color Controls -->
@@ -1865,49 +1901,28 @@
                       <div class="prop-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
                         <label class="prop-field-label">
                           <span class="prop-field-title">Image Fit / Size</span>
-                          <select class="prop-input" [ngModel]="b.props['bgSize'] || 'cover'"
-                                  (ngModelChange)="setProp(b, 'bgSize', $event)">
-                            <option value="cover">Cover (Full Fill)</option>
-                            <option value="contain">Contain (Fit Inside)</option>
-                            <option value="auto">Auto (Native Size)</option>
-                          </select>
+                          <app-custom-select [options]="bgSizeOptions" [ngModel]="b.props['bgSize'] || 'cover'"
+                                             (ngModelChange)="setProp(b, 'bgSize', $event)"></app-custom-select>
                         </label>
 
                         <label class="prop-field-label">
                           <span class="prop-field-title">Image Position</span>
-                          <select class="prop-input" [ngModel]="b.props['bgPosition'] || 'center'"
-                                  (ngModelChange)="setProp(b, 'bgPosition', $event)">
-                            <option value="center">Center</option>
-                            <option value="top">Top</option>
-                            <option value="bottom">Bottom</option>
-                            <option value="left">Left</option>
-                            <option value="right">Right</option>
-                          </select>
+                          <app-custom-select [options]="bgPositionOptions" [ngModel]="b.props['bgPosition'] || 'center'"
+                                             (ngModelChange)="setProp(b, 'bgPosition', $event)"></app-custom-select>
                         </label>
                       </div>
 
                       <div class="prop-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
                         <label class="prop-field-label">
                           <span class="prop-field-title">Repeat</span>
-                          <select class="prop-input" [ngModel]="b.props['bgRepeat'] || 'no-repeat'"
-                                  (ngModelChange)="setProp(b, 'bgRepeat', $event)">
-                            <option value="no-repeat">No Repeat</option>
-                            <option value="repeat">Repeat (Tiles)</option>
-                            <option value="repeat-x">Repeat Horizontal</option>
-                            <option value="repeat-y">Repeat Vertical</option>
-                          </select>
+                          <app-custom-select [options]="bgRepeatOptions" [ngModel]="b.props['bgRepeat'] || 'no-repeat'"
+                                             (ngModelChange)="setProp(b, 'bgRepeat', $event)"></app-custom-select>
                         </label>
 
                         <label class="prop-field-label">
                           <span class="prop-field-title">Dark Tint Overlay</span>
-                          <select class="prop-input" [ngModel]="b.props['bgOverlay'] || 'none'"
-                                  (ngModelChange)="setProp(b, 'bgOverlay', $event)">
-                            <option value="none">None (Pure Image)</option>
-                            <option value="rgba(0,0,0,0.35)">Subtle Dark (35%)</option>
-                            <option value="rgba(0,0,0,0.55)">Medium Dark (55%)</option>
-                            <option value="rgba(0,0,0,0.75)">Deep Dark (75%)</option>
-                            <option value="rgba(15,23,42,0.65)">Navy Tint</option>
-                          </select>
+                          <app-custom-select [options]="bgOverlayOptions" [ngModel]="b.props['bgOverlay'] || 'none'"
+                                             (ngModelChange)="setProp(b, 'bgOverlay', $event)"></app-custom-select>
                         </label>
                       </div>
                     }
@@ -1960,14 +1975,8 @@
 
                       <label class="prop-field-label">
                         <span class="prop-field-title">Dark Tint Overlay</span>
-                        <select class="prop-input" [ngModel]="b.props['bgOverlay'] || 'none'"
-                                (ngModelChange)="setProp(b, 'bgOverlay', $event)">
-                          <option value="none">None (Pure Video)</option>
-                          <option value="rgba(0,0,0,0.35)">Subtle Dark (35%)</option>
-                          <option value="rgba(0,0,0,0.55)">Medium Dark (55%)</option>
-                          <option value="rgba(0,0,0,0.75)">Deep Dark (75%)</option>
-                          <option value="rgba(15,23,42,0.65)">Navy Tint</option>
-                        </select>
+                        <app-custom-select [options]="bgOverlayOptions" [ngModel]="b.props['bgOverlay'] || 'none'"
+                                           (ngModelChange)="setProp(b, 'bgOverlay', $event)"></app-custom-select>
                       </label>
                     }
                   </div>
@@ -2044,33 +2053,20 @@
                     <div class="props-section-body">
                       <label class="prop-field-label">
                         <span class="prop-field-title">Canvas Max Width</span>
-                        <select [ngModel]="pageSettings()['maxWidth'] || '820px'" (ngModelChange)="updateSetting('maxWidth', $event)" class="prop-input">
-                          <option value="640px">Narrow (640px)</option>
-                          <option value="760px">Standard (760px)</option>
-                          <option value="820px">Default (820px)</option>
-                          <option value="960px">Wide (960px)</option>
-                          <option value="100%">Full Width (100% of Viewport)</option>
-                        </select>
+                        <app-custom-select [options]="maxWidthOptions" [ngModel]="pageSettings()['maxWidth'] || '820px'"
+                                           (ngModelChange)="updateSetting('maxWidth', $event)"></app-custom-select>
                       </label>
 
                       <label class="prop-field-label">
                         <span class="prop-field-title">Canvas Min Width</span>
-                        <select [ngModel]="pageSettings()['minWidth'] || '0px'" (ngModelChange)="updateSetting('minWidth', $event)" class="prop-input">
-                          <option value="0px">None (0px)</option>
-                          <option value="320px">Small (320px)</option>
-                          <option value="480px">Medium (480px)</option>
-                          <option value="640px">Large (640px)</option>
-                          <option value="768px">Tablet (768px)</option>
-                          <option value="100%">Full Width (100%)</option>
-                        </select>
+                        <app-custom-select [options]="minWidthOptions" [ngModel]="pageSettings()['minWidth'] || '0px'"
+                                           (ngModelChange)="updateSetting('minWidth', $event)"></app-custom-select>
                       </label>
 
                       <label class="prop-field-label">
                         <span class="prop-field-title">Canvas Alignment</span>
-                        <select [ngModel]="pageSettings()['align'] || 'center'" (ngModelChange)="updateSetting('align', $event)" class="prop-input">
-                          <option value="center">Center Aligned in Editor</option>
-                          <option value="left">Left Aligned in Editor</option>
-                        </select>
+                        <app-custom-select [options]="alignOptions" [ngModel]="pageSettings()['align'] || 'center'"
+                                           (ngModelChange)="updateSetting('align', $event)"></app-custom-select>
                       </label>
                     </div>
                   }
@@ -2096,11 +2092,8 @@
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                             Editor Theme
                           </span>
-                          <select [ngModel]="editorTheme()" (ngModelChange)="setEditorTheme($event)" class="prop-input">
-                            <option value="dark">Dark (Default)</option>
-                            <option value="light">Light</option>
-                            <option value="auto">Auto Detect</option>
-                          </select>
+                          <app-custom-select [options]="themeModeOptions" [ngModel]="editorTheme()"
+                                             (ngModelChange)="setEditorTheme($event)"></app-custom-select>
                         </label>
 
                         <label class="prop-field-label" style="margin-bottom: 0;">
@@ -2108,11 +2101,8 @@
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                             Preview Theme
                           </span>
-                          <select [ngModel]="previewTheme()" (ngModelChange)="setPreviewTheme($event)" class="prop-input">
-                            <option value="light">Light (Default)</option>
-                            <option value="dark">Dark</option>
-                            <option value="auto">Auto Detect</option>
-                          </select>
+                          <app-custom-select [options]="previewThemeOptions" [ngModel]="previewTheme()"
+                                             (ngModelChange)="setPreviewTheme($event)"></app-custom-select>
                         </label>
                       </div>
 
@@ -2128,14 +2118,8 @@
 
                       <label class="prop-field-label">
                         <span class="prop-field-title">Canvas Background Theme</span>
-                        <select [ngModel]="pageSettings()['bg'] || 'default'" (ngModelChange)="updateSetting('bg', $event)" class="prop-input">
-                          <option value="default">Adaptive Theme (Dark in Edit, Light in Preview)</option>
-                          <option value="pure-black">OLED Pure Black (#000000)</option>
-                          <option value="deep-navy">Deep Navy (#0a1324)</option>
-                          <option value="dark-card">Slate Card (#111827)</option>
-                          <option value="light">Clean Light Card (#ffffff)</option>
-                          <option value="custom">Custom Background Color...</option>
-                        </select>
+                        <app-custom-select [options]="bgPresetOptions" [ngModel]="pageSettings()['bg'] || 'default'"
+                                           (ngModelChange)="updateSetting('bg', $event)"></app-custom-select>
                       </label>
 
                       @if (pageSettings()['bg'] === 'custom') {
@@ -2153,13 +2137,8 @@
 
                       <label class="prop-field-label">
                         <span class="prop-field-title">Typography Font Family</span>
-                        <select [ngModel]="pageSettings()['fontFamily'] || 'system'" (ngModelChange)="updateSetting('fontFamily', $event)" class="prop-input">
-                          <option value="system">System Default (San Francisco / Segoe UI)</option>
-                          <option value="inter">Inter (Modern Tech / Clean)</option>
-                          <option value="outfit">Outfit (Modern Geometric / Display)</option>
-                          <option value="roboto">Roboto (Classic Sans)</option>
-                          <option value="mono">JetBrains Mono (Code / Editorial)</option>
-                        </select>
+                        <app-custom-select [options]="fontFamilyOptions" [ngModel]="pageSettings()['fontFamily'] || 'system'"
+                                           (ngModelChange)="updateSetting('fontFamily', $event)"></app-custom-select>
                       </label>
 
                       <label class="prop-field-label">
@@ -2267,10 +2246,8 @@
 
                       <label class="prop-field-label">
                         <span class="prop-field-title">Publish Status</span>
-                        <select class="prop-input" [value]="activePage()?.status || 'draft'" (change)="updateActiveStatus($event)">
-                          <option value="draft">Draft (Private)</option>
-                          <option value="published">Published (Live)</option>
-                        </select>
+                        <app-custom-select [options]="pageStatusOptions" [ngModel]="activePage()?.status || 'draft'"
+                                           (ngModelChange)="updateActiveStatusValue($event)"></app-custom-select>
                       </label>
 
                       <button type="button" class="btn ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px;"
@@ -2323,15 +2300,8 @@
 
           <label class="prop-field-label">
             <span class="prop-field-title">Category / Tag</span>
-            <select [ngModel]="reusableCategoryInput()" (ngModelChange)="reusableCategoryInput.set($event)" class="prop-input">
-              <option [value]="targetReusableBlock()?.type">{{ getBlockLabel(targetReusableBlock()?.type || '') }}</option>
-              <option value="container">Container / Section</option>
-              <option value="hero">Hero Section</option>
-              <option value="card">Card / Grid</option>
-              <option value="navigation">Navigation</option>
-              <option value="callout">Callout / Banner</option>
-              <option value="custom">Custom</option>
-            </select>
+            <app-custom-select [options]="reusableModalCategoryOptions" [ngModel]="reusableCategoryInput()"
+                               (ngModelChange)="reusableCategoryInput.set($event)"></app-custom-select>
           </label>
 
           @if (targetReusableBlock(); as blk) {

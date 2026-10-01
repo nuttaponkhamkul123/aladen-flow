@@ -54,13 +54,22 @@
   width: 30px;
   height: 30px;
   border-radius: var(--radius-sm);
-  background: #181c28;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-surface-elevated, #181c28);
+  border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.1));
   display: grid;
   place-items: center;
-  color: #818cf8;
+  color: var(--accent-primary, #818cf8);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+:host-context([data-theme="light"]) .logo-icon,
+:host-context(.theme-light) .logo-icon {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.2);
+  color: var(--accent-primary);
+  box-shadow: none;
 }
 
 .brand-text {

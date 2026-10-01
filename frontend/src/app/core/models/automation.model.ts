@@ -1,4 +1,4 @@
-export type FlowNodeType = 'trigger' | 'condition' | 'action';
+export type FlowNodeType = 'trigger' | 'condition' | 'action' | 'ai';
 
 export interface FlowNode {
   id: string;
@@ -75,7 +75,7 @@ export interface FlowTemplate {
   name: string;
   description: string;
   trigger_type: string;
-  category: 'kanban' | 'cms' | 'cross_platform';
+  category: 'kanban' | 'cms' | 'cross_platform' | 'ai';
   badge: string;
   nodes: FlowNode[];
   edges: FlowEdge[];

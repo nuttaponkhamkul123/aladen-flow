@@ -1,0 +1,55 @@
+<div class="custom-select-container"
+     [class.is-open]="isOpen()"
+     [class.is-disabled]="disabled()"
+     [class.open-upward]="openUpward()"
+     [class.size-sm]="size() === 'sm'"
+     [class.size-md]="size() === 'md'"
+     [class]="customClass()">
+  <button type="button"
+          class="custom-select-trigger"
+          (click)="toggleOpen($event)"
+          [disabled]="disabled()"
+          [attr.aria-expanded]="isOpen()"
+          [attr.aria-haspopup]="'listbox'">
+    <span class="custom-select-label" [class.is-placeholder]="!hasSelection()">
+      @if (selectedOption()?.icon) {
+        <span class="custom-select-icon" [innerHTML]="selectedOption()!.icon"></span>
+      }
+      <span class="custom-select-text">{{ selectedOption()?.label || placeholder() }}</span>
+    </span>
+    <svg class="custom-select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>
+  </button>
+
+  @if (isOpen()) {
+    <div class="custom-select-dropdown" role="listbox" (click)="$event.stopPropagation()">
+      <div class="custom-select-options-list">
+        @for (opt of normalizedOptions(); track opt.value) {
+          <div class="custom-select-option"
+               role="option"
+               [class.is-selected]="isSelected(opt)"
+               [attr.aria-selected]="isSelected(opt)"
+               (click)="selectOption(opt, $event)">
+            @if (opt.icon) {
+              <span class="option-icon" [innerHTML]="opt.icon"></span>
+            }
+            <div class="option-content">
+              <span class="option-label">{{ opt.label }}</span>
+              @if (opt.sub) {
+                <span class="option-sub">{{ opt.sub }}</span>
+              }
+            </div>
+            @if (isSelected(opt)) {
+              <svg class="option-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            }
+          </div>
+        } @empty {
+          <div class="custom-select-empty">No options available</div>
+        }
+      </div>
+    </div>
+  }
+</div>

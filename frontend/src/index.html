@@ -11,8 +11,27 @@
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
+  <script>
+    (function() {
+      try {
+        var mode = localStorage.getItem('app-theme-mode') || 'auto';
+        var isDark = true;
+        if (mode === 'dark') {
+          isDark = true;
+        } else if (mode === 'light') {
+          isDark = false;
+        } else {
+          isDark = !window.matchMedia || window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        var theme = isDark ? 'theme-dark' : 'theme-light';
+        var themeAttr = isDark ? 'dark' : 'light';
+        document.documentElement.classList.add(theme);
+        document.documentElement.setAttribute('data-theme', themeAttr);
+      } catch (e) {}
+    })();
+  </script>
 </head>
-<body class="theme-dark">
+<body>
   <app-root></app-root>
 </body>
 </html>

@@ -17,11 +17,19 @@
             </select>
           </div>
         }
-        <button type="button" class="btn-tool new-flow-btn" (click)="createNewFlow()" title="Create New Automation Flow">
+        <button type="button" class="btn-tool new-flow-btn" (click)="openCreateFlowModal()" title="Create New Automation Flow">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           <span>New Flow</span>
+        </button>
+
+        <button type="button" class="btn-tool palette-toggle-btn" [class.active]="showPaletteDrawer()" (click)="togglePalette()" title="Toggle Node Palette Drawer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+          <span>Palette</span>
         </button>
       </div>
 
@@ -59,6 +67,12 @@
           </svg>
           <span>Action</span>
         </button>
+        <button type="button" class="btn-palette ai-palette" (click)="addNode('ai')" title="Add Gemini AI Node">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+          </svg>
+          <span>AI Agent</span>
+        </button>
       </div>
 
       <button type="button" class="btn-tool template-btn" (click)="showTemplateModal.set(true)" title="Browse Pre-built Templates">
@@ -95,8 +109,117 @@
     </div>
   </header>
 
-  <!-- Main Canvas Area -->
+  <!-- Main Work Body -->
   <main class="automations-body">
+    <!-- Left-hand Node Palette Drawer -->
+    @if (showPaletteDrawer()) {
+      <aside class="palette-drawer">
+        <div class="palette-drawer-header">
+          <div class="drawer-title-group">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            <span class="drawer-heading">Node Library</span>
+          </div>
+          <button type="button" class="btn-icon-subtle" (click)="togglePalette()" title="Collapse Palette">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+        </div>
+
+        <div class="palette-drawer-scroll">
+          <!-- Triggers Section -->
+          <div class="palette-section">
+            <div class="section-label trigger-label">
+              <span class="dot-indicator purple"></span>
+              <span>TRIGGERS</span>
+            </div>
+            <div class="blueprint-card-grid">
+              @for (bp of blueprints; track bp.title) {
+                @if (bp.category === 'trigger') {
+                  <div class="blueprint-card" (click)="addBlueprint(bp)">
+                    <div class="bp-top">
+                      <span class="bp-badge purple">{{ bp.badge }}</span>
+                      <button type="button" class="bp-add-btn" title="Add to canvas">+</button>
+                    </div>
+                    <div class="bp-title">{{ bp.title }}</div>
+                    <div class="bp-subtitle">{{ bp.subtitle }}</div>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+
+          <!-- Conditions Section -->
+          <div class="palette-section">
+            <div class="section-label condition-label">
+              <span class="dot-indicator amber"></span>
+              <span>CONDITIONS & RULES</span>
+            </div>
+            <div class="blueprint-card-grid">
+              @for (bp of blueprints; track bp.title) {
+                @if (bp.category === 'condition') {
+                  <div class="blueprint-card" (click)="addBlueprint(bp)">
+                    <div class="bp-top">
+                      <span class="bp-badge amber">{{ bp.badge }}</span>
+                      <button type="button" class="bp-add-btn" title="Add to canvas">+</button>
+                    </div>
+                    <div class="bp-title">{{ bp.title }}</div>
+                    <div class="bp-subtitle">{{ bp.subtitle }}</div>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+
+          <!-- AI Intelligence Section -->
+          <div class="palette-section">
+            <div class="section-label ai-label">
+              <span class="dot-indicator fuchsia"></span>
+              <span>AI AGENTS (GEMINI)</span>
+            </div>
+            <div class="blueprint-card-grid">
+              @for (bp of blueprints; track bp.title) {
+                @if (bp.category === 'ai') {
+                  <div class="blueprint-card ai-card" (click)="addBlueprint(bp)">
+                    <div class="bp-top">
+                      <span class="bp-badge fuchsia">{{ bp.badge }}</span>
+                      <button type="button" class="bp-add-btn" title="Add to canvas">+</button>
+                    </div>
+                    <div class="bp-title">{{ bp.title }}</div>
+                    <div class="bp-subtitle">{{ bp.subtitle }}</div>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+
+          <!-- Actions Section -->
+          <div class="palette-section">
+            <div class="section-label action-label">
+              <span class="dot-indicator emerald"></span>
+              <span>ACTIONS & OPS</span>
+            </div>
+            <div class="blueprint-card-grid">
+              @for (bp of blueprints; track bp.title) {
+                @if (bp.category === 'action') {
+                  <div class="blueprint-card" (click)="addBlueprint(bp)">
+                    <div class="bp-top">
+                      <span class="bp-badge emerald">{{ bp.badge }}</span>
+                      <button type="button" class="bp-add-btn" title="Add to canvas">+</button>
+                    </div>
+                    <div class="bp-title">{{ bp.title }}</div>
+                    <div class="bp-subtitle">{{ bp.subtitle }}</div>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        </div>
+      </aside>
+    }
+
+    <!-- Main Canvas Viewport -->
     <div class="canvas-viewport" id="flowCanvas" (click)="onCanvasClick($event)">
       <!-- Connecting Helper Floating Banner -->
       @if (connectingSourceNode(); as src) {
@@ -109,6 +232,46 @@
         </div>
       }
 
+      <!-- Canvas Zero State / Recipe Showcase -->
+      @if (!automationService.activeFlow() || automationService.activeFlow()?.nodes?.length === 0) {
+        <div class="canvas-empty-state">
+          <div class="empty-state-badge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            <span>Aladenflow Autonomous Nervous System</span>
+          </div>
+
+          <h2 class="empty-title">Automate your Workspace</h2>
+          <p class="empty-desc">
+            Connect Kanban events, CMS publications, and Gemini AI into autonomous pipelines with visual logic.
+          </p>
+
+          <div class="recipe-grid">
+            @for (tmpl of templates; track tmpl.name) {
+              <div class="recipe-card" (click)="applyRecipe(tmpl)">
+                <div class="recipe-top">
+                  <span class="recipe-badge">{{ tmpl.badge }}</span>
+                  <span class="recipe-nodes-count">{{ tmpl.nodes.length }} Nodes</span>
+                </div>
+                <h4 class="recipe-title">{{ tmpl.name }}</h4>
+                <p class="recipe-desc">{{ tmpl.description }}</p>
+                <button type="button" class="btn-use-recipe">
+                  <span>Use This Recipe</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+            }
+          </div>
+
+          <div class="empty-actions">
+            <button type="button" class="btn primary" (click)="openCreateFlowModal()">
+              + Create Blank Workflow
+            </button>
+          </div>
+        </div>
+      }
+
       <!-- SVG Connecting Wires Layer -->
       @if (automationService.activeFlow(); as flow) {
         <svg class="canvas-svg-layer">
@@ -116,6 +279,10 @@
             <linearGradient id="wireGradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stop-color="#3b82f6" />
               <stop offset="100%" stop-color="#60a5fa" />
+            </linearGradient>
+            <linearGradient id="aiWireGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#d946ef" />
+              <stop offset="100%" stop-color="#06b6d4" />
             </linearGradient>
           </defs>
 
@@ -191,6 +358,11 @@
                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
                   </svg>
                   <span>CONDITION</span>
+                } @else if (node.type === 'ai') {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                  </svg>
+                  <span>AI AGENT</span>
                 } @else {
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="5 3 19 12 5 21 5 3"/>
@@ -216,6 +388,8 @@
                 <span class="tag-text">Event: {{ node.config['event'] || 'card_updated' }}</span>
               } @else if (node.type === 'condition') {
                 <span class="tag-text">If {{ node.config['field'] || 'column' }} {{ node.config['operator'] || '==' }} "{{ node.config['value'] || '' }}"</span>
+              } @else if (node.type === 'ai') {
+                <span class="tag-text">AI: {{ node.config['action_type'] === 'ai_generate_checklist' ? 'Generate Subtasks' : 'Auto-Triage & Categorize' }}</span>
               } @else {
                 <span class="tag-text">Do: {{ node.config['action_type'] || 'move_card_column' }}</span>
               }
@@ -264,7 +438,9 @@
               <label class="form-label">Triggering Event</label>
               <select class="form-select" [(ngModel)]="node.config['event']" (ngModelChange)="saveCurrentFlow()">
                 <option value="checklist_completed">Checklist 100% Completed</option>
-                <option value="card_updated">Card Created or Updated</option>
+                <option value="card_created">New Card Created</option>
+                <option value="card_updated">Card Updated (Details, Priority)</option>
+                <option value="card_moved">Card Moved to Column</option>
                 <option value="cms_page_published">CMS Page Published</option>
                 <option value="manual_trigger">Manual Trigger</option>
               </select>
@@ -277,6 +453,8 @@
                 <option value="column_name">Card Column Name</option>
                 <option value="priority">Card Priority</option>
                 <option value="title_or_desc">Card Title / Description</option>
+                <option value="labels">Card Labels / Tags</option>
+                <option value="checklist_pct">Checklist Completion %</option>
                 <option value="status">CMS Page Status</option>
               </select>
             </div>
@@ -288,6 +466,8 @@
                 <option value="not_equals">Does Not Equal (!=)</option>
                 <option value="contains">Contains Substring</option>
                 <option value="not_contains">Does Not Contain</option>
+                <option value="greater_than">Greater Than (&gt;)</option>
+                <option value="less_than">Less Than (&lt;)</option>
               </select>
             </div>
 
@@ -295,13 +475,38 @@
               <label class="form-label">Value to Match</label>
               <input type="text" class="form-input" [(ngModel)]="node.config['value']" (ngModelChange)="saveCurrentFlow()" placeholder="e.g. Done, urgent, bug"/>
             </div>
+          } @else if (node.type === 'ai') {
+            <div class="form-group">
+              <label class="form-label">AI Agent Capability</label>
+              <select class="form-select" [(ngModel)]="node.config['action_type']" (ngModelChange)="saveCurrentFlow()">
+                <option value="ai_triage">Gemini Smart Triage (Classify Urgency & Tags)</option>
+                <option value="ai_generate_checklist">AI Subtask Breakdown (Auto-Generate 3 Tasks)</option>
+              </select>
+            </div>
+
+            <div class="ai-inspector-info-card">
+              <div class="ai-info-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                <span>Autonomous Agent</span>
+              </div>
+              <p class="ai-info-text">
+                When triggered, Gemini inspects card content in context, evaluates severity/sentiment, and mutates properties automatically without human delay.
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Activity Log Note</label>
+              <input type="text" class="form-input" [(ngModel)]="node.config['add_activity']" (ngModelChange)="saveCurrentFlow()" placeholder="AI processed this card"/>
+            </div>
           } @else {
             <div class="form-group">
               <label class="form-label">Action Type</label>
               <select class="form-select" [(ngModel)]="node.config['action_type']" (ngModelChange)="saveCurrentFlow()">
                 <option value="move_card_column">Move Card to Column</option>
                 <option value="set_priority">Set Card Priority</option>
+                <option value="add_label">Attach Label Tag</option>
                 <option value="create_card">Create Board Verification Card</option>
+                <option value="publish_cms_page">Publish CMS Page</option>
               </select>
             </div>
 
@@ -319,6 +524,11 @@
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </select>
+              </div>
+            } @else if (node.config['action_type'] === 'add_label') {
+              <div class="form-group">
+                <label class="form-label">Label Name</label>
+                <input type="text" class="form-input" [(ngModel)]="node.config['label_name']" (ngModelChange)="saveCurrentFlow()" placeholder="e.g. bug, urgent, qa"/>
               </div>
             } @else if (node.config['action_type'] === 'create_card') {
               <div class="form-group">
@@ -381,72 +591,101 @@
               </div>
             </div>
           }
-
-          <!-- Incoming connections -->
-          <div class="form-group">
-            <label class="form-label">Incoming Links (From)</label>
-            @if (getNodeIncomingEdges(node.id).length === 0) {
-              <div class="no-connections-text">No incoming connections.</div>
-            } @else {
-              <div class="connections-list">
-                @for (edge of getNodeIncomingEdges(node.id); track edge.id) {
-                  <div class="connection-tag-item">
-                    <span class="conn-arrow">←</span>
-                    <span class="conn-name">{{ getNodeById(edge.source)?.title || edge.source }}</span>
-                    <button type="button" class="conn-remove-btn" (click)="deleteEdge(edge)" title="Disconnect link"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-                  </div>
-                }
-              </div>
-            }
-          </div>
-
-          <div class="inspector-actions">
-            <button type="button" class="btn-delete-node" (click)="deleteNode(node)">
-              Delete Node
-            </button>
-          </div>
         </div>
       </aside>
     }
   </main>
 
-  <!-- Execution Logs Slide-Out Drawer -->
-  @if (showLogsDrawer()) {
-    <div class="logs-drawer-overlay" (click)="showLogsDrawer.set(false)">
-      <div class="logs-drawer" (click)="$event.stopPropagation()">
-        <div class="logs-drawer-header">
-          <div class="logs-drawer-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-            <span>Automation Execution History</span>
+  <!-- Create Flow Modal -->
+  @if (showCreateModal()) {
+    <div class="modal-backdrop" (click)="showCreateModal.set(false)">
+      <div class="modal-card new-flow-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <div class="modal-icon-badge purple">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="modal-heading">Create Automation Flow</h3>
+              <p class="modal-subheading">Build an autonomous rule for your workspace</p>
+            </div>
           </div>
-          <button type="button" class="close-drawer-btn" (click)="showLogsDrawer.set(false)" title="Close Logs"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          <button type="button" class="btn-icon-subtle" (click)="showCreateModal.set(false)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
 
-        <div class="logs-drawer-content">
-          @if (automationService.recentLogs().length === 0) {
-            <div class="logs-empty-state">No execution runs logged yet. Click "Test Run" to execute!</div>
-          } @else {
-            <div class="logs-list">
-              @for (log of automationService.recentLogs(); track log.id) {
-                <div class="log-entry-item" [class.success]="log.status === 'success'" [class.skipped]="log.status === 'skipped'">
-                  <div class="log-top">
-                    <span class="log-badge {{ log.status }}">{{ log.status | uppercase }}</span>
-                    <span class="log-flow-name">{{ log.automation_name || 'Automation Rule' }}</span>
-                    <span class="log-time">{{ log.created_at }}</span>
-                  </div>
-                  <div class="log-summary">{{ log.summary }}</div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Workflow Name</label>
+            <input type="text" class="form-input" [ngModel]="newFlowName()" (ngModelChange)="newFlowName.set($event)" placeholder="e.g. Auto-Move on Checklist Completion"/>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Description / Intent</label>
+            <input type="text" class="form-input" [ngModel]="newFlowDescription()" (ngModelChange)="newFlowDescription.set($event)" placeholder="What does this automation accomplish?"/>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Primary Trigger Event</label>
+            <select class="form-select" [ngModel]="newFlowTrigger()" (ngModelChange)="newFlowTrigger.set($event)">
+              <option value="checklist_completed">Checklist 100% Completed</option>
+              <option value="card_created">New Card Created</option>
+              <option value="card_updated">Card Updated or Moved</option>
+              <option value="cms_page_published">CMS Page Published</option>
+              <option value="manual_trigger">Manual Trigger Only</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Starter Blueprint</label>
+            <div class="template-choice-grid">
+              <label class="choice-tile" [class.selected]="newFlowTemplate() === 'checklist'">
+                <input type="radio" name="tmplChoice" value="checklist" [checked]="newFlowTemplate() === 'checklist'" (change)="newFlowTemplate.set('checklist')"/>
+                <div class="tile-content">
+                  <span class="tile-title">Checklist Auto-Done</span>
+                  <span class="tile-desc">Move card to Done when all items complete</span>
                 </div>
-              }
+              </label>
+
+              <label class="choice-tile" [class.selected]="newFlowTemplate() === 'ai'">
+                <input type="radio" name="tmplChoice" value="ai" [checked]="newFlowTemplate() === 'ai'" (change)="newFlowTemplate.set('ai')"/>
+                <div class="tile-content">
+                  <span class="tile-title">AI Smart Triage</span>
+                  <span class="tile-desc">Gemini analyzes urgency & tags tickets</span>
+                </div>
+              </label>
+
+              <label class="choice-tile" [class.selected]="newFlowTemplate() === 'bug'">
+                <input type="radio" name="tmplChoice" value="bug" [checked]="newFlowTemplate() === 'bug'" (change)="newFlowTemplate.set('bug')"/>
+                <div class="tile-content">
+                  <span class="tile-title">Urgent Bug Escalator</span>
+                  <span class="tile-desc">Promotes bug tickets to Urgent</span>
+                </div>
+              </label>
+
+              <label class="choice-tile" [class.selected]="newFlowTemplate() === 'blank'">
+                <input type="radio" name="tmplChoice" value="blank" [checked]="newFlowTemplate() === 'blank'" (change)="newFlowTemplate.set('blank')"/>
+                <div class="tile-content">
+                  <span class="tile-title">Blank Pipeline</span>
+                  <span class="tile-desc">Start with standard 3-node starter</span>
+                </div>
+              </label>
             </div>
-          }
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn secondary" (click)="showCreateModal.set(false)">Cancel</button>
+          <button type="button" class="btn primary" (click)="confirmCreateFlow()">Create Flow</button>
         </div>
       </div>
     </div>
   }
 
-  <!-- Test Execution Result Modal -->
+  <!-- Test Run Results Modal -->
   @if (showTestModal() && automationService.lastExecutionResult(); as result) {
     <div class="modal-backdrop" (click)="showTestModal.set(false)">
       <div class="test-result-modal" (click)="$event.stopPropagation()">
@@ -496,8 +735,8 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-secondary" (click)="showTestModal.set(false)">Dismiss</button>
-          <button type="button" class="btn-primary" (click)="runTestFlow(true)">Run Again</button>
+          <button type="button" class="btn secondary" (click)="showTestModal.set(false)">Dismiss</button>
+          <button type="button" class="btn primary" (click)="runTestFlow(true)">Run Again</button>
         </div>
       </div>
     </div>
@@ -539,6 +778,47 @@
         </div>
       </div>
     </div>
+  }
+
+  <!-- Execution History Logs Drawer -->
+  @if (showLogsDrawer()) {
+    <aside class="logs-drawer">
+      <div class="logs-drawer-header">
+        <div class="logs-title-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span class="logs-heading">Recent Execution Logs</span>
+        </div>
+        <button type="button" class="btn-icon-subtle" (click)="showLogsDrawer.set(false)" title="Close Logs">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="logs-drawer-content">
+        @if (automationService.recentLogs().length === 0) {
+          <div class="no-logs-empty">
+            <div class="empty-icon-circle">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <p class="empty-text">No execution logs recorded yet. Trigger a workflow or run a test to populate logs.</p>
+          </div>
+        } @else {
+          <div class="logs-list">
+            @for (log of automationService.recentLogs(); track log.id) {
+              <div class="log-entry-item {{ log.status }}">
+                <div class="log-top-row">
+                  <span class="log-status-pill {{ log.status }}">{{ log.status }}</span>
+                  <span class="log-time">{{ log.created_at }}</span>
+                </div>
+                <div class="log-name">{{ log.automation_name || 'Automation Flow' }}</div>
+                <div class="log-summary">{{ log.summary }}</div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </aside>
   }
 
   <!-- Save Toast Notification -->

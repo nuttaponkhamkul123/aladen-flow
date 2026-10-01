@@ -70,12 +70,23 @@ export class ThemeService {
 
   toggleThemeMode() {
     const current = this.themeMode();
-    const next: ThemeMode = current === 'auto' ? 'dark' : current === 'dark' ? 'light' : 'auto';
-    this.setThemeMode(next);
+    if (current === 'auto') {
+      // Immediately switch away from current resolved appearance
+      this.setThemeMode(this.systemIsDark() ? 'light' : 'dark');
+    } else if (current === 'dark') {
+      this.setThemeMode('light');
+    } else {
+      this.setThemeMode('auto');
+    }
   }
 
   toggleDark() {
-    this.toggleThemeMode();
+    this.toggleLightDark();
+  }
+
+  toggleLightDark() {
+    const currentlyDark = this.isDark();
+    this.setThemeMode(currentlyDark ? 'light' : 'dark');
   }
 
   setAmbientTheme(theme: AmbientTheme) {
