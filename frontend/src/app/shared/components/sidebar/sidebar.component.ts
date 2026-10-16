@@ -8,6 +8,7 @@ import { BoardService } from '../../../core/services/board.service';
 import { CmsService } from '../../../core/services/cms.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { AutomationService } from '../../../core/services/automation.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -22,6 +23,7 @@ export class SidebarComponent {
   cmsService = inject(CmsService);
   settingsService = inject(SettingsService);
   automationService = inject(AutomationService);
+  authService = inject(AuthService);
   private router = inject(Router);
 
   isCollapsed = signal<boolean>(this.loadCollapsedState());
@@ -85,5 +87,10 @@ export class SidebarComponent {
 
   activePageStatus = computed(() => {
     return this.cmsService.activePage()?.status || 'draft';
+  });
+
+  userDisplayName = computed(() => {
+    const user = this.authService.currentUser();
+    return user?.display_name || user?.username || 'Workspace';
   });
 }

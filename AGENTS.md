@@ -11,3 +11,15 @@
 ## Code & Engineering Principles
 - **Design System Fidelity**: Maintain Aladenflow Studio aesthetic standards (harmonious dark glassmorphism, semantic CSS variables, crisp vector SVGs).
 - **Windows Execution**: Use `npm.cmd` for Node/Angular builds and package operations in the Windows environment.
+
+<!-- antislop:start -->
+## antislop
+For UI, copy, people, mobile layout, or code comments work, read `antislop` skills and rules:
+- Core filter, always on: `.agents/skills/antislop/SKILL.md`
+- UI / visual: `.agents/skills/antislop-ui/SKILL.md`
+- Copy & text: `.agents/skills/antislop-copywriting/SKILL.md`
+- People: `.agents/skills/antislop-human/SKILL.md`
+- Mobile / responsive: `.agents/skills/antislop-layoutmobile/SKILL.md`
+- Code comments: `.agents/skills/antislop-code/SKILL.md`
+<!-- antislop:end -->
+

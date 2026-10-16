@@ -54,6 +54,9 @@
                 @case ('storage') {
                   <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
                 }
+                @case ('account') {
+                  <circle cx="12" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                }
               }
             </svg>
             <span>{{ tab.label }}</span>
@@ -102,8 +105,8 @@
             </div>
 
             <div class="setting-group setting-group--spaced">
-              <span class="setting-label" id="ambient-label">Canvas Ambient Preset</span>
-              <p class="setting-desc">Background gradient and backdrop atmosphere for boards and studio</p>
+              <span class="setting-label" id="ambient-label">System Atmosphere Theme</span>
+              <p class="setting-desc">Transforms the entire system theme: accent colors, buttons, glowing telemetry, and atmosphere</p>
               <div class="ambient-list" role="radiogroup" aria-labelledby="ambient-label">
                 @for (amb of ambientThemes; track amb.id) {
                   <label class="ambient-item" [class.active]="themeService.ambientTheme() === amb.id">
@@ -113,10 +116,14 @@
                     <span class="ambient-radio" aria-hidden="true">
                       <span class="radio-dot"></span>
                     </span>
+                    <span class="ambient-swatch" [class]="amb.previewClass" aria-hidden="true"></span>
                     <span class="ambient-info">
                       <span class="ambient-text">{{ amb.label }}</span>
                       <span class="ambient-desc">{{ amb.desc }}</span>
                     </span>
+                    @if (themeService.ambientTheme() === amb.id) {
+                      <span class="ambient-active-badge">Active</span>
+                    }
                   </label>
                 }
               </div>
@@ -248,6 +255,124 @@
                 </button>
               </div>
             </div>
+          </div>
+        }
+
+
+        <!-- USER ACCOUNT & PROFILE TAB -->
+        @if (settingsService.activeTab() === 'account') {
+          <div class="tab-pane" role="tabpanel" id="panel-account" aria-labelledby="tab-account">
+            <h3 class="pane-title">User Account &amp; Profiles</h3>
+            <p class="pane-subtitle">Manage individual account sessions and isolated user preferences</p>
+
+            @if (authService.currentUser(); as user) {
+              <!-- Current Logged In Profile Card -->
+              <div class="setting-group">
+                <div class="user-card-primary">
+                  <div class="user-card-avatar-wrap">
+                    @if (user.avatar_url) {
+                      <img [src]="user.avatar_url" [alt]="user.display_name" class="user-profile-large-avatar" />
+                    } @else {
+                      <div class="user-profile-large-initials">
+                        {{ (user.display_name.charAt(0) || user.username.charAt(0)).toUpperCase() }}
+                      </div>
+                    }
+                  </div>
+                  <div class="user-card-info">
+                    <div class="user-card-top">
+                      <span class="user-card-name">{{ user.display_name }}</span>
+                      <span class="user-card-handle">@{{ user.username }}</span>
+                    </div>
+                    <span class="user-card-email">{{ user.email }}</span>
+                    <div class="user-card-badges">
+                      <span class="badge badge-accent">Active Session</span>
+                      <span class="badge badge-subtle">ID #{{ user.id }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Isolated Preferences Summary -->
+                <div class="user-preferences-box">
+                  <div class="pref-box-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83 2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    <span>Isolated Settings for {{ user.display_name }}</span>
+                  </div>
+                  <div class="pref-grid">
+                    <div class="pref-item">
+                      <span class="pref-label">Theme Mode:</span>
+                      <span class="pref-val">{{ themeService.themeMode() | titlecase }}</span>
+                    </div>
+                    <div class="pref-item">
+                      <span class="pref-label">Canvas Style:</span>
+                      <span class="pref-val">{{ themeService.ambientTheme() | titlecase }}</span>
+                    </div>
+                    <div class="pref-item">
+                      <span class="pref-label">AI Engine:</span>
+                      <span class="pref-val">{{ settingsService.aiProvider() | uppercase }}</span>
+                    </div>
+                    <div class="pref-item">
+                      <span class="pref-label">Selected Model:</span>
+                      <span class="pref-val font-mono">{{ settingsService.aiModel() || settingsService.aiOllamaModel() }}</span>
+                    </div>
+                  </div>
+                  <p class="pref-note">Any adjustments made in Appearance or AI Engine tabs are automatically isolated and saved to this account in the database.</p>
+                </div>
+
+                <!-- Switch User Strip -->
+                <div class="setting-group--spaced">
+                  <span class="setting-label">Switch To Another Profile</span>
+                  <p class="setting-desc">Switch accounts instantly to test multi-user preference isolation.</p>
+                  <div class="accounts-switch-grid">
+                    @for (u of authService.availableUsers(); track u.id) {
+                      <button type="button"
+                              class="account-card-chip"
+                              [class.active]="u.id === user.id"
+                              (click)="authService.quickSwitchUser(u.username)">
+                        <img [src]="u.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64'" class="chip-avatar" />
+                        <div class="chip-details">
+                          <span class="chip-name">{{ u.display_name }}</span>
+                          <span class="chip-sub">{{ u.theme_mode === 'dark' ? 'Dark' : 'Light' }} · {{ (u.ambient_theme || 'default') | titlecase }}</span>
+                        </div>
+                        @if (u.id === user.id) {
+                          <span class="chip-active-dot">Current</span>
+                        }
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <!-- Action row: sign out / new user -->
+                <div class="user-action-row">
+                  <button type="button" class="btn btn-secondary" (click)="authService.openRegister()">
+                    Register New Account
+                  </button>
+                  <button type="button" class="btn btn-danger" (click)="authService.logout()">
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <!-- Not Logged In -->
+              <div class="setting-group not-logged-in-box">
+                <div class="login-prompt-icon">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  </svg>
+                </div>
+                <h4 class="prompt-title">You are currently using Guest Mode</h4>
+                <p class="prompt-desc">Sign in or create an account to persist isolated themes, AI configurations, and customized workspace preferences across devices.</p>
+                <div class="prompt-actions">
+                  <button type="button" class="btn primary" (click)="authService.openLogin()">
+                    Sign In
+                  </button>
+                  <button type="button" class="btn btn-secondary" (click)="authService.openRegister()">
+                    Create Account
+                  </button>
+                </div>
+              </div>
+            }
           </div>
         }
 

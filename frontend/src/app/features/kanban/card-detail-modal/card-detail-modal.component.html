@@ -35,21 +35,335 @@
           @if (card.due_date) {
             <span class="meta-date">Due {{ card.due_date }}</span>
           }
+          @for (lbl of card.labels || []; track lbl.id) {
+            <span class="card-active-tag" [style.background]="lbl.color + '22'" [style.borderColor]="lbl.color + '66'" [style.color]="lbl.color">
+              <span class="tag-pill-dot" [style.background]="lbl.color"></span>
+              <span class="tag-text">{{ lbl.name }}</span>
+              <button type="button" class="tag-remove-x" (click)="removeLabelFromCard(lbl.id, $event)" title="Remove tag from card">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </span>
+          }
         </div>
 
-        <section class="modal-section">
-          <div class="section-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <line x1="21" y1="10" x2="3" y2="10" />
-              <line x1="21" y1="6" x2="3" y2="6" />
-              <line x1="21" y1="14" x2="3" y2="14" />
-              <line x1="21" y1="18" x2="3" y2="18" />
-            </svg>
-            <h4>Description</h4>
+        <section class="modal-section md-blocks-section">
+          <div class="md-header-row">
+            <div class="section-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="21" y1="10" x2="3" y2="10" />
+                <line x1="21" y1="6" x2="3" y2="6" />
+                <line x1="21" y1="14" x2="3" y2="14" />
+                <line x1="21" y1="18" x2="3" y2="18" />
+              </svg>
+              <h4>Description</h4>
+            </div>
+
+            <!-- Mode Switcher: Blocks / Preview / Markdown -->
+            <div class="md-mode-switch">
+              <button type="button" class="md-mode-btn" [class.active]="descriptionMode === 'blocks'"
+                      (click)="switchMode('blocks')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>
+                </svg>
+                Blocks
+              </button>
+              <button type="button" class="md-mode-btn" [class.active]="descriptionMode === 'preview'"
+                      (click)="switchMode('preview')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+                Preview
+              </button>
+              <button type="button" class="md-mode-btn" [class.active]="descriptionMode === 'raw'"
+                      (click)="switchMode('raw')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                </svg>
+                Markdown
+              </button>
+            </div>
           </div>
-          <textarea [(ngModel)]="card.description" (blur)="saveCardField('description')"
-            placeholder="Add detailed notes, acceptance criteria, or context..."></textarea>
+
+          <!-- MARKDOWN BLOCKS CANVAS WITH DRAG & DROP -->
+          @if (descriptionMode === 'blocks') {
+            <div class="blocks-document-canvas" (click)="onCanvasClick($event)">
+              @for (block of blocks; track block.id; let idx = $index) {
+                <div class="block-row"
+                     [attr.data-block-idx]="idx"
+                     [class.is-active-menu]="activeBlockMenuId === block.id"
+                     [class.is-dragging]="draggedBlockIndex === idx"
+                     [class.drop-before]="dragOverBlockIndex === idx && dragDropPosition === 'before'"
+                     [class.drop-after]="dragOverBlockIndex === idx && dragDropPosition === 'after'"
+                     (dragover)="onBlockDragOver($event, idx)"
+                     (dragleave)="onBlockDragLeave($event, idx)"
+                     (drop)="onBlockDrop($event, idx)">
+
+                  <!-- Block Gutter: + and Drag Handle -->
+                  <div class="block-gutter">
+                    <button type="button" class="gutter-btn add-btn" (click)="$event.stopPropagation(); addBlockBelow(idx)" title="Add block below">
+                      +
+                    </button>
+                    <button type="button" class="gutter-btn handle-btn"
+                            draggable="true"
+                            (dragstart)="onBlockDragStart($event, idx)"
+                            (dragend)="onBlockDragEnd()"
+                            (click)="toggleBlockMenu(block.id, $event)"
+                            title="Drag to reorder, or click for block options">
+                      ⋮⋮
+                    </button>
+
+                    <!-- Block Action Popover Menu -->
+                    @if (activeBlockMenuId === block.id) {
+                      <div class="block-menu-popover" (click)="$event.stopPropagation()">
+                        <div class="popover-section-title">TURN INTO</div>
+                        <div class="popover-turn-grid">
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'text')">
+                            <span class="popover-icon">¶</span> Text
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'h1')">
+                            <span class="popover-icon">H1</span> Heading 1
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'h2')">
+                            <span class="popover-icon">H2</span> Heading 2
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'h3')">
+                            <span class="popover-icon">H3</span> Heading 3
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'todo')">
+                            <span class="popover-icon">☑</span> To-do List
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'bullet')">
+                            <span class="popover-icon">•</span> Bulleted List
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'quote')">
+                            <span class="popover-icon">“</span> Quote
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'callout')">
+                            <span class="popover-icon">💡</span> Callout
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'code')">
+                            <span class="popover-icon">&#123;&nbsp;&#125;</span> Code
+                          </button>
+                          <button type="button" class="popover-item" (click)="setBlockType(block, 'divider')">
+                            <span class="popover-icon">—</span> Divider
+                          </button>
+                        </div>
+
+                        <div class="popover-divider"></div>
+
+                        <div class="popover-actions-list">
+                          <button type="button" class="popover-item" (click)="duplicateBlock(idx)">
+                            <span class="popover-icon">⧉</span> Duplicate
+                          </button>
+                          <button type="button" class="popover-item" (click)="moveBlock(idx, -1)" [disabled]="idx === 0">
+                            <span class="popover-icon">↑</span> Move Up
+                          </button>
+                          <button type="button" class="popover-item" (click)="moveBlock(idx, 1)" [disabled]="idx === blocks.length - 1">
+                            <span class="popover-icon">↓</span> Move Down
+                          </button>
+                          <button type="button" class="popover-item danger" (click)="deleteBlock(idx)">
+                            <span class="popover-icon">✕</span> Delete
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+
+                  <!-- Block Content Body -->
+                  <div class="block-content" [ngClass]="'block-' + block.type">
+                    <!-- Heading 1 -->
+                    @if (block.type === 'h1') {
+                      <textarea #blockInput [(ngModel)]="block.text"
+                        (input)="onBlockInput(block, blockInput)"
+                        (keydown)="onBlockKeydown($event, idx, block)"
+                        (blur)="syncBlocksToMarkdown(true, false)"
+                        class="block-textarea h1-input" rows="1"
+                        placeholder="Heading 1"></textarea>
+                    }
+
+                    <!-- Heading 2 -->
+                    @else if (block.type === 'h2') {
+                      <textarea #blockInput [(ngModel)]="block.text"
+                        (input)="onBlockInput(block, blockInput)"
+                        (keydown)="onBlockKeydown($event, idx, block)"
+                        (blur)="syncBlocksToMarkdown(true, false)"
+                        class="block-textarea h2-input" rows="1"
+                        placeholder="Heading 2"></textarea>
+                    }
+
+                    <!-- Heading 3 -->
+                    @else if (block.type === 'h3') {
+                      <textarea #blockInput [(ngModel)]="block.text"
+                        (input)="onBlockInput(block, blockInput)"
+                        (keydown)="onBlockKeydown($event, idx, block)"
+                        (blur)="syncBlocksToMarkdown(true, false)"
+                        class="block-textarea h3-input" rows="1"
+                        placeholder="Heading 3"></textarea>
+                    }
+
+                    <!-- To-do / Checkbox Block -->
+                    @else if (block.type === 'todo') {
+                      <div class="block-todo-wrap">
+                        <button type="button" class="block-checkbox-box" [class.checked]="block.checked"
+                                (click)="toggleTodoBlock(block)">
+                          @if (block.checked) {
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          }
+                        </button>
+                        <textarea #blockInput [(ngModel)]="block.text"
+                          (input)="onBlockInput(block, blockInput)"
+                          (keydown)="onBlockKeydown($event, idx, block)"
+                          (blur)="syncBlocksToMarkdown(true, false)"
+                          class="block-textarea todo-input" [class.checked]="block.checked" rows="1"
+                          placeholder="To-do"></textarea>
+                      </div>
+                    }
+
+                    <!-- Bullet List Block -->
+                    @else if (block.type === 'bullet') {
+                      <div class="block-bullet-wrap">
+                        <span class="block-bullet-dot">•</span>
+                        <textarea #blockInput [(ngModel)]="block.text"
+                          (input)="onBlockInput(block, blockInput)"
+                          (keydown)="onBlockKeydown($event, idx, block)"
+                          (blur)="syncBlocksToMarkdown(true, false)"
+                          class="block-textarea bullet-input" rows="1"
+                          placeholder="List item"></textarea>
+                      </div>
+                    }
+
+                    <!-- Quote Block -->
+                    @else if (block.type === 'quote') {
+                      <div class="block-quote-wrap">
+                        <textarea #blockInput [(ngModel)]="block.text"
+                          (input)="onBlockInput(block, blockInput)"
+                          (keydown)="onBlockKeydown($event, idx, block)"
+                          (blur)="syncBlocksToMarkdown(true, false)"
+                          class="block-textarea quote-input" rows="1"
+                          placeholder="Empty quote..."></textarea>
+                      </div>
+                    }
+
+                    <!-- Callout Block -->
+                    @else if (block.type === 'callout') {
+                      <div class="block-callout-wrap">
+                        <span class="callout-icon">💡</span>
+                        <textarea #blockInput [(ngModel)]="block.text"
+                          (input)="onBlockInput(block, blockInput)"
+                          (keydown)="onBlockKeydown($event, idx, block)"
+                          (blur)="syncBlocksToMarkdown(true, false)"
+                          class="block-textarea callout-input" rows="1"
+                          placeholder="Note or key insight..."></textarea>
+                      </div>
+                    }
+
+                    <!-- Code Block -->
+                    @else if (block.type === 'code') {
+                      <div class="block-code-wrap">
+                        <div class="code-head">
+                          <span class="code-tag">CODE</span>
+                          <input [(ngModel)]="block.lang" (blur)="syncBlocksToMarkdown(true, false)" class="code-lang-input" placeholder="ts" />
+                        </div>
+                        <textarea #blockInput [(ngModel)]="block.text"
+                          (input)="onBlockInput(block, blockInput)"
+                          (keydown)="onBlockKeydown($event, idx, block)"
+                          (blur)="syncBlocksToMarkdown(true, false)"
+                          class="block-textarea code-input" rows="3"
+                          placeholder="// Code snippet..."></textarea>
+                      </div>
+                    }
+
+                    <!-- Divider Block -->
+                    @else if (block.type === 'divider') {
+                      <div class="block-divider-wrap" tabindex="0" (keydown)="onBlockKeydown($event, idx, block)" title="Divider line (Press Backspace to delete, Enter to add block below)">
+                        <hr class="block-divider-line" />
+                      </div>
+                    }
+
+                    <!-- Default Text Block -->
+                    @else {
+                      <textarea #blockInput [(ngModel)]="block.text"
+                        (input)="onBlockInput(block, blockInput)"
+                        (keydown)="onBlockKeydown($event, idx, block)"
+                        (blur)="syncBlocksToMarkdown(true, false)"
+                        class="block-textarea text-input" rows="1"
+                        placeholder="Type '/' for commands, or write text..."></textarea>
+                    }
+
+                    <!-- Slash Command Menu Popover -->
+                    @if (slashMenuBlockId === block.id) {
+                      <div class="slash-menu-popover" (click)="$event.stopPropagation()">
+                        <div class="slash-header">
+                          <span class="slash-title">BASIC BLOCKS</span>
+                          @if (slashQuery) {
+                            <span class="slash-filter">filtering by "{{ slashQuery }}"</span>
+                          }
+                        </div>
+                        <div class="slash-list">
+                          @for (cmd of filteredSlashCommands; track cmd.type; let i = $index) {
+                            <button type="button" class="slash-item" [class.selected]="i === selectedSlashIndex"
+                                    (click)="applySlashCommand(block, cmd.type)"
+                                    (mouseenter)="selectedSlashIndex = i">
+                              <span class="slash-icon">{{ cmd.icon }}</span>
+                              <div class="slash-text">
+                                <span class="slash-label">{{ cmd.label }}</span>
+                                <span class="slash-desc">{{ cmd.desc }}</span>
+                              </div>
+                            </button>
+                          } @empty {
+                            <div class="slash-empty">No matching blocks found</div>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+
+              <!-- Quick Add Bar -->
+              <div class="canvas-footer" (click)="addBlockBelow(blocks.length - 1)">
+                <span class="footer-plus">+</span>
+                <span class="footer-hint">Click or press Enter to add a new block</span>
+              </div>
+            </div>
+          }
+
+          <!-- RAW MARKDOWN EDITOR MODE -->
+          @else if (descriptionMode === 'raw') {
+            <div class="raw-markdown-container">
+              <div class="raw-tools">
+                <span class="raw-label">Raw Markdown Mode</span>
+                <span class="raw-tip">Edits sync with blocks</span>
+              </div>
+              <textarea [(ngModel)]="card.description" (blur)="saveCardField('description'); initBlocksFromDescription()"
+                class="md-editor-textarea"
+                placeholder="Write raw markdown notes..."></textarea>
+            </div>
+          }
+
+          <!-- RENDERED READING PREVIEW MODE -->
+          @else {
+            <div class="md-preview-container" (click)="onPreviewBlockClick($event)" title="Click anywhere to edit blocks">
+              <div class="preview-edit-hint">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+                <span>Click anywhere to edit blocks</span>
+              </div>
+              @if (card.description && card.description.trim()) {
+                <div class="md-preview-content" [innerHTML]="parsedDescriptionHtml"></div>
+              } @else {
+                <div class="md-empty-preview">
+                  <p>No description provided yet. Click here to add blocks.</p>
+                </div>
+              }
+            </div>
+          }
         </section>
 
         <section class="modal-section">
@@ -136,21 +450,105 @@
           </div>
         </div>
 
-        <div class="aside-row">
-          <label>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-              <path d="M7 7h.01" />
-            </svg>
-            Labels
-          </label>
+        <div class="aside-row tag-management-row">
+          <div class="tag-header-row">
+            <label>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+                <path d="M7 7h.01" />
+              </svg>
+              <span>Tags</span>
+              @if (card.labels && card.labels.length) {
+                <span class="tag-count-bubble">{{ card.labels.length }}</span>
+              }
+            </label>
+            <button type="button" class="btn-create-tag-toggle" (click)="showTagCreator = !showTagCreator"
+                    [class.open]="showTagCreator" title="Create a new custom tag">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>{{ showTagCreator ? 'Close' : 'New Tag' }}</span>
+            </button>
+          </div>
+
+          <!-- Inline Custom Tag Creator -->
+          @if (showTagCreator) {
+            <div class="custom-tag-creator">
+              <div class="creator-title">New Custom Tag</div>
+              <div class="tag-name-input-wrap">
+                <input type="text" [(ngModel)]="newTagName" (keydown.enter)="createCustomTag()"
+                       placeholder="Tag name (e.g. Frontend, Bug, API)..." class="tag-name-input" autofocus />
+              </div>
+
+              <!-- Color Palette & Custom Picker -->
+              <div class="tag-color-palette-label">Tag Color</div>
+              <div class="tag-color-swatches">
+                @for (c of presetColors; track c) {
+                  <button type="button" class="color-swatch-dot"
+                          [style.background]="c"
+                          [class.selected]="newTagColor.toLowerCase() === c.toLowerCase()"
+                          (click)="newTagColor = c"
+                          [title]="c"></button>
+                }
+                <label class="custom-color-input-wrapper" title="Pick custom color">
+                  <input type="color" [(ngModel)]="newTagColor" class="custom-hex-picker" />
+                  <span class="custom-hex-icon">🎨</span>
+                </label>
+              </div>
+
+              <!-- Tag Preview -->
+              @if (newTagName.trim()) {
+                <div class="tag-preview-wrap">
+                  <span class="preview-label">Preview:</span>
+                  <span class="preview-tag-pill" [style.background]="newTagColor + '22'" [style.borderColor]="newTagColor" [style.color]="newTagColor">
+                    <span class="tag-preview-dot" [style.background]="newTagColor"></span>
+                    {{ newTagName.trim() }}
+                  </span>
+                </div>
+              }
+
+              <div class="creator-actions">
+                <button type="button" class="btn primary btn-xs" (click)="createCustomTag()" [disabled]="!newTagName.trim()">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Add Tag</span>
+                </button>
+                <button type="button" class="btn ghost btn-xs" (click)="showTagCreator = false">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          }
+
+          <!-- Search / Filter existing tags if multiple -->
+          @if (boardLabels.length > 5) {
+            <div class="tag-search-box">
+              <input type="text" [(ngModel)]="tagSearchQuery" placeholder="Search tags..." class="tag-search-input" />
+            </div>
+          }
+
+          <!-- Available Tags List -->
           <div class="labels-list">
-            @for (lbl of boardLabels; track lbl.id) {
-              <label class="label-pill" [style.background]="lbl.color + '22'" [style.borderColor]="lbl.color" [style.color]="lbl.color">
-                <input type="checkbox" [checked]="hasLabel(lbl.id)" (change)="toggleLabel(lbl.id)" />
-                <span>{{ lbl.name }}</span>
-              </label>
+            @for (lbl of filteredBoardLabels; track lbl.id) {
+              <div class="label-chip-item" [class.active]="hasLabel(lbl.id)">
+                <label class="label-pill"
+                       [style.background]="hasLabel(lbl.id) ? (lbl.color + '26') : 'var(--bg-surface-elevated)'"
+                       [style.borderColor]="hasLabel(lbl.id) ? lbl.color : 'var(--border-subtle)'"
+                       [style.color]="hasLabel(lbl.id) ? lbl.color : 'var(--text-secondary)'">
+                  <input type="checkbox" [checked]="hasLabel(lbl.id)" (change)="toggleLabel(lbl.id)" />
+                  <span class="label-dot" [style.background]="lbl.color"></span>
+                  <span class="label-name-text">{{ lbl.name }}</span>
+                </label>
+                <button type="button" class="btn-delete-tag" (click)="deleteBoardLabel(lbl.id, $event)" title="Delete tag from board">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            } @empty {
+              <p class="empty-tags-hint">No tags yet. Click "+ New Tag" to create one.</p>
             }
           </div>
         </div>
@@ -164,14 +562,14 @@
             Card Cover
           </label>
           <div class="cover-gradient-presets">
-            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #0f172a, #1e3a8a)')"
-              style="background:linear-gradient(135deg, #1e3a8a, #3b82f6);" title="Midnight Slate"></button>
-            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #064e3b, #047857)')"
-              style="background:linear-gradient(135deg, #0f766e, #14b8a6);" title="Forest Emerald"></button>
-            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #1e1b4b, #3730a3)')"
-              style="background:linear-gradient(135deg, #4338ca, #6366f1);" title="Deep Indigo"></button>
-            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #27272a, #3f3f46)')"
-              style="background:linear-gradient(135deg, #c2410c, #f97316);" title="Zinc Neutral"></button>
+            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #163832, #235e54)')"
+              style="background:linear-gradient(135deg, #163832, #52b8a6);" title="Verdigris Studio"></button>
+            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #3d2417, #5c3520)')"
+              style="background:linear-gradient(135deg, #3d2417, #d99a3d);" title="Warm Amber"></button>
+            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #1f2d3d, #2d4157)')"
+              style="background:linear-gradient(135deg, #1f2d3d, #6b9bc4);" title="Slate Slate"></button>
+            <button type="button" class="cover-preset-dot" (click)="setCover('linear-gradient(135deg, #1a1917, #302d2a)')"
+              style="background:linear-gradient(135deg, #1a1917, #45423e);" title="Graphite Dark"></button>
             <button type="button" class="cover-preset-dot clear" (click)="setCover('')" title="Remove Cover">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />

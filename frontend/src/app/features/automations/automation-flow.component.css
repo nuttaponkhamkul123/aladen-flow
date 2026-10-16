@@ -15,7 +15,7 @@
   width: 100%;
   height: 100%;
   position: relative;
-  background: var(--bg-app);
+  background: transparent;
   user-select: none;
 }
 
@@ -27,9 +27,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 18px;
-  background: var(--bg-surface);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--glass-surface-header);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: inset 0 -1px 0 var(--glass-specular);
   z-index: 20;
   gap: 16px;
   flex-shrink: 0;
@@ -396,10 +398,13 @@
   position: absolute;
   width: 250px;
   border-radius: 12px;
-  background: var(--bg-surface-elevated);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-md);
+  background: var(--glass-surface-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-top: 1px solid var(--glass-border-top);
+  border-left: 1px solid var(--glass-border-left);
+  box-shadow: var(--glass-shadow);
   cursor: grab;
   z-index: 10;
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.08s;
@@ -413,7 +418,8 @@
 
 .flow-node-card.selected {
   border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 1px var(--accent-primary), var(--shadow-lg);
+  border-top-color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: var(--glass-shadow-hover), 0 0 16px rgba(82, 184, 166, 0.3);
 }
 
 /* Node Color Themes */
@@ -590,10 +596,11 @@
 .node-inspector-panel {
   width: 320px;
   height: 100%;
-  background: var(--bg-surface);
-  backdrop-filter: blur(20px);
-  border-left: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-lg);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-left: 1px solid var(--glass-border);
+  box-shadow: -1px 0 0 var(--glass-specular), var(--glass-shadow);
   z-index: 15;
   display: flex;
   flex-direction: column;
@@ -606,7 +613,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-surface-header);
+  box-shadow: inset 0 -1px 0 var(--glass-specular);
 }
 
 .inspector-title-group {

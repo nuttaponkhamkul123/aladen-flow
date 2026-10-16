@@ -10,7 +10,7 @@
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background: var(--bg-app);
+  background: transparent;
 }
 
 .app-content-pane {
@@ -30,4 +30,132 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
+}
+
+/* Authentication Loading Splash */
+.auth-loading-splash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: var(--bg-app, #131211);
+  color: var(--text-primary, #f4f2ef);
+}
+
+.splash-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.splash-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2.5px solid var(--border-subtle, rgba(255, 250, 240, 0.08));
+  border-top-color: var(--accent-primary, #52b8a6);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.splash-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #a6a09a);
+  letter-spacing: 0.01em;
+}
+
+/* Full-Page Authentication Gate - Antislop Elegance */
+.auth-gate-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100vw;
+  padding: 32px 16px;
+  box-sizing: border-box;
+  background-color: var(--bg-app, #131211);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(82, 184, 166, 0.12), transparent 70%),
+    radial-gradient(circle at 50% 100%, rgba(217, 154, 61, 0.05), transparent 50%);
+  overflow-y: auto;
+}
+
+.gate-branding-card {
+  text-align: center;
+  max-width: 520px;
+  margin-bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gate-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: var(--radius-xl, 12px);
+  background: var(--bg-surface-elevated, #211f1d);
+  border: 1px solid var(--border-medium, rgba(255, 250, 240, 0.13));
+  box-shadow: var(--shadow-md, 0 4px 10px -2px rgba(0, 0, 0, 0.42));
+  color: var(--accent-primary, #52b8a6);
+  margin-bottom: 14px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gate-logo-badge:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-primary, #52b8a6);
+}
+
+.gate-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text-primary, #f4f2ef);
+  margin: 0;
+}
+
+.gate-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #a6a09a);
+  margin: 8px 0 0 0;
+  line-height: 1.45;
+  max-width: 420px;
+}
+
+.gate-guard-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 5px 12px;
+  background: var(--color-warning-subtle, rgba(217, 154, 61, 0.13));
+  border: 1px solid rgba(217, 154, 61, 0.25);
+  border-radius: var(--radius-pill, 9999px);
+  color: var(--color-warning, #d99a3d);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.gate-form-card {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  justify-content: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

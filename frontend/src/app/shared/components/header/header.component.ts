@@ -7,6 +7,8 @@ import { filter, map } from 'rxjs/operators';
 import { ThemeService, AmbientTheme } from '../../../core/services/theme.service';
 import { BoardService } from '../../../core/services/board.service';
 import { CmsService } from '../../../core/services/cms.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { CmsPage } from '../../../core/models/cms.model';
 
 @Component({
@@ -20,10 +22,13 @@ export class HeaderComponent {
   themeService = inject(ThemeService);
   boardService = inject(BoardService);
   cmsService = inject(CmsService);
+  authService = inject(AuthService);
+  settingsService = inject(SettingsService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
 
   showPagesPopup = false;
+  showUserMenu = signal<boolean>(false);
 
   private routeEvent = toSignal(
     this.router.events.pipe(
@@ -75,9 +80,28 @@ export class HeaderComponent {
     });
   }
 
+  ambientThemes: { id: AmbientTheme; label: string; desc: string; previewClass: string }[] = [
+    { id: 'nebula', label: 'Nebula', desc: 'Cobalt indigo', previewClass: 'swatch-nebula' },
+    { id: 'aurora', label: 'Aurora', desc: 'Subtle emerald', previewClass: 'swatch-aurora' },
+    { id: 'default', label: 'Default Slate', desc: 'Neutral slate', previewClass: 'swatch-default' },
+    { id: 'cyberpunk', label: 'Cyberpunk', desc: 'Obsidian grid', previewClass: 'swatch-cyberpunk' },
+    { id: 'blueprint', label: 'Blueprint', desc: 'Blueprint matrix', previewClass: 'swatch-blueprint' }
+  ];
+
   onAmbientChange(event: Event) {
     const select = event.target as HTMLSelectElement;
     this.themeService.setAmbientTheme(select.value as AmbientTheme);
+  }
+
+  setAmbient(theme: AmbientTheme) {
+    this.themeService.setAmbientTheme(theme);
+  }
+
+  cycleAmbientTheme() {
+    const list: AmbientTheme[] = ['default', 'aurora', 'nebula', 'cyberpunk', 'blueprint'];
+    const idx = list.indexOf(this.themeService.ambientTheme());
+    const next = list[(idx + 1) % list.length];
+    this.themeService.setAmbientTheme(next);
   }
 
   onSearchInput(event: Event) {
@@ -157,5 +181,24 @@ export class HeaderComponent {
       },
       error: (err) => console.error(err)
     });
+  }
+
+  toggleUserMenu() {
+    this.showUserMenu.set(!this.showUserMenu());
+  }
+
+  openAccountSettings() {
+    this.showUserMenu.set(false);
+    this.settingsService.open('account');
+  }
+
+  switchAccount(username: string) {
+    this.showUserMenu.set(false);
+    this.authService.quickSwitchUser(username);
+  }
+
+  logout() {
+    this.showUserMenu.set(false);
+    this.authService.logout().subscribe();
   }
 }

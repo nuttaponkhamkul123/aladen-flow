@@ -1,124 +1,211 @@
-<main class="board"
-      [class]="'board-theme-' + themeService.ambientTheme()"
-      cdkDropList
-      cdkDropListOrientation="horizontal"
-      (cdkDropListDropped)="onColumnDrop($event)">
-
-  @for (col of filteredColumns(); track col.id) {
-    <div class="column" cdkDrag>
-      <!-- Column Header -->
-      <div class="column-header" cdkDragHandle>
-        <div class="column-header-left">
-          <div class="column-dot"></div>
-          <input class="column-title" [value]="col.name" (blur)="onColumnTitleBlur(col, $event)"
-                 (keydown.enter)="$any($event.target).blur()" title="Click to rename" />
-          <span class="column-count">{{ (col.cards || []).length }}</span>
-        </div>
-        <button (click)="deleteColumn(col.id)" class="column-menu" title="Delete column">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
-        </button>
+<div class="kanban-container">
+  @if (activeBoard()?.labels && activeBoard()!.labels!.length > 0) {
+    <div class="board-tags-bar">
+      <div class="tag-filter-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+          <path d="M7 7h.01" />
+        </svg>
+        <span>Tags:</span>
       </div>
+      <button type="button" class="board-tag-chip" [class.active]="!selectedTagFilter()" (click)="clearTagFilter()">
+        All
+      </button>
+      @for (lbl of activeBoard()?.labels || []; track lbl.id) {
+        <button type="button" class="board-tag-chip"
+                [class.active]="selectedTagFilter()?.toLowerCase() === lbl.name.toLowerCase()"
+                [style.background]="selectedTagFilter()?.toLowerCase() === lbl.name.toLowerCase() ? (lbl.color + '26') : null"
+                [style.borderColor]="selectedTagFilter()?.toLowerCase() === lbl.name.toLowerCase() ? lbl.color : null"
+                [style.color]="selectedTagFilter()?.toLowerCase() === lbl.name.toLowerCase() ? lbl.color : null"
+                (click)="toggleTagFilter(lbl.name)">
+          <span class="tag-chip-dot" [style.background]="lbl.color"></span>
+          <span>{{ lbl.name }}</span>
+        </button>
+      }
+      @if (selectedTagFilter()) {
+        <button type="button" class="tag-clear-filter-btn" (click)="clearTagFilter()" title="Clear tag filter">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          <span>Clear filter</span>
+        </button>
+      }
+    </div>
+  }
 
-      <!-- Cards List (CDK drop list) -->
-      <div class="card-list"
-           [id]="'col-' + col.id"
-           cdkDropList
-           [cdkDropListData]="col.cards || []"
-           [cdkDropListConnectedTo]="connectedDropLists()"
-           (cdkDropListDropped)="onCardDrop($event, col.id)">
-        @for (card of col.cards || []; track card.id) {
-          <div class="card" cdkDrag (click)="selectCard(card)">
-            @if (card.cover) {
-              <div class="card-cover-banner"
-                   [style.backgroundImage]="card.cover.startsWith('http') || card.cover.startsWith('data:') ? 'url(' + card.cover + ')' : null"
-                   [style.background]="!card.cover.startsWith('http') && !card.cover.startsWith('data:') ? card.cover : null">
+  <main class="board" [class]="'board-theme-' + themeService.ambientTheme()">
+    <!-- Column Dock Drop List -->
+    <div class="columns-dock"
+         cdkDropList
+         cdkDropListOrientation="horizontal"
+         [cdkDropListData]="filteredColumns()"
+         (cdkDropListDropped)="onColumnDrop($event)">
+
+      @for (col of filteredColumns(); track col.id) {
+        <div class="column" cdkDrag [cdkDragData]="col">
+          <!-- Column Header (entire header draggable via cdkDragHandle) -->
+          <div class="column-header" cdkDragHandle title="Drag to reorder column group">
+            <div class="column-header-left">
+              <div class="column-drag-handle" title="Drag column">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="9" cy="6" r="1.5" fill="currentColor"/>
+                  <circle cx="15" cy="6" r="1.5" fill="currentColor"/>
+                  <circle cx="9" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="15" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="9" cy="18" r="1.5" fill="currentColor"/>
+                  <circle cx="15" cy="18" r="1.5" fill="currentColor"/>
+                </svg>
               </div>
-            }
+              <div class="column-dot"></div>
 
-            @if (card.labels && card.labels.length) {
-              <div class="card-labels">
-                @for (lbl of card.labels; track lbl.id) {
-                  <span class="card-label" [style.background]="lbl.color">
-                    {{ lbl.name }}
-                  </span>
-                }
-              </div>
-            }
-
-            <div class="card-title-text">{{ card.title }}</div>
-
-            <div class="card-meta">
-              <span class="badge" [class]="'priority-' + card.priority">
-                <span class="priority-dot"></span>
-                {{ card.priority }}
-              </span>
-
-              @if (card.checklist && card.checklist.length) {
-                <div class="checklist-progress">
-                  <div class="bar">
-                    <div [style.width.%]="(getChecklistDone(card) / card.checklist.length) * 100"></div>
-                  </div>
-                  <span>{{ getChecklistDone(card) }}/{{ card.checklist.length }}</span>
-                </div>
-              }
-
-              @if (card.due_date) {
-                <span class="due">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:2px">
-                    <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                  {{ card.due_date }}
+              @if (editingColumnId === col.id) {
+                <input class="column-title-input"
+                       [value]="col.name"
+                       (blur)="finishEditingColumn(col, $event)"
+                       (keydown.enter)="$any($event.target).blur()"
+                       (keydown.escape)="editingColumnId = null"
+                       (click)="$event.stopPropagation()"
+                       (mousedown)="$event.stopPropagation()"
+                       autofocus />
+              } @else {
+                <span class="column-title"
+                      (dblclick)="startEditingColumn(col.id, $event)"
+                      title="Double-click or click pencil to rename">
+                  {{ col.name }}
                 </span>
               }
+
+              <span class="column-count">{{ (col.cards || []).length }}</span>
+            </div>
+
+            <div class="column-actions">
+              <button (click)="startEditingColumn(col.id, $event)" class="column-menu" title="Rename column">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
+              </button>
+              <button (click)="deleteColumn(col.id)" class="column-menu column-delete" title="Delete column">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+        <!-- Cards List (CDK drop list) -->
+        <div class="card-list"
+             [id]="'col-' + col.id"
+             cdkDropList
+             [cdkDropListData]="col.cards || []"
+             [cdkDropListConnectedTo]="connectedDropLists()"
+             (cdkDropListDropped)="onCardDrop($event, col.id)">
+          @for (card of col.cards || []; track card.id) {
+            <div class="card glass-card-3d" #cardEl
+                 cdkDrag
+                 (cdkDragStarted)="onCardDragStarted(cardEl)"
+                 (cdkDragEnded)="onCardDragEnded(cardEl)"
+                 (click)="selectCard(card)"
+                 (mousemove)="onCardMouseMove($event, cardEl)"
+                 (mouseleave)="onCardMouseLeave(cardEl)">
+              
+              <!-- iOS 27 Liquid Specular Reflection & Prismatic Edge Layers -->
+              <div class="card-glass-specular" aria-hidden="true"></div>
+              <div class="card-glass-rim" aria-hidden="true"></div>
+
+              <div class="card-content-3d">
+                @if (card.cover) {
+                  <div class="card-cover-banner"
+                       [style.backgroundImage]="card.cover.startsWith('http') || card.cover.startsWith('data:') ? 'url(' + card.cover + ')' : null"
+                       [style.background]="!card.cover.startsWith('http') && !card.cover.startsWith('data:') ? card.cover : null">
+                  </div>
+                }
+
+                @if (card.labels && card.labels.length) {
+                  <div class="card-labels">
+                    @for (lbl of card.labels; track lbl.id) {
+                      <span class="card-label" [style.background]="lbl.color" (click)="onCardTagClick(lbl.name, $event)" [title]="'Filter by: ' + lbl.name">
+                        {{ lbl.name }}
+                      </span>
+                    }
+                  </div>
+                }
+
+                <div class="card-title-text">{{ card.title }}</div>
+
+                <div class="card-meta">
+                  <span class="badge" [class]="'priority-' + card.priority">
+                    <span class="priority-dot"></span>
+                    {{ card.priority }}
+                  </span>
+
+                  @if (card.checklist && card.checklist.length) {
+                    <div class="checklist-progress">
+                      <div class="bar">
+                        <div [style.width.%]="(getChecklistDone(card) / card.checklist.length) * 100"></div>
+                      </div>
+                      <span>{{ getChecklistDone(card) }}/{{ card.checklist.length }}</span>
+                    </div>
+                  }
+
+                  @if (card.due_date) {
+                    <span class="due">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:2px">
+                        <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      {{ card.due_date }}
+                    </span>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Add Card Trigger Button -->
+        @if (addingCardColumnId !== col.id) {
+          <button (click)="openAddCardInput(col.id)" class="add-card-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>Add a card</span>
+          </button>
+        }
+
+        <!-- Add Card Form -->
+        @if (addingCardColumnId === col.id) {
+          <div class="add-card-form open">
+            <textarea [(ngModel)]="newCardTitle" (keydown.enter)="createCard(col.id)" (keydown.escape)="cancelAddCard()"
+                      placeholder="Enter a card title..." autofocus></textarea>
+            <div class="form-actions">
+              <button (click)="createCard(col.id)" class="btn primary btn-sm">Add Card</button>
+              <button (click)="cancelAddCard()" class="btn ghost btn-sm">Cancel</button>
             </div>
           </div>
         }
       </div>
-
-      <!-- Add Card Trigger Button -->
-      @if (addingCardColumnId !== col.id) {
-        <button (click)="openAddCardInput(col.id)" class="add-card-btn">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          <span>Add a card</span>
-        </button>
-      }
-
-      <!-- Add Card Form -->
-      @if (addingCardColumnId === col.id) {
-        <div class="add-card-form open">
-          <textarea [(ngModel)]="newCardTitle" (keydown.enter)="createCard(col.id)" (keydown.escape)="cancelAddCard()"
-                    placeholder="Enter a card title..." autofocus></textarea>
-          <div class="form-actions">
-            <button (click)="createCard(col.id)" class="btn primary btn-sm">Add Card</button>
-            <button (click)="cancelAddCard()" class="btn ghost btn-sm">Cancel</button>
-          </div>
-        </div>
-      }
+    }
     </div>
-  }
 
-  <!-- Interactive Ghost Add Column Card -->
-  <div class="add-column-ghost" (click)="openAddColumnPrompt()" title="Add new column">
-    <div class="ghost-icon">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-      </svg>
+    <!-- Interactive Ghost Add Column Card -->
+    <div class="add-column-ghost" (click)="openAddColumnPrompt()" title="Add new column">
+      <div class="ghost-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </div>
+      <span>Add New Column</span>
     </div>
-    <span>Add New Column</span>
-  </div>
 
-  <!-- Card Detail Modal -->
-  @if (selectedCard) {
-    <app-card-detail-modal
-      [card]="selectedCard"
-      [boardLabels]="activeBoard()?.labels || []"
-      (close)="selectedCard = null"
-      (cardUpdated)="onCardUpdated($event)"
-      (cardDeleted)="onCardDeleted($event)">
-    </app-card-detail-modal>
-  }
-</main>
+    <!-- Card Detail Modal -->
+    @if (selectedCard) {
+      <app-card-detail-modal
+        [card]="selectedCard"
+        [boardLabels]="activeBoard()?.labels || []"
+        (close)="selectedCard = null"
+        (cardUpdated)="onCardUpdated($event)"
+        (cardDeleted)="onCardDeleted($event)"
+        (labelsChanged)="onLabelsChanged()">
+      </app-card-detail-modal>
+    }
+  </main>
+</div>

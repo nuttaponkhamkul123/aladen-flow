@@ -1,249 +1,461 @@
-<div class="dashboard">
+<div class="dashboard 3d-perspective-root">
   @if (loading()) {
-    <div class="dashboard-loading">
-      <div class="spinner"></div>
-      <span>Loading workspace telemetry...</span>
-    </div>
+  <div class="dashboard-loading">
+    <div class="spinner-3d"></div>
+    <span class="loading-label">Initializing 3D Telemetry Arena...</span>
+  </div>
   } @else if (overview(); as data) {
-    <!-- Dashboard Header with Live Status & Quick Action Buttons -->
-    <header class="dash-header">
-      <div class="dash-title-group">
-        <div class="dash-eyebrow">
-          <span class="workspace-live-dot"></span>
-          <span class="workspace-kicker">WORKSPACE TELEMETRY</span>
-        </div>
-        <h1 class="dash-title">Workspace Overview</h1>
-        <p class="dash-subtitle">Real-time metrics across boards, documents, and team activities</p>
+  <!-- Dashboard Header with Live Heartbeat -->
+  <header class="dash-header">
+    <div class="dash-title-group">
+      <div class="dash-eyebrow">
+        <span class="workspace-live-dot pulse-3d"></span>
+        <span class="workspace-kicker">Hello</span>
       </div>
+      <h1 class="dash-title">Workspace Spatial Overview</h1>
+      <p class="dash-subtitle">Multi-dimensional real-time intelligence across projects, cards, and published sites</p>
+    </div>
 
-      <div class="dash-header-actions">
-        <a routerLink="/kanban" class="dash-action-btn secondary">
-          <span>Open Boards</span>
-        </a>
-        <a routerLink="/cms" class="dash-action-btn primary">
-          <span>Site Builder</span>
-        </a>
-      </div>
-    </header>
+    <div class="dash-header-actions">
+      <a routerLink="/kanban" class="dash-action-btn secondary btn-3d">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <path d="M9 3v18" />
+          <path d="M15 3v18" />
+        </svg>
+        <span>Open Boards</span>
+      </a>
+      <a routerLink="/cms" class="dash-action-btn primary btn-3d">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 2 7 12 12 22 7 12 2" />
+          <polyline points="2 17 12 22 22 17" />
+          <polyline points="2 12 12 17 22 12" />
+        </svg>
+        <span>Site Builder</span>
+      </a>
+    </div>
+  </header>
 
-    <!-- Key Metrics Grid: Pure Numbers, Zero Decorative Icon Clutter -->
-    <section class="stats-grid" aria-label="Key Workspace Metrics">
-      <div class="stat-card">
-        <div class="stat-card-header">
+  <!-- Key Metrics: Interactive 3D Tilt Cards -->
+  <section class="stats-grid-3d" aria-label="3D Workspace Key Metrics">
+    <!-- Stat 1: Total Boards -->
+    <div #card1 class="stat-card-3d" (mousemove)="onCardMouseMove($event, card1)"
+      (mouseleave)="onCardMouseLeave(card1)">
+      <div class="card-glass-specular"></div>
+      <div class="stat-card-content">
+        <div class="stat-card-top">
           <span class="stat-kicker">TOTAL BOARDS</span>
+          <div class="stat-icon-badge verdigris">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M9 3v18" />
+            </svg>
+          </div>
         </div>
-        <div class="stat-number-row">
-          <span class="stat-value">{{ data.kanban.totalBoards }}</span>
+        <div class="stat-value-wrap">
+          <span class="stat-value-3d">{{ data.kanban.totalBoards }}</span>
+          <span class="stat-unit">boards</span>
         </div>
         <div class="stat-sub-info">
           <span class="stat-sub-num">{{ (data.kanban.boardProgress || []).length }}</span>
-          <span class="stat-sub-text">active projects configured</span>
+          <span class="stat-sub-text">active workspaces</span>
         </div>
-        <div class="stat-footer-bar">
-          <div class="stat-bar-fill" style="width: 100%;"></div>
+        <div class="stat-footer-bar-3d">
+          <div class="stat-bar-fill-3d verdigris" style="width: 100%;"></div>
         </div>
       </div>
+    </div>
 
-      <div class="stat-card">
-        <div class="stat-card-header">
-          <span class="stat-kicker">TRACKED CARDS</span>
+    <!-- Stat 2: Tracked Cards -->
+    <div #card2 class="stat-card-3d" (mousemove)="onCardMouseMove($event, card2)"
+      (mouseleave)="onCardMouseLeave(card2)">
+      <div class="card-glass-specular"></div>
+      <div class="stat-card-content">
+        <div class="stat-card-top">
+          <span class="stat-kicker">TOTAL CARDS</span>
+          <div class="stat-icon-badge amber">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+          </div>
         </div>
-        <div class="stat-number-row">
-          <span class="stat-value">{{ data.kanban.totalCards }}</span>
+        <div class="stat-value-wrap">
+          <span class="stat-value-3d">{{ data.kanban.totalCards }}</span>
+          <span class="stat-unit">tasks</span>
         </div>
         <div class="stat-sub-info">
           <span class="stat-sub-num warning">{{ data.kanban.doingCards }}</span>
-          <span class="stat-sub-text">in progress</span>
+          <span class="stat-sub-text">in flight</span>
           <span class="stat-sub-sep">/</span>
           <span class="stat-sub-num success">{{ data.kanban.doneCards }}</span>
-          <span class="stat-sub-text">closed</span>
+          <span class="stat-sub-text">done</span>
         </div>
-        <div class="stat-footer-bar">
-          <div class="stat-bar-fill warning" [style.width.%]="data.kanban.totalCards ? (data.kanban.doingCards / data.kanban.totalCards) * 100 : 0"></div>
+        <div class="stat-footer-bar-3d">
+          <div class="stat-bar-fill-3d amber"
+            [style.width.%]="data.kanban.totalCards ? (data.kanban.doingCards / data.kanban.totalCards) * 100 : 0">
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="stat-card">
-        <div class="stat-card-header">
+    <!-- Stat 3: CMS Pages -->
+    <div #card3 class="stat-card-3d" (mousemove)="onCardMouseMove($event, card3)"
+      (mouseleave)="onCardMouseLeave(card3)">
+      <div class="card-glass-specular"></div>
+      <div class="stat-card-content">
+        <div class="stat-card-top">
           <span class="stat-kicker">CMS PAGES</span>
+          <div class="stat-icon-badge slate">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+          </div>
         </div>
-        <div class="stat-number-row">
-          <span class="stat-value">{{ data.cms.totalPages }}</span>
+        <div class="stat-value-wrap">
+          <span class="stat-value-3d">{{ data.cms.totalPages }}</span>
+          <span class="stat-unit">pages</span>
         </div>
         <div class="stat-sub-info">
-          <span class="stat-sub-num purple">{{ data.cms.publishedPages }}</span>
-          <span class="stat-sub-text">published</span>
+          <span class="stat-sub-num success">{{ data.cms.publishedPages }}</span>
+          <span class="stat-sub-text">live</span>
           <span class="stat-sub-sep">/</span>
           <span class="stat-sub-num">{{ data.cms.draftPages }}</span>
           <span class="stat-sub-text">drafts</span>
         </div>
-        <div class="stat-footer-bar">
-          <div class="stat-bar-fill purple" [style.width.%]="data.cms.totalPages ? ((data.cms.totalPages - data.cms.draftPages) / data.cms.totalPages) * 100 : 0"></div>
+        <div class="stat-footer-bar-3d">
+          <div class="stat-bar-fill-3d slate"
+            [style.width.%]="data.cms.totalPages ? (data.cms.publishedPages / data.cms.totalPages) * 100 : 0"></div>
         </div>
       </div>
+    </div>
 
-      <div class="stat-card">
-        <div class="stat-card-header">
-          <span class="stat-kicker">PUBLISHED RATIO</span>
+    <!-- Stat 4: Production Ratio -->
+    <div #card4 class="stat-card-3d" (mousemove)="onCardMouseMove($event, card4)"
+      (mouseleave)="onCardMouseLeave(card4)">
+      <div class="card-glass-specular"></div>
+      <div class="stat-card-content">
+        <div class="stat-card-top">
+          <span class="stat-kicker">COMPLETION VELOCITY</span>
+          <div class="stat-icon-badge sage">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12A10 10 0 1 1 12 2" />
+              <path d="M22 2 12 12" />
+            </svg>
+          </div>
         </div>
-        <div class="stat-number-row">
-          <span class="stat-value">{{ data.cms.totalPages ? Math.round((data.cms.publishedPages / data.cms.totalPages) * 100) : 0 }}%</span>
+        <div class="stat-value-wrap">
+          <span class="stat-value-3d">{{ data.kanban.totalCards ? Math.round((data.kanban.doneCards /
+            data.kanban.totalCards) * 100) : 0 }}%</span>
+          <span class="stat-unit">resolved</span>
         </div>
         <div class="stat-sub-info">
-          <span class="stat-sub-num success">{{ data.cms.publishedPages }}</span>
-          <span class="stat-sub-text">of</span>
-          <span class="stat-sub-num">{{ data.cms.totalPages }}</span>
-          <span class="stat-sub-text">pages live in production</span>
+          <span class="stat-sub-num success">{{ data.kanban.doneCards }}</span>
+          <span class="stat-sub-text">of {{ data.kanban.totalCards }} tasks completed</span>
         </div>
-        <div class="stat-footer-bar">
-          <div class="stat-bar-fill success" [style.width.%]="data.cms.totalPages ? (data.cms.publishedPages / data.cms.totalPages) * 100 : 0"></div>
+        <div class="stat-footer-bar-3d">
+          <div class="stat-bar-fill-3d sage"
+            [style.width.%]="data.kanban.totalCards ? (data.kanban.doneCards / data.kanban.totalCards) * 100 : 0"></div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Main Two-Column Analytics Grid -->
-    <div class="dash-grid">
-      <!-- Left Column: Kanban Analytics & Board Progress -->
-      <div class="dash-col">
-        <!-- Card Distribution Breakdown -->
-        <section class="dash-panel">
-          <div class="panel-header">
-            <h3 class="panel-title">Card Distribution</h3>
-            <span class="panel-metric-num">{{ data.kanban.totalCards }} cards</span>
+  <!-- Visualized 3D Stage & Distribution Arena -->
+  <section class="arena-3d-panel">
+    <div class="panel-header-3d">
+      <div class="panel-header-info">
+        <span class="arena-badge">SPATIAL VISUALIZER</span>
+        <h2 class="panel-title-3d">Card Lifecycle & Volumetric Distribution</h2>
+      </div>
+      <div class="arena-legend">
+        <span class="legend-chip todo"><i class="legend-dot todo"></i> To Do ({{ data.kanban.todoCards }})</span>
+        <span class="legend-chip doing"><i class="legend-dot doing"></i> Doing ({{ data.kanban.doingCards }})</span>
+        <span class="legend-chip done"><i class="legend-dot done"></i> Done ({{ data.kanban.doneCards }})</span>
+        <span class="legend-chip urgent"><i class="legend-dot urgent"></i> High Priority ({{
+          data.kanban.highPriorityCards }})</span>
+      </div>
+    </div>
+
+    <div class="arena-stage-split">
+      <!-- 3D Isometric Donut Ring -->
+      <div class="donut-3d-container">
+        <div class="donut-3d-disc">
+          <!-- Ambient Shadow underneath the 3D ring -->
+          <div class="donut-shadow-ellipse"></div>
+
+          <svg class="donut-svg-3d" viewBox="0 0 200 200" width="220" height="220">
+            <defs>
+              <!-- Gradients for 3D Arc Illumination -->
+              <linearGradient id="gradTodo" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#8baed4" />
+                <stop offset="100%" stop-color="#4a7ba5" />
+              </linearGradient>
+              <linearGradient id="gradDoing" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f5ba58" />
+                <stop offset="100%" stop-color="#d98926" />
+              </linearGradient>
+              <linearGradient id="gradDone" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#73c485" />
+                <stop offset="100%" stop-color="#3d824d" />
+              </linearGradient>
+              <linearGradient id="gradUrgent" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f0726a" />
+                <stop offset="100%" stop-color="#b83832" />
+              </linearGradient>
+              <!-- Inner depth filter -->
+              <filter id="ringDepth" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="6" stdDeviation="4" flood-color="#000000" flood-opacity="0.6" />
+              </filter>
+            </defs>
+
+            <!-- Track background ring -->
+            <circle cx="100" cy="100" r="65" class="donut-ring-track" />
+
+            <!-- Slices -->
+            @if (data.kanban.totalCards > 0) {
+            <!-- To Do Segment -->
+            <circle cx="100" cy="100" r="65" class="donut-slice todo"
+              [attr.stroke-dasharray]="getSegmentDash(data.kanban.todoCards, data.kanban.totalCards)"
+              [attr.stroke-dashoffset]="0" (mouseenter)="hoveredSegment.set('todo')"
+              (mouseleave)="hoveredSegment.set(null)" filter="url(#ringDepth)" />
+            <!-- Doing Segment -->
+            <circle cx="100" cy="100" r="65" class="donut-slice doing"
+              [attr.stroke-dasharray]="getSegmentDash(data.kanban.doingCards, data.kanban.totalCards)"
+              [attr.stroke-dashoffset]="getSegmentOffset(data.kanban.todoCards, data.kanban.totalCards)"
+              (mouseenter)="hoveredSegment.set('doing')" (mouseleave)="hoveredSegment.set(null)"
+              filter="url(#ringDepth)" />
+            <!-- Done Segment -->
+            <circle cx="100" cy="100" r="65" class="donut-slice done"
+              [attr.stroke-dasharray]="getSegmentDash(data.kanban.doneCards, data.kanban.totalCards)"
+              [attr.stroke-dashoffset]="getSegmentOffset(data.kanban.todoCards + data.kanban.doingCards, data.kanban.totalCards)"
+              (mouseenter)="hoveredSegment.set('done')" (mouseleave)="hoveredSegment.set(null)"
+              filter="url(#ringDepth)" />
+            }
+          </svg>
+
+          <!-- Floating 3D Core Hub -->
+          <div class="donut-core-hub">
+            <span class="hub-label">CARDS</span>
+            <span class="hub-value">{{ data.kanban.totalCards }}</span>
+            <span class="hub-sub">{{ data.kanban.doingCards }} active</span>
+          </div>
+        </div>
+        <span class="donut-hint">Interactive 3D Stage Ring</span>
+      </div>
+
+      <!-- 3D Isometric Columns (Pillars) Flow -->
+      <div class="pillars-3d-arena">
+        <div class="pillars-scene">
+          <!-- Stage 1: Backlog / To Do -->
+          <div class="pillar-group" title="To Do: {{ data.kanban.todoCards }} cards">
+            <div class="pillar-column todo"
+              [style.height.px]="getPillarHeight(data.kanban.todoCards, data.kanban.totalCards)">
+              <div class="pillar-face top"></div>
+              <div class="pillar-face front">
+                <span class="pillar-face-num">{{ data.kanban.todoCards }}</span>
+              </div>
+              <div class="pillar-face side"></div>
+            </div>
+            <div class="pillar-base-shadow"></div>
+            <div class="pillar-label-box">
+              <span class="pillar-title">TO DO</span>
+              <span class="pillar-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.todoCards /
+                data.kanban.totalCards) * 100) : 0 }}%</span>
+            </div>
           </div>
 
-          <!-- Multi-segment Distribution Bar -->
-          @if (data.kanban.totalCards > 0) {
-            <div class="distribution-stacked-bar">
-              <div class="seg-fill todo" [style.width.%]="(data.kanban.todoCards / data.kanban.totalCards) * 100" title="To Do: {{ data.kanban.todoCards }}"></div>
-              <div class="seg-fill doing" [style.width.%]="(data.kanban.doingCards / data.kanban.totalCards) * 100" title="In Progress: {{ data.kanban.doingCards }}"></div>
-              <div class="seg-fill done" [style.width.%]="(data.kanban.doneCards / data.kanban.totalCards) * 100" title="Done: {{ data.kanban.doneCards }}"></div>
+          <!-- Stage 2: In Progress / Doing -->
+          <div class="pillar-group active" title="In Progress: {{ data.kanban.doingCards }} cards">
+            <div class="pillar-column doing"
+              [style.height.px]="getPillarHeight(data.kanban.doingCards, data.kanban.totalCards)">
+              <div class="pillar-face top"></div>
+              <div class="pillar-face front">
+                <span class="pillar-face-num">{{ data.kanban.doingCards }}</span>
+              </div>
+              <div class="pillar-face side"></div>
             </div>
+            <div class="pillar-base-shadow active"></div>
+            <div class="pillar-label-box active">
+              <span class="pillar-title">DOING</span>
+              <span class="pillar-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.doingCards /
+                data.kanban.totalCards) * 100) : 0 }}%</span>
+            </div>
+          </div>
+
+          <!-- Stage 3: Completed / Done -->
+          <div class="pillar-group" title="Done: {{ data.kanban.doneCards }} cards">
+            <div class="pillar-column done"
+              [style.height.px]="getPillarHeight(data.kanban.doneCards, data.kanban.totalCards)">
+              <div class="pillar-face top"></div>
+              <div class="pillar-face front">
+                <span class="pillar-face-num">{{ data.kanban.doneCards }}</span>
+              </div>
+              <div class="pillar-face side"></div>
+            </div>
+            <div class="pillar-base-shadow"></div>
+            <div class="pillar-label-box">
+              <span class="pillar-title">DONE</span>
+              <span class="pillar-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.doneCards /
+                data.kanban.totalCards) * 100) : 0 }}%</span>
+            </div>
+          </div>
+
+          <!-- Stage 4: Urgent / High Priority Flag -->
+          <div class="pillar-group urgent" title="High Priority: {{ data.kanban.highPriorityCards }} cards">
+            <div class="pillar-column urgent"
+              [style.height.px]="getPillarHeight(data.kanban.highPriorityCards, data.kanban.totalCards)">
+              <div class="pillar-face top"></div>
+              <div class="pillar-face front">
+                <span class="pillar-face-num">{{ data.kanban.highPriorityCards }}</span>
+              </div>
+              <div class="pillar-face side"></div>
+            </div>
+            <div class="pillar-base-shadow urgent"></div>
+            <div class="pillar-label-box urgent">
+              <span class="pillar-title">URGENT</span>
+              <span class="pillar-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.highPriorityCards /
+                data.kanban.totalCards) * 100) : 0 }}%</span>
+            </div>
+          </div>
+        </div>
+        <span class="pillars-hint">Volumetric Column Elevation (Height scales with task density)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Two-Column Spatial Grids -->
+  <div class="dash-grid-3d">
+    <!-- Left Column: 3D Board Progression & Completion Depth Cards -->
+    <div class="dash-col-3d">
+      <section class="dash-panel-3d">
+        <div class="panel-header-3d">
+          <div class="header-icon-title">
+            <span class="panel-icon verdigris">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3h7v9H3z" />
+                <path d="M14 3h7v5h-7z" />
+                <path d="M14 12h7v9h-7z" />
+                <path d="M3 16h7v5H3z" />
+              </svg>
+            </span>
+            <h3 class="panel-title-3d">Board Progress Tracking</h3>
+          </div>
+          <span class="panel-metric-num">{{ (data.kanban.boardProgress || []).length }} boards</span>
+        </div>
+
+        <div class="board-progress-3d-list">
+          @for (board of data.kanban.boardProgress; track board.id) {
+          <div class="board-item-3d">
+            <div class="board-item-top">
+              <div class="board-item-meta">
+                <span class="board-name-3d">{{ board.name }}</span>
+                <span class="board-count-chip">{{ board.done }} of {{ board.total }} done</span>
+              </div>
+              <div class="board-pct-tag" [class.complete]="board.percentage === 100">
+                {{ board.percentage }}%
+              </div>
+            </div>
+            <!-- 3D Extruded Depth Track -->
+            <div class="progress-track-3d">
+              <div class="progress-fill-3d" [style.width.%]="board.percentage"
+                [class.complete]="board.percentage === 100">
+                <div class="fill-cap-glow"></div>
+              </div>
+            </div>
+          </div>
+          } @empty {
+          <div class="panel-empty-state-3d">
+            <p>No active boards configured in this workspace</p>
+          </div>
           }
+        </div>
+      </section>
 
-          <div class="breakdown-grid">
-            <div class="breakdown-item">
-              <div class="breakdown-meta">
-                <span class="breakdown-name">To Do</span>
-                <span class="breakdown-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.todoCards / data.kanban.totalCards) * 100) : 0 }}%</span>
-              </div>
-              <span class="breakdown-count todo">{{ data.kanban.todoCards }}</span>
-            </div>
-
-            <div class="breakdown-item">
-              <div class="breakdown-meta">
-                <span class="breakdown-name">In Progress</span>
-                <span class="breakdown-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.doingCards / data.kanban.totalCards) * 100) : 0 }}%</span>
-              </div>
-              <span class="breakdown-count doing">{{ data.kanban.doingCards }}</span>
-            </div>
-
-            <div class="breakdown-item">
-              <div class="breakdown-meta">
-                <span class="breakdown-name">Completed</span>
-                <span class="breakdown-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.doneCards / data.kanban.totalCards) * 100) : 0 }}%</span>
-              </div>
-              <span class="breakdown-count done">{{ data.kanban.doneCards }}</span>
-            </div>
-
-            <div class="breakdown-item">
-              <div class="breakdown-meta">
-                <span class="breakdown-name">High Priority</span>
-                <span class="breakdown-pct">{{ data.kanban.totalCards ? Math.round((data.kanban.highPriorityCards / data.kanban.totalCards) * 100) : 0 }}%</span>
-              </div>
-              <span class="breakdown-count urgent">{{ data.kanban.highPriorityCards }}</span>
-            </div>
+      <!-- CMS Document Space in 3D -->
+      <section class="dash-panel-3d">
+        <div class="panel-header-3d">
+          <div class="header-icon-title">
+            <span class="panel-icon slate">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+              </svg>
+            </span>
+            <h3 class="panel-title-3d">Site Architecture</h3>
           </div>
-        </section>
+          <span class="panel-metric-num">{{ (data.cms.recentPages || []).length }} pages</span>
+        </div>
 
-        <!-- Board Completion Progress -->
-        <section class="dash-panel">
-          <div class="panel-header">
-            <h3 class="panel-title">Board Completion</h3>
-            <span class="panel-metric-num">{{ (data.kanban.boardProgress || []).length }} boards</span>
-          </div>
-
-          <div class="progress-list">
-            @for (board of data.kanban.boardProgress; track board.id) {
-              <div class="board-progress-card">
-                <div class="board-progress-top">
-                  <span class="board-title">{{ board.name }}</span>
-                  <div class="board-numbers">
-                    <span class="board-ratio">{{ board.done }} / {{ board.total }}</span>
-                    <span class="board-pct-num" [class.complete]="board.percentage === 100">{{ board.percentage }}%</span>
-                  </div>
-                </div>
-                <div class="board-progress-track">
-                  <div class="board-progress-fill" [style.width.%]="board.percentage" [class.complete]="board.percentage === 100"></div>
-                </div>
-              </div>
-            } @empty {
-              <div class="panel-empty-state">
-                <p>No boards configured in workspace</p>
-              </div>
-            }
-          </div>
-        </section>
-      </div>
-
-      <!-- Right Column: Recent Activity & Published Documents -->
-      <div class="dash-col">
-        <!-- Recent Activity Feed -->
-        <section class="dash-panel">
-          <div class="panel-header">
-            <h3 class="panel-title">Workspace Activity</h3>
-            <span class="panel-metric-num">{{ data.recentActivities.length }} events</span>
-          </div>
-
-          <div class="activity-feed">
-            @for (act of data.recentActivities; track act.id) {
-              <div class="activity-feed-row">
-                <span class="activity-time-text">{{ getTimeAgo(act.created_at) }}</span>
-                <div class="activity-feed-body">
-                  <p class="activity-message-text">{{ act.message }}</p>
-                  @if (act.board_name) {
-                    <span class="activity-board-tag">{{ act.board_name }}</span>
-                  }
-                </div>
-              </div>
-            } @empty {
-              <div class="panel-empty-state">
-                <p>No recent activity recorded</p>
-              </div>
-            }
-          </div>
-        </section>
-
-        <!-- CMS Documents & Pages -->
-        <section class="dash-panel">
-          <div class="panel-header">
-            <h3 class="panel-title">Site Documents</h3>
-            <span class="panel-metric-num">{{ (data.cms.recentPages || []).length }} pages</span>
-          </div>
-
-          <div class="documents-list">
-            @for (page of data.cms.recentPages; track page.id) {
-              <a class="document-item-row" routerLink="/cms">
-                <div class="document-info">
-                  <span class="document-name">{{ page.title }}</span>
-                  <span class="document-slug">/p/{{ page.slug }}</span>
-                </div>
-                <div class="document-status" [class.published]="page.status === 'published'">
+        <div class="documents-grid-3d">
+          @for (page of data.cms.recentPages; track page.id) {
+          <a class="doc-card-3d" routerLink="/cms">
+            <div class="doc-card-depth-edge"></div>
+            <div class="doc-card-inner">
+              <div class="doc-card-head">
+                <span class="doc-card-title">{{ page.title }}</span>
+                <span class="doc-card-badge" [class.published]="page.status === 'published'">
                   {{ page.status }}
-                </div>
-              </a>
-            } @empty {
-              <div class="panel-empty-state">
-                <p>No site pages created yet</p>
+                </span>
               </div>
-            }
+              <span class="doc-card-slug">/p/{{ page.slug }}</span>
+            </div>
+          </a>
+          } @empty {
+          <div class="panel-empty-state-3d">
+            <p>No published site documents yet</p>
           </div>
-        </section>
-      </div>
+          }
+        </div>
+      </section>
     </div>
+
+    <!-- Right Column: 3D Holographic Activity Spine -->
+    <div class="dash-col-3d">
+      <section class="dash-panel-3d">
+        <div class="panel-header-3d">
+          <div class="header-icon-title">
+            <span class="panel-icon amber">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </span>
+            <h3 class="panel-title-3d">Telemetry Activity Stream</h3>
+          </div>
+          <span class="panel-metric-num">{{ data.recentActivities.length }} events</span>
+        </div>
+
+        <div class="activity-timeline-3d">
+          <!-- 3D Continuous Luminous Spine -->
+          <div class="timeline-spine-line"></div>
+
+          @for (act of data.recentActivities; track act.id) {
+          <div class="timeline-entry-3d">
+            <div class="timeline-bead-3d">
+              <div class="bead-inner-light"></div>
+            </div>
+            <div class="timeline-card-3d">
+              <div class="timeline-card-meta">
+                <span class="timeline-time-tag">{{ getTimeAgo(act.created_at) }}</span>
+                @if (act.board_name) {
+                <span class="timeline-board-chip">{{ act.board_name }}</span>
+                }
+              </div>
+              <p class="timeline-msg">{{ act.message }}</p>
+            </div>
+          </div>
+          } @empty {
+          <div class="panel-empty-state-3d">
+            <p>No telemetry events logged</p>
+          </div>
+          }
+        </div>
+      </section>
+    </div>
+  </div>
   } @else {
-    <div class="dashboard-empty">
-      <p>Failed to connect to workspace database telemetry.</p>
-    </div>
+  <div class="dashboard-empty">
+    <p>Failed to connect to workspace database telemetry.</p>
+  </div>
   }
 </div>

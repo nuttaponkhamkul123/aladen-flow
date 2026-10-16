@@ -33,30 +33,215 @@ if (fs.existsSync(distBrowserPath)) {
 }
 app.use(express.static(path.join(__dirname, 'public')));
 
-function logActivity(cardId, boardId, message) {
-  db.prepare('INSERT INTO activities (card_id, board_id, message) VALUES (?, ?, ?)').run(
+const auth = require('./auth');
+
+function logActivity(cardId, boardId, message, userId = null) {
+  if (!userId && boardId) {
+    try {
+      const b = db.prepare('SELECT user_id FROM boards WHERE id = ?').get(boardId);
+      if (b) userId = b.user_id;
+    } catch (_) {}
+  }
+  if (!userId && cardId) {
+    try {
+      const c = db.prepare('SELECT b.user_id FROM cards c JOIN columns col ON col.id = c.column_id JOIN boards b ON b.id = col.board_id WHERE c.id = ?').get(cardId);
+      if (c) userId = c.user_id;
+    } catch (_) {}
+  }
+  db.prepare('INSERT INTO activities (card_id, board_id, message, user_id) VALUES (?, ?, ?, ?)').run(
     cardId || null,
     boardId || null,
-    message
+    message,
+    userId || 1
   );
 }
 
-// Consolidated Workspace Overview & Statistics
+// ==================== AUTH & USER SETTINGS ====================
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { username, password, email, displayName } = req.body;
+    if (!username || !username.trim()) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    const cleanUsername = username.trim().toLowerCase();
+    if (!/^[a-zA-Z0-9_-]{3,20}$/.test(cleanUsername)) {
+      return res.status(400).json({ error: 'Username must be 3-20 characters (letters, numbers, underscores)' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const existing = db.prepare('SELECT id FROM users WHERE LOWER(username) = ? OR (email IS NOT NULL AND LOWER(email) = ?)').get(cleanUsername, (email || '').toLowerCase());
+    if (existing) {
+      return res.status(409).json({ error: 'Username or email already taken' });
+    }
+
+    const { hash, salt } = auth.hashPassword(password);
+    const cleanEmail = email && email.trim() ? email.trim().toLowerCase() : null;
+    const cleanName = displayName && displayName.trim() ? displayName.trim() : username.trim();
+    const avatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`;
+
+    const info = db.prepare(`
+      INSERT INTO users (username, email, password_hash, salt, display_name, avatar_url)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(cleanUsername, cleanEmail, hash, salt, cleanName, avatar);
+
+    const userId = Number(info.lastInsertRowid);
+    if (db.seedUserWorkspace) {
+      db.seedUserWorkspace(userId, cleanUsername, cleanName);
+    }
+    const settings = auth.getUserSettings(userId);
+    const { token, expiresAt } = auth.createSession(userId);
+
+    res.json({
+      user: {
+        id: userId,
+        username: cleanUsername,
+        email: cleanEmail,
+        display_name: cleanName,
+        avatar_url: avatar
+      },
+      token,
+      expiresAt,
+      settings
+    });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Failed to create user account' });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    const cleanInput = username.trim().toLowerCase();
+    const user = db.prepare(`
+      SELECT * FROM users
+      WHERE LOWER(username) = ? OR LOWER(email) = ?
+    `).get(cleanInput, cleanInput);
+
+    if (!user || !auth.verifyPassword(password, user.password_hash, user.salt)) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const { token, expiresAt } = auth.createSession(user.id);
+    const settings = auth.getUserSettings(user.id);
+
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name || user.username,
+        avatar_url: user.avatar_url
+      },
+      token,
+      expiresAt,
+      settings
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const user = auth.getAuthUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const settings = auth.getUserSettings(user.id);
+  res.json({ user, settings });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (token) {
+      db.prepare('DELETE FROM user_sessions WHERE token = ?').run(token);
+    }
+  }
+  res.json({ ok: true });
+});
+
+app.get('/api/auth/users', (req, res) => {
+  const users = db.prepare(`
+    SELECT u.id, u.username, u.display_name, u.avatar_url, u.email,
+           s.theme_mode, s.ambient_theme, s.ai_provider
+    FROM users u
+    LEFT JOIN user_settings s ON s.user_id = u.id
+    ORDER BY u.id ASC
+  `).all();
+  res.json(users);
+});
+
+app.get('/api/users/settings', (req, res) => {
+  const user = auth.getAuthUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const settings = auth.getUserSettings(user.id);
+  res.json(settings);
+});
+
+app.patch('/api/users/settings', (req, res) => {
+  const user = auth.getAuthUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const updated = auth.updateUserSettings(user.id, req.body);
+  res.json(updated);
+});
+
+// ==================== AUTHENTICATION GATE MIDDLEWARE ====================
+// Protect all /api/ workspace & feature routes so unauthenticated users cannot access features
+app.use('/api', (req, res, next) => {
+  // Allow public auth endpoints
+  if (
+    req.path.startsWith('/auth/login') ||
+    req.path.startsWith('/auth/register') ||
+    req.path.startsWith('/auth/users') ||
+    req.path.startsWith('/auth/me')
+  ) {
+    return next();
+  }
+
+  const user = auth.getAuthUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required. Please sign in to use Aladenflow features.' });
+  }
+
+  req.user = user;
+  next();
+});
+
+// Consolidated Workspace Overview & Statistics (Strictly Isolated by User)
 app.get('/api/overview', (req, res) => {
   try {
-    const totalBoards = db.prepare('SELECT COUNT(*) as count FROM boards').get()?.count || 0;
-    const boards = db.prepare('SELECT id, name FROM boards ORDER BY created_at ASC').all() || [];
+    const userId = req.user.id;
+    const totalBoards = db.prepare('SELECT COUNT(*) as count FROM boards WHERE user_id = ?').get(userId)?.count || 0;
+    const boards = db.prepare('SELECT id, name FROM boards WHERE user_id = ? ORDER BY created_at ASC').all(userId) || [];
 
-    const totalCards = db.prepare('SELECT COUNT(*) as count FROM cards WHERE archived = 0').get()?.count || 0;
+    const totalCards = db.prepare(`
+      SELECT COUNT(*) as count FROM cards c
+      JOIN columns col ON col.id = c.column_id
+      JOIN boards b ON b.id = col.board_id
+      WHERE c.archived = 0 AND b.user_id = ?
+    `).get(userId)?.count || 0;
 
     const cards = db.prepare(`
       SELECT c.id, c.title, c.priority, c.due_date, c.created_at, col.name as column_name, col.board_id, b.name as board_name
       FROM cards c
       JOIN columns col ON col.id = c.column_id
       JOIN boards b ON b.id = col.board_id
-      WHERE c.archived = 0
+      WHERE c.archived = 0 AND b.user_id = ?
       ORDER BY c.created_at DESC
-    `).all() || [];
+    `).all(userId) || [];
 
     let todoCards = 0;
     let doingCards = 0;
@@ -77,25 +262,27 @@ app.get('/api/overview', (req, res) => {
       }
     });
 
-    const totalPages = db.prepare('SELECT COUNT(*) as count FROM pages').get()?.count || 0;
-    const publishedPages = db.prepare("SELECT COUNT(*) as count FROM pages WHERE status = 'published'").get()?.count || 0;
+    const totalPages = db.prepare('SELECT COUNT(*) as count FROM pages WHERE user_id = ?').get(userId)?.count || 0;
+    const publishedPages = db.prepare("SELECT COUNT(*) as count FROM pages WHERE user_id = ? AND status = 'published'").get(userId)?.count || 0;
     const draftPages = totalPages - publishedPages;
-    const totalReusableBlocks = db.prepare('SELECT COUNT(*) as count FROM reusable_blocks').get()?.count || 0;
+    const totalReusableBlocks = db.prepare('SELECT COUNT(*) as count FROM reusable_blocks WHERE user_id = ?').get(userId)?.count || 0;
 
     const recentPages = db.prepare(`
       SELECT id, title, slug, status, is_first_page, updated_at, created_at
       FROM pages
+      WHERE user_id = ?
       ORDER BY updated_at DESC
       LIMIT 6
-    `).all() || [];
+    `).all(userId) || [];
 
     const recentActivities = db.prepare(`
       SELECT a.id, a.card_id, a.board_id, a.message, a.created_at, b.name as board_name
       FROM activities a
       LEFT JOIN boards b ON b.id = a.board_id
+      WHERE a.user_id = ? OR b.user_id = ?
       ORDER BY a.created_at DESC
       LIMIT 8
-    `).all() || [];
+    `).all(userId, userId) || [];
 
     const boardProgress = boards.map(b => {
       const bCards = cards.filter(c => c.board_id === b.id);
@@ -139,32 +326,34 @@ app.get('/api/overview', (req, res) => {
 });
 
 app.get('/api/boards', (req, res) => {
-  const boards = db.prepare('SELECT * FROM boards ORDER BY created_at ASC').all();
+  const boards = db.prepare('SELECT * FROM boards WHERE user_id = ? ORDER BY created_at ASC').all(req.user.id);
   res.json(boards);
 });
 
 app.post('/api/boards', (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'name required' });
-  const info = db.prepare('INSERT INTO boards (name) VALUES (?)').run(name.trim());
-  const boardId = info.lastInsertRowid;
+  const info = db.prepare('INSERT INTO boards (name, user_id) VALUES (?, ?)').run(name.trim(), req.user.id);
+  const boardId = Number(info.lastInsertRowid);
   const defaults = ['To Do', 'Doing', 'Done'];
   defaults.forEach((n, i) => {
     db.prepare('INSERT INTO columns (board_id, name, position) VALUES (?, ?, ?)').run(boardId, n, i);
   });
-  logActivity(null, boardId, `Board created: "${name.trim()}"`);
-  res.json({ id: boardId, name: name.trim() });
+  logActivity(null, boardId, `Board created: "${name.trim()}"`, req.user.id);
+  res.json({ id: boardId, name: name.trim(), user_id: req.user.id });
 });
 
 app.delete('/api/boards/:id', (req, res) => {
+  const b = db.prepare('SELECT id FROM boards WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!b) return res.status(404).json({ error: 'Board not found' });
   db.prepare('DELETE FROM boards WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
 app.get('/api/boards/:id', (req, res) => {
   const boardId = Number(req.params.id);
-  const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(boardId);
-  if (!board) return res.status(404).json({ error: 'not found' });
+  const board = db.prepare('SELECT * FROM boards WHERE id = ? AND user_id = ?').get(boardId, req.user.id);
+  if (!board) return res.status(404).json({ error: 'Board not found' });
 
   const columns = db
     .prepare('SELECT * FROM columns WHERE board_id = ? ORDER BY position ASC')
@@ -423,14 +612,95 @@ app.post('/api/boards/:id/labels', (req, res) => {
   const boardId = Number(req.params.id);
   const { name, color } = req.body;
   if (!name || !color) return res.status(400).json({ error: 'name and color required' });
+  const cleanName = name.trim();
+  const cleanColor = color.trim();
+
+  const existing = db.prepare('SELECT * FROM labels WHERE board_id = ? AND LOWER(name) = LOWER(?)').get(boardId, cleanName);
+  if (existing) {
+    if (existing.color !== cleanColor) {
+      db.prepare('UPDATE labels SET color = ? WHERE id = ?').run(cleanColor, existing.id);
+      existing.color = cleanColor;
+    }
+    return res.json(existing);
+  }
+
   const info = db
     .prepare('INSERT INTO labels (board_id, name, color) VALUES (?, ?, ?)')
-    .run(boardId, name.trim(), color);
-  res.json({ id: info.lastInsertRowid });
+    .run(boardId, cleanName, cleanColor);
+  res.json({ id: info.lastInsertRowid, board_id: boardId, name: cleanName, color: cleanColor });
+});
+
+app.patch('/api/labels/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const { name, color } = req.body;
+  const updates = [];
+  const params = [];
+  if (typeof name === 'string' && name.trim()) {
+    updates.push('name = ?');
+    params.push(name.trim());
+  }
+  if (typeof color === 'string' && color.trim()) {
+    updates.push('color = ?');
+    params.push(color.trim());
+  }
+  if (updates.length) {
+    params.push(id);
+    db.prepare(`UPDATE labels SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  }
+  const updated = db.prepare('SELECT * FROM labels WHERE id = ?').get(id);
+  res.json(updated || { ok: true });
 });
 
 app.delete('/api/labels/:id', (req, res) => {
-  db.prepare('DELETE FROM labels WHERE id = ?').run(req.params.id);
+  const id = Number(req.params.id);
+  db.prepare('DELETE FROM card_labels WHERE label_id = ?').run(id);
+  db.prepare('DELETE FROM labels WHERE id = ?').run(id);
+  res.json({ ok: true });
+});
+
+app.post('/api/cards/:id/labels', (req, res) => {
+  const cardId = Number(req.params.id);
+  const card = db.prepare('SELECT c.*, col.board_id FROM cards c JOIN columns col ON col.id = c.column_id WHERE c.id = ?').get(cardId);
+  if (!card) return res.status(404).json({ error: 'card not found' });
+
+  let labelId = req.body.labelId ? Number(req.body.labelId) : null;
+  let label = null;
+
+  if (labelId) {
+    label = db.prepare('SELECT * FROM labels WHERE id = ?').get(labelId);
+  } else if (req.body.name) {
+    const cleanName = req.body.name.trim();
+    const cleanColor = (req.body.color || '#3b82f6').trim();
+    label = db.prepare('SELECT * FROM labels WHERE board_id = ? AND LOWER(name) = LOWER(?)').get(card.board_id, cleanName);
+    if (!label) {
+      const info = db.prepare('INSERT INTO labels (board_id, name, color) VALUES (?, ?, ?)').run(card.board_id, cleanName, cleanColor);
+      label = { id: info.lastInsertRowid, board_id: card.board_id, name: cleanName, color: cleanColor };
+    } else if (req.body.color && label.color !== cleanColor) {
+      db.prepare('UPDATE labels SET color = ? WHERE id = ?').run(cleanColor, label.id);
+      label.color = cleanColor;
+    }
+    labelId = label.id;
+  }
+
+  if (!label || !labelId) {
+    return res.status(400).json({ error: 'valid labelId or name required' });
+  }
+
+  db.prepare('INSERT OR IGNORE INTO card_labels (card_id, label_id) VALUES (?, ?)').run(cardId, labelId);
+  logActivity(cardId, card.board_id, `Tag "${label.name}" added to card`);
+  res.json(label);
+});
+
+app.delete('/api/cards/:id/labels/:labelId', (req, res) => {
+  const cardId = Number(req.params.id);
+  const labelId = Number(req.params.labelId);
+  const card = db.prepare('SELECT c.*, col.board_id FROM cards c JOIN columns col ON col.id = c.column_id WHERE c.id = ?').get(cardId);
+  const label = db.prepare('SELECT * FROM labels WHERE id = ?').get(labelId);
+
+  db.prepare('DELETE FROM card_labels WHERE card_id = ? AND label_id = ?').run(cardId, labelId);
+  if (card && label) {
+    logActivity(cardId, card.board_id, `Tag "${label.name}" removed from card`);
+  }
   res.json({ ok: true });
 });
 
@@ -718,11 +988,11 @@ function evaluateAutomationFlow(flow, inputContext = {}, commit = true) {
         }
 
         if (cardContext && commit) {
-          db.prepare('UPDATE cards SET priority = ?, updated_at = datetime("now") WHERE id = ?').run(determinedPriority, cardContext.id);
+          db.prepare("UPDATE cards SET priority = ?, updated_at = datetime('now') WHERE id = ?").run(determinedPriority, cardContext.id);
 
           let label = db.prepare('SELECT id, name FROM labels WHERE board_id = ? AND LOWER(name) = LOWER(?)').get(cardContext.board_id, suggestedTag);
           if (!label) {
-            const color = suggestedTag === 'bug' ? '#ef4444' : suggestedTag === 'docs' ? '#10b981' : '#3b82f6';
+            const color = suggestedTag === 'bug' ? '#e0574f' : suggestedTag === 'docs' ? '#5aa469' : '#52b8a6';
             const lInfo = db.prepare('INSERT INTO labels (board_id, name, color) VALUES (?, ?, ?)').run(cardContext.board_id, suggestedTag, color);
             label = { id: lInfo.lastInsertRowid, name: suggestedTag };
           }
@@ -832,7 +1102,7 @@ function runAutomationsForTrigger(triggerType, context = {}) {
 // REST Endpoints for Automations
 app.get('/api/automations', (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM automations ORDER BY created_at DESC').all();
+    const rows = db.prepare('SELECT * FROM automations WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
     const list = rows.map(r => ({
       ...r,
       is_active: Boolean(r.is_active),
@@ -986,10 +1256,11 @@ function uniqueSlug(base, excludeId = null) {
 
 app.get('/api/pages', (req, res) => {
   const { q, tag, status } = req.query;
+  const userId = req.user.id;
   let sql = `SELECT p.id, p.title, p.slug, p.status, p.parent_id, p.position, p.is_first_page, p.created_at, p.updated_at,
     (SELECT GROUP_CONCAT(tag, ',') FROM page_tags pt WHERE pt.page_id = p.id) AS tag_csv
-    FROM pages p WHERE 1=1`;
-  const params = [];
+    FROM pages p WHERE p.user_id = ?`;
+  const params = [userId];
   if (q) {
     sql += ' AND (p.title LIKE ?)';
     params.push(`%${q}%`);
@@ -1013,15 +1284,21 @@ app.get('/api/pages', (req, res) => {
 
 app.get('/api/tags', (req, res) => {
   const rows = db
-    .prepare('SELECT tag, COUNT(*) AS c FROM page_tags GROUP BY tag ORDER BY tag ASC')
-    .all();
+    .prepare(`
+      SELECT pt.tag, COUNT(*) AS c
+      FROM page_tags pt
+      JOIN pages p ON p.id = pt.page_id
+      WHERE p.user_id = ?
+      GROUP BY pt.tag ORDER BY pt.tag ASC
+    `)
+    .all(req.user.id);
   res.json(rows);
 });
 
 app.get('/api/pages/:id', (req, res) => {
   const id = Number(req.params.id);
-  const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(id);
-  if (!page) return res.status(404).json({ error: 'not found' });
+  const page = db.prepare('SELECT * FROM pages WHERE id = ? AND user_id = ?').get(id, req.user.id);
+  if (!page) return res.status(404).json({ error: 'Page not found' });
   page.tags = db.prepare('SELECT tag FROM page_tags WHERE page_id = ?').all(id).map(r => r.tag);
   try { page.blocks = JSON.parse(page.blocks || '[]'); }
   catch { page.blocks = []; }
@@ -1051,11 +1328,11 @@ app.post('/api/pages', (req, res) => {
   let settingsJson;
   try { settingsJson = JSON.stringify(typeof settings === 'object' && settings !== null ? settings : {}); }
   catch { settingsJson = '{}'; }
-  const pageCount = db.prepare('SELECT COUNT(*) AS c FROM pages').get()?.c || 0;
+  const pageCount = db.prepare('SELECT COUNT(*) AS c FROM pages WHERE user_id = ?').get(req.user.id)?.c || 0;
   const isFirstPage = pageCount === 0 ? 1 : 0;
   const info = db
-    .prepare('INSERT INTO pages (title, slug, blocks, status, settings, parent_id, position, is_first_page) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(title.trim(), slug, blocksJson, status, settingsJson, parent_id != null ? Number(parent_id) : null, Number(position) || 0, isFirstPage);
+    .prepare('INSERT INTO pages (title, slug, blocks, status, settings, parent_id, position, is_first_page, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(title.trim(), slug, blocksJson, status, settingsJson, parent_id != null ? Number(parent_id) : null, Number(position) || 0, isFirstPage, req.user.id);
   const insertTag = db.prepare('INSERT OR IGNORE INTO page_tags (page_id, tag) VALUES (?, ?)');
   (tags || []).forEach(t => {
     if (t && typeof t === 'string') insertTag.run(info.lastInsertRowid, t.trim().toLowerCase());
@@ -1065,8 +1342,8 @@ app.post('/api/pages', (req, res) => {
 
 app.patch('/api/pages/:id', (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare('SELECT * FROM pages WHERE id = ?').get(id);
-  if (!existing) return res.status(404).json({ error: 'not found' });
+  const existing = db.prepare('SELECT * FROM pages WHERE id = ? AND user_id = ?').get(id, req.user.id);
+  if (!existing) return res.status(404).json({ error: 'Page not found' });
   const { title, blocks, status, tags, settings, parent_id, position, is_first_page } = req.body;
   const tx = db.transaction(() => {
     const updates = [];
@@ -1169,10 +1446,12 @@ app.post('/api/pages/reorder', (req, res) => {
 
 app.delete('/api/pages/:id', (req, res) => {
   const id = Number(req.params.id);
-  const target = db.prepare('SELECT is_first_page FROM pages WHERE id = ?').get(id);
+  const target = db.prepare('SELECT id, is_first_page FROM pages WHERE id = ? AND user_id = ?').get(id, req.user.id);
+  if (!target) return res.status(404).json({ error: 'Page not found' });
+  db.prepare('DELETE FROM page_tags WHERE page_id = ?').run(id);
   db.prepare('DELETE FROM pages WHERE id = ?').run(id);
-  if (target && target.is_first_page) {
-    const nextFirst = db.prepare('SELECT id FROM pages ORDER BY position ASC, id ASC LIMIT 1').get();
+  if (target.is_first_page) {
+    const nextFirst = db.prepare('SELECT id FROM pages WHERE user_id = ? ORDER BY position ASC, id ASC LIMIT 1').get(req.user.id);
     if (nextFirst) {
       db.prepare('UPDATE pages SET is_first_page = 1 WHERE id = ?').run(nextFirst.id);
     }
@@ -1183,7 +1462,7 @@ app.delete('/api/pages/:id', (req, res) => {
 // Reusable Blocks API
 app.get('/api/reusable-blocks', (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM reusable_blocks ORDER BY created_at DESC').all();
+    const rows = db.prepare('SELECT * FROM reusable_blocks WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
     const result = [];
     rows.forEach(r => {
       try {

@@ -13,6 +13,7 @@ export class BoardService {
   boards = signal<Board[]>([]);
   activeBoardId = signal<number>(1);
   searchQuery = signal<string>('');
+  selectedTagFilter = signal<string | null>(null);
 
   getBoards(): Observable<Board[]> {
     return this.http.get<Board[]>(`${this.baseUrl}/boards`);
@@ -80,8 +81,20 @@ export class BoardService {
     return this.http.post<Label>(`${this.baseUrl}/boards/${boardId}/labels`, { name, color });
   }
 
+  updateLabel(id: number, data: { name?: string; color?: string }): Observable<Label> {
+    return this.http.patch<Label>(`${this.baseUrl}/labels/${id}`, data);
+  }
+
   deleteLabel(id: number): Observable<{ ok: boolean }> {
     return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/labels/${id}`);
+  }
+
+  addTagToCard(cardId: number, data: { labelId?: number; name?: string; color?: string }): Observable<Label> {
+    return this.http.post<Label>(`${this.baseUrl}/cards/${cardId}/labels`, data);
+  }
+
+  removeTagFromCard(cardId: number, labelId: number): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/cards/${cardId}/labels/${labelId}`);
   }
 
   addChecklistItem(cardId: number, text: string): Observable<ChecklistItem> {

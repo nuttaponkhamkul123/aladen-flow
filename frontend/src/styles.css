@@ -97,6 +97,20 @@
   --input-border: rgba(255, 250, 240, 0.12);
   --input-text: #f4f2ef;
   --input-placeholder: #78736d;
+
+  /* iOS 27 Liquid Glass System Tokens (Dark) */
+  --glass-blur: 24px;
+  --glass-blur-deep: 32px;
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.015) 100%), rgba(26, 24, 22, 0.68);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%), rgba(32, 29, 27, 0.75);
+  --glass-surface-header: linear-gradient(180deg, rgba(28, 26, 24, 0.8) 0%, rgba(20, 19, 18, 0.72) 100%);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-top: rgba(255, 255, 255, 0.32);
+  --glass-border-left: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 24px -5px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25), inset 0 1px 1.5px rgba(255, 255, 255, 0.32), inset 0 -1px 1px rgba(0, 0, 0, 0.25);
+  --glass-shadow-hover: 0 22px 46px -10px rgba(0, 0, 0, 0.68), 0 8px 20px -3px rgba(0, 0, 0, 0.35), 0 0 26px rgba(82, 184, 166, 0.18), inset 0 1.5px 2px rgba(255, 255, 255, 0.48), inset 0 -1px 1px rgba(0, 0, 0, 0.32);
+  --glass-specular: radial-gradient(circle 260px at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.08) 38%, transparent 72%);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.04) 35%, rgba(82, 184, 166, 0.32) 75%, rgba(255, 255, 255, 0.2) 100%);
 }
 
 .theme-light,
@@ -143,6 +157,21 @@
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+
+  /* iOS 27 Liquid Glass System Tokens (Light) */
+  --glass-blur: 24px;
+  --glass-blur-deep: 32px;
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.8) 100%), rgba(255, 255, 255, 0.88);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.86) 100%), #ffffff;
+  --glass-surface-header: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 246, 242, 0.82) 100%);
+  --glass-border: rgba(35, 30, 24, 0.09);
+  --glass-border-top: rgba(255, 255, 255, 0.95);
+  --glass-border-left: rgba(255, 255, 255, 0.85);
+  --glass-shadow: 0 6px 18px -4px rgba(35, 30, 24, 0.07), 0 2px 6px rgba(35, 30, 24, 0.04), inset 0 1px 1.5px #ffffff, inset 0 -1px 1px rgba(0, 0, 0, 0.03);
+  --glass-shadow-hover: 0 18px 36px -8px rgba(35, 30, 24, 0.15), 0 6px 16px rgba(35, 30, 24, 0.07), 0 0 22px rgba(82, 184, 166, 0.2), inset 0 1.5px 2px #ffffff;
+  --glass-specular: radial-gradient(circle 260px at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.2) 40%, transparent 75%);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.35) 35%, rgba(82, 184, 166, 0.35) 75%, rgba(255, 255, 255, 0.7) 100%);
+
   --radius-pill: 9999px;
   --radius-full: 9999px;
 
@@ -184,6 +213,386 @@
   --input-border: rgba(35, 30, 24, 0.15);
   --input-text: #1c1a17;
   --input-placeholder: #86807a;
+}
+
+/* ==========================================================================
+   AMBIENT ATMOSPHERE SYSTEM THEMES (SYSTEM-WIDE TRANSFORMATION)
+   Applied automatically across the entire app when an atmosphere is chosen.
+   Both Dark Mode and Light Mode are fully supported for every atmosphere.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. NEBULA (Cosmic Deep Space Obsidian & Electric Cobalt Indigo / Violet)
+   -------------------------------------------------------------------------- */
+:root[data-ambient-theme="nebula"],
+html[data-ambient-theme="nebula"],
+body[data-ambient-theme="nebula"],
+.ambient-theme-nebula {
+  --bg-app: #080914;
+  --bg-body: #080914;
+  --bg-surface: #0f1022;
+  --bg-surface-elevated: #15182e;
+  --bg-surface-hover: #1e2240;
+  --bg-surface-active: #272c54;
+  --bg-surface-subtle: #0d0e1c;
+  --bg-surface-header: #121428;
+  --bg-surface-card: #15182e;
+  --bg-column: #0e1022;
+  --bg-subtle: rgba(99, 102, 241, 0.05);
+
+  --border-subtle: rgba(165, 180, 252, 0.08);
+  --border-medium: rgba(165, 180, 252, 0.16);
+  --border-focus: #6366f1;
+
+  --accent-primary: #6366f1;
+  --accent-primary-hover: #818cf8;
+  --accent-primary-subtle: rgba(99, 102, 241, 0.16);
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  --accent-glow: 0 0 16px rgba(99, 102, 241, 0.42);
+
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%), rgba(16, 17, 34, 0.72);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(99, 102, 241, 0.06) 100%), rgba(22, 24, 46, 0.78);
+  --glass-surface-header: linear-gradient(180deg, rgba(18, 20, 40, 0.85) 0%, rgba(12, 13, 28, 0.75) 100%);
+  --glass-border: rgba(165, 180, 252, 0.14);
+  --glass-border-top: rgba(255, 255, 255, 0.35);
+  --glass-border-left: rgba(165, 180, 252, 0.22);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.04) 35%, rgba(99, 102, 241, 0.45) 75%, rgba(168, 85, 247, 0.28) 100%);
+  --glass-shadow-hover: 0 22px 46px -10px rgba(0, 0, 0, 0.7), 0 8px 20px -3px rgba(0, 0, 0, 0.35), 0 0 28px rgba(99, 102, 241, 0.28), inset 0 1.5px 2px rgba(255, 255, 255, 0.48), inset 0 -1px 1px rgba(0, 0, 0, 0.32);
+
+  --canvas-grid-dot: rgba(165, 180, 252, 0.09);
+  --canvas-bg: #080914;
+  --bg-canvas: #080914;
+}
+
+:root[data-theme="light"][data-ambient-theme="nebula"],
+html[data-theme="light"][data-ambient-theme="nebula"],
+.theme-light[data-ambient-theme="nebula"],
+.theme-light body.ambient-theme-nebula,
+[data-theme="light"] body.ambient-theme-nebula,
+[data-theme="light"] [data-ambient-theme="nebula"],
+body.theme-light.ambient-theme-nebula {
+  --bg-app: #f4f5fd;
+  --bg-body: #f4f5fd;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-hover: #eceffd;
+  --bg-surface-active: #e2e5fb;
+  --bg-surface-subtle: #f8f9ff;
+  --bg-surface-header: #ffffff;
+  --bg-surface-card: #ffffff;
+  --bg-column: #ebeefc;
+  --bg-subtle: rgba(79, 70, 229, 0.04);
+
+  --border-subtle: rgba(79, 70, 229, 0.1);
+  --border-medium: rgba(79, 70, 229, 0.18);
+  --border-focus: #4f46e5;
+
+  --accent-primary: #4f46e5;
+  --accent-primary-hover: #4338ca;
+  --accent-primary-subtle: rgba(79, 70, 229, 0.12);
+  --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  --accent-glow: 0 0 16px rgba(79, 70, 229, 0.32);
+
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 245, 253, 0.85) 100%), rgba(255, 255, 255, 0.9);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(238, 242, 255, 0.88) 100%), #ffffff;
+  --glass-surface-header: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(244, 245, 253, 0.85) 100%);
+  --glass-border: rgba(79, 70, 229, 0.11);
+  --glass-border-top: rgba(255, 255, 255, 0.98);
+  --glass-border-left: rgba(255, 255, 255, 0.9);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.35) 35%, rgba(79, 70, 229, 0.35) 75%, rgba(255, 255, 255, 0.7) 100%);
+  --glass-shadow-hover: 0 18px 36px -8px rgba(30, 27, 75, 0.14), 0 6px 16px rgba(30, 27, 75, 0.06), 0 0 24px rgba(79, 70, 229, 0.22), inset 0 1.5px 2px #ffffff;
+
+  --canvas-grid-dot: rgba(79, 70, 229, 0.11);
+  --canvas-bg: #f4f5fd;
+  --bg-canvas: #f4f5fd;
+}
+
+/* --------------------------------------------------------------------------
+   2. AURORA (Northern Boreal Pine & Vivid Crystalline Emerald / Mint Cyan)
+   -------------------------------------------------------------------------- */
+:root[data-ambient-theme="aurora"],
+html[data-ambient-theme="aurora"],
+body[data-ambient-theme="aurora"],
+.ambient-theme-aurora {
+  --bg-app: #07100e;
+  --bg-body: #07100e;
+  --bg-surface: #0d1b17;
+  --bg-surface-elevated: #132621;
+  --bg-surface-hover: #19332c;
+  --bg-surface-active: #21433a;
+  --bg-surface-subtle: #0a1512;
+  --bg-surface-header: #0f1f1a;
+  --bg-surface-card: #132621;
+  --bg-column: #0e1d19;
+  --bg-subtle: rgba(16, 185, 129, 0.05);
+
+  --border-subtle: rgba(52, 211, 153, 0.08);
+  --border-medium: rgba(52, 211, 153, 0.16);
+  --border-focus: #10b981;
+
+  --accent-primary: #10b981;
+  --accent-primary-hover: #34d399;
+  --accent-primary-subtle: rgba(16, 185, 129, 0.16);
+  --accent-gradient: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  --accent-glow: 0 0 16px rgba(16, 185, 129, 0.42);
+
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%), rgba(13, 27, 23, 0.72);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(16, 185, 129, 0.06) 100%), rgba(19, 38, 33, 0.78);
+  --glass-surface-header: linear-gradient(180deg, rgba(15, 31, 26, 0.86) 0%, rgba(9, 19, 16, 0.76) 100%);
+  --glass-border: rgba(52, 211, 153, 0.13);
+  --glass-border-top: rgba(255, 255, 255, 0.35);
+  --glass-border-left: rgba(52, 211, 153, 0.22);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.04) 35%, rgba(16, 185, 129, 0.45) 75%, rgba(6, 182, 212, 0.28) 100%);
+  --glass-shadow-hover: 0 22px 46px -10px rgba(0, 0, 0, 0.7), 0 8px 20px -3px rgba(0, 0, 0, 0.35), 0 0 28px rgba(16, 185, 129, 0.28), inset 0 1.5px 2px rgba(255, 255, 255, 0.48), inset 0 -1px 1px rgba(0, 0, 0, 0.32);
+
+  --canvas-grid-dot: rgba(52, 211, 153, 0.09);
+  --canvas-bg: #07100e;
+  --bg-canvas: #07100e;
+}
+
+:root[data-theme="light"][data-ambient-theme="aurora"],
+html[data-theme="light"][data-ambient-theme="aurora"],
+.theme-light[data-ambient-theme="aurora"],
+.theme-light body.ambient-theme-aurora,
+[data-theme="light"] body.ambient-theme-aurora,
+[data-theme="light"] [data-ambient-theme="aurora"],
+body.theme-light.ambient-theme-aurora {
+  --bg-app: #f0fcf6;
+  --bg-body: #f0fcf6;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-hover: #e4f9ef;
+  --bg-surface-active: #d4f5e4;
+  --bg-surface-subtle: #f5fdf9;
+  --bg-surface-header: #ffffff;
+  --bg-surface-card: #ffffff;
+  --bg-column: #e5f9f0;
+  --bg-subtle: rgba(5, 150, 105, 0.04);
+
+  --border-subtle: rgba(16, 185, 129, 0.1);
+  --border-medium: rgba(16, 185, 129, 0.18);
+  --border-focus: #059669;
+
+  --accent-primary: #059669;
+  --accent-primary-hover: #047857;
+  --accent-primary-subtle: rgba(5, 150, 105, 0.12);
+  --accent-gradient: linear-gradient(135deg, #059669 0%, #0891b2 100%);
+  --accent-glow: 0 0 16px rgba(5, 150, 105, 0.32);
+
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 252, 246, 0.85) 100%), rgba(255, 255, 255, 0.9);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(230, 249, 240, 0.88) 100%), #ffffff;
+  --glass-surface-header: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 252, 246, 0.85) 100%);
+  --glass-border: rgba(16, 185, 129, 0.11);
+  --glass-border-top: rgba(255, 255, 255, 0.98);
+  --glass-border-left: rgba(255, 255, 255, 0.9);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.35) 35%, rgba(5, 150, 105, 0.35) 75%, rgba(255, 255, 255, 0.7) 100%);
+  --glass-shadow-hover: 0 18px 36px -8px rgba(6, 78, 59, 0.14), 0 6px 16px rgba(6, 78, 59, 0.06), 0 0 24px rgba(5, 150, 105, 0.22), inset 0 1.5px 2px #ffffff;
+
+  --canvas-grid-dot: rgba(16, 185, 129, 0.11);
+  --canvas-bg: #f0fcf6;
+  --bg-canvas: #f0fcf6;
+}
+
+/* --------------------------------------------------------------------------
+   3. CYBERPUNK (High-Contrast Matrix Onyx & Radiant Cyber Amber / Gold)
+   -------------------------------------------------------------------------- */
+:root[data-ambient-theme="cyberpunk"],
+html[data-ambient-theme="cyberpunk"],
+body[data-ambient-theme="cyberpunk"],
+.ambient-theme-cyberpunk {
+  --bg-app: #09090d;
+  --bg-body: #09090d;
+  --bg-surface: #121219;
+  --bg-surface-elevated: #1a1a24;
+  --bg-surface-hover: #232330;
+  --bg-surface-active: #2e2e40;
+  --bg-surface-subtle: #0d0d14;
+  --bg-surface-header: #14141d;
+  --bg-surface-card: #1a1a24;
+  --bg-column: #13131c;
+  --bg-subtle: rgba(245, 158, 11, 0.05);
+
+  --border-subtle: rgba(251, 191, 36, 0.09);
+  --border-medium: rgba(251, 191, 36, 0.18);
+  --border-focus: #f59e0b;
+
+  --accent-primary: #f59e0b;
+  --accent-primary-hover: #fbbf24;
+  --accent-primary-subtle: rgba(245, 158, 11, 0.16);
+  --accent-gradient: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #ef4444 100%);
+  --accent-glow: 0 0 16px rgba(245, 158, 11, 0.45);
+
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(245, 158, 11, 0.04) 100%), rgba(18, 18, 25, 0.74);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(245, 158, 11, 0.06) 100%), rgba(26, 26, 36, 0.8);
+  --glass-surface-header: linear-gradient(180deg, rgba(20, 20, 29, 0.88) 0%, rgba(12, 12, 18, 0.78) 100%);
+  --glass-border: rgba(251, 191, 36, 0.14);
+  --glass-border-top: rgba(255, 255, 255, 0.36);
+  --glass-border-left: rgba(251, 191, 36, 0.22);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.04) 35%, rgba(245, 158, 11, 0.45) 75%, rgba(249, 115, 22, 0.28) 100%);
+  --glass-shadow-hover: 0 22px 46px -10px rgba(0, 0, 0, 0.7), 0 8px 20px -3px rgba(0, 0, 0, 0.35), 0 0 28px rgba(245, 158, 11, 0.28), inset 0 1.5px 2px rgba(255, 255, 255, 0.48), inset 0 -1px 1px rgba(0, 0, 0, 0.32);
+
+  --canvas-grid-dot: rgba(251, 191, 36, 0.09);
+  --canvas-bg: #09090d;
+  --bg-canvas: #09090d;
+}
+
+:root[data-theme="light"][data-ambient-theme="cyberpunk"],
+html[data-theme="light"][data-ambient-theme="cyberpunk"],
+.theme-light[data-ambient-theme="cyberpunk"],
+.theme-light body.ambient-theme-cyberpunk,
+[data-theme="light"] body.ambient-theme-cyberpunk,
+[data-theme="light"] [data-ambient-theme="cyberpunk"],
+body.theme-light.ambient-theme-cyberpunk {
+  --bg-app: #fdfbf7;
+  --bg-body: #fdfbf7;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-hover: #fbf2df;
+  --bg-surface-active: #f7e6c4;
+  --bg-surface-subtle: #fefcf9;
+  --bg-surface-header: #ffffff;
+  --bg-surface-card: #ffffff;
+  --bg-column: #fbf2e3;
+  --bg-subtle: rgba(217, 119, 6, 0.04);
+
+  --border-subtle: rgba(217, 119, 6, 0.1);
+  --border-medium: rgba(217, 119, 6, 0.18);
+  --border-focus: #d97706;
+
+  --accent-primary: #d97706;
+  --accent-primary-hover: #b45309;
+  --accent-primary-subtle: rgba(217, 119, 6, 0.12);
+  --accent-gradient: linear-gradient(135deg, #d97706 0%, #ea580c 100%);
+  --accent-glow: 0 0 16px rgba(217, 119, 6, 0.32);
+
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(253, 251, 247, 0.85) 100%), rgba(255, 255, 255, 0.9);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(251, 242, 223, 0.88) 100%), #ffffff;
+  --glass-surface-header: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(253, 251, 247, 0.85) 100%);
+  --glass-border: rgba(217, 119, 6, 0.11);
+  --glass-border-top: rgba(255, 255, 255, 0.98);
+  --glass-border-left: rgba(255, 255, 255, 0.9);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.35) 35%, rgba(217, 119, 6, 0.35) 75%, rgba(255, 255, 255, 0.7) 100%);
+  --glass-shadow-hover: 0 18px 36px -8px rgba(120, 53, 15, 0.14), 0 6px 16px rgba(120, 53, 15, 0.06), 0 0 24px rgba(217, 119, 6, 0.22), inset 0 1.5px 2px #ffffff;
+
+  --canvas-grid-dot: rgba(217, 119, 6, 0.11);
+  --canvas-bg: #fdfbf7;
+  --bg-canvas: #fdfbf7;
+}
+
+/* --------------------------------------------------------------------------
+   4. BLUEPRINT (Architectural Tech Drafting Navy & Precision Sky Azure)
+   -------------------------------------------------------------------------- */
+:root[data-ambient-theme="blueprint"],
+html[data-ambient-theme="blueprint"],
+body[data-ambient-theme="blueprint"],
+.ambient-theme-blueprint {
+  --bg-app: #070c18;
+  --bg-body: #070c18;
+  --bg-surface: #0d172a;
+  --bg-surface-elevated: #13223d;
+  --bg-surface-hover: #1a2e52;
+  --bg-surface-active: #223b69;
+  --bg-surface-subtle: #0a1222;
+  --bg-surface-header: #0f1b30;
+  --bg-surface-card: #13223d;
+  --bg-column: #0e192e;
+  --bg-subtle: rgba(2, 132, 199, 0.05);
+
+  --border-subtle: rgba(56, 189, 248, 0.09);
+  --border-medium: rgba(56, 189, 248, 0.18);
+  --border-focus: #0284c7;
+
+  --accent-primary: #0284c7;
+  --accent-primary-hover: #38bdf8;
+  --accent-primary-subtle: rgba(2, 132, 199, 0.16);
+  --accent-gradient: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+  --accent-glow: 0 0 16px rgba(2, 132, 199, 0.42);
+
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(2, 132, 199, 0.04) 100%), rgba(13, 23, 42, 0.74);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(2, 132, 199, 0.06) 100%), rgba(19, 34, 61, 0.8);
+  --glass-surface-header: linear-gradient(180deg, rgba(15, 27, 48, 0.88) 0%, rgba(8, 15, 28, 0.78) 100%);
+  --glass-border: rgba(56, 189, 248, 0.14);
+  --glass-border-top: rgba(255, 255, 255, 0.36);
+  --glass-border-left: rgba(56, 189, 248, 0.22);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.04) 35%, rgba(2, 132, 199, 0.45) 75%, rgba(56, 189, 248, 0.28) 100%);
+  --glass-shadow-hover: 0 22px 46px -10px rgba(0, 0, 0, 0.7), 0 8px 20px -3px rgba(0, 0, 0, 0.35), 0 0 28px rgba(2, 132, 199, 0.28), inset 0 1.5px 2px rgba(255, 255, 255, 0.48), inset 0 -1px 1px rgba(0, 0, 0, 0.32);
+
+  --canvas-grid-dot: rgba(56, 189, 248, 0.09);
+  --canvas-bg: #070c18;
+  --bg-canvas: #070c18;
+}
+
+:root[data-theme="light"][data-ambient-theme="blueprint"],
+html[data-theme="light"][data-ambient-theme="blueprint"],
+.theme-light[data-ambient-theme="blueprint"],
+.theme-light body.ambient-theme-blueprint,
+[data-theme="light"] body.ambient-theme-blueprint,
+[data-theme="light"] [data-ambient-theme="blueprint"],
+body.theme-light.ambient-theme-blueprint {
+  --bg-app: #f0f7ff;
+  --bg-body: #f0f7ff;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-hover: #e0effe;
+  --bg-surface-active: #bae0fd;
+  --bg-surface-subtle: #f6faff;
+  --bg-surface-header: #ffffff;
+  --bg-surface-card: #ffffff;
+  --bg-column: #e2effe;
+  --bg-subtle: rgba(2, 132, 199, 0.04);
+
+  --border-subtle: rgba(2, 132, 199, 0.1);
+  --border-medium: rgba(2, 132, 199, 0.18);
+  --border-focus: #0284c7;
+
+  --accent-primary: #0284c7;
+  --accent-primary-hover: #0369a1;
+  --accent-primary-subtle: rgba(2, 132, 199, 0.12);
+  --accent-gradient: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%);
+  --accent-glow: 0 0 16px rgba(2, 132, 199, 0.32);
+
+  --glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 247, 255, 0.85) 100%), rgba(255, 255, 255, 0.9);
+  --glass-surface-elevated: linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(224, 239, 254, 0.88) 100%), #ffffff;
+  --glass-surface-header: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 247, 255, 0.85) 100%);
+  --glass-border: rgba(2, 132, 199, 0.11);
+  --glass-border-top: rgba(255, 255, 255, 0.98);
+  --glass-border-left: rgba(255, 255, 255, 0.9);
+  --glass-rim: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.35) 35%, rgba(2, 132, 199, 0.35) 75%, rgba(255, 255, 255, 0.7) 100%);
+  --glass-shadow-hover: 0 18px 36px -8px rgba(12, 74, 110, 0.14), 0 6px 16px rgba(12, 74, 110, 0.06), 0 0 24px rgba(2, 132, 199, 0.22), inset 0 1.5px 2px #ffffff;
+
+  --canvas-grid-dot: rgba(2, 132, 199, 0.11);
+  --canvas-bg: #f0f7ff;
+  --bg-canvas: #f0f7ff;
+}
+
+/* --------------------------------------------------------------------------
+   5. DEFAULT SLATE (Warm Graphite Obsidian & Studio Verdigris)
+   -------------------------------------------------------------------------- */
+:root[data-ambient-theme="default"],
+html[data-ambient-theme="default"],
+body[data-ambient-theme="default"],
+.ambient-theme-default {
+  --border-focus: #52b8a6;
+  --accent-primary: #52b8a6;
+  --accent-primary-hover: #67c9b7;
+  --accent-primary-subtle: rgba(82, 184, 166, 0.13);
+  --accent-gradient: #52b8a6;
+  --accent-glow: 0 0 0 1px rgba(82, 184, 166, 0.32);
+}
+
+:root[data-theme="light"][data-ambient-theme="default"],
+html[data-theme="light"][data-ambient-theme="default"],
+.theme-light[data-ambient-theme="default"],
+.theme-light body.ambient-theme-default,
+[data-theme="light"] body.ambient-theme-default,
+[data-theme="light"] [data-ambient-theme="default"],
+body.theme-light.ambient-theme-default {
+  --border-focus: #2f7f70;
+  --accent-primary: #2f7f70;
+  --accent-primary-hover: #276a5d;
+  --accent-primary-subtle: rgba(47, 127, 112, 0.09);
+  --accent-gradient: #2f7f70;
+  --accent-glow: 0 0 0 1px rgba(47, 127, 112, 0.22);
 }
 
 /* ==========================================================================
@@ -323,11 +732,14 @@ body {
   justify-content: space-between;
   padding: 0 20px;
   height: 56px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--glass-surface-header);
+  border-bottom: 1px solid var(--glass-border);
   flex-shrink: 0;
   z-index: 40;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), inset 0 -1px 0 var(--border-subtle);
+  transition: background 0.25s ease, border-color 0.25s ease;
 }
 
 .topbar-left {
@@ -341,13 +753,17 @@ body {
   align-items: center;
   gap: 8px;
   padding: 5px 12px;
-  background: var(--bg-surface-hover);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  background: var(--glass-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-border-top);
+  border-radius: var(--radius-pill, 9999px);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  box-shadow: var(--shadow-xs);
 }
 
 .topbar-context-badge .context-icon {
@@ -413,11 +829,16 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--bg-surface-hover);
-  padding: 3px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
+  background: var(--glass-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 3px 4px;
+  border-radius: var(--radius-pill, 9999px);
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-border-top);
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.15);
 }
+
 
 .tab {
   display: inline-flex;
@@ -1317,8 +1738,8 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* Card Component */
-.card {
+/* Card Component Base */
+.card:not(.glass-card-3d) {
   background: var(--bg-surface-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -1329,13 +1750,13 @@ body {
   user-select: none;
 }
 
-.card:hover {
+.card:not(.glass-card-3d):hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-card-hover);
   border-color: var(--border-medium);
 }
 
-.card:active {
+.card:not(.glass-card-3d):active {
   cursor: grabbing;
 }
 
@@ -1343,6 +1764,53 @@ body {
   opacity: 0.25;
   transform: scale(0.96);
 }
+
+/* Global CDK Drag Floating 3D Glass Preview (appended to body) */
+.cdk-drag-preview.card,
+.cdk-drag-preview.glass-card-3d {
+  box-sizing: border-box !important;
+  border-radius: 16px !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 100%),
+    rgba(28, 26, 24, 0.92) !important;
+  backdrop-filter: blur(32px) saturate(210%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(210%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.32) !important;
+  border-top-color: rgba(255, 255, 255, 0.55) !important;
+  box-shadow:
+    0 32px 64px -14px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(82, 184, 166, 0.3),
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.45) !important;
+  opacity: 0.98 !important;
+  z-index: 10000 !important;
+  cursor: grabbing !important;
+  pointer-events: none !important;
+}
+
+.cdk-drag-preview.card .card-content-3d,
+.cdk-drag-preview.glass-card-3d .card-content-3d {
+  transform: scale(1.025) rotate(1.8deg) !important;
+  transition: transform 0.18s ease;
+}
+
+/* Global Column Drag Preview */
+.cdk-drag-preview.column {
+  box-sizing: border-box !important;
+  width: 316px !important;
+  border-radius: 20px !important;
+  background:
+    linear-gradient(180deg, rgba(28, 26, 24, 0.92) 0%, rgba(19, 18, 17, 0.88) 100%) !important;
+  backdrop-filter: blur(32px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-top-color: rgba(255, 255, 255, 0.55) !important;
+  box-shadow: 0 35px 70px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(82, 184, 166, 0.25) !important;
+  opacity: 0.96 !important;
+  z-index: 10000 !important;
+  cursor: grabbing !important;
+  pointer-events: none !important;
+}
+
 
 .card-labels {
   display: flex;
@@ -1656,8 +2124,11 @@ body {
 
 /* CMS Sidebar */
 .cms-sidebar {
-  background: var(--bg-surface);
-  border-right: 1px solid var(--border-subtle);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-border);
+  box-shadow: 1px 0 0 var(--glass-specular);
   padding: 14px 14px 20px;
   overflow-y: auto;
   display: flex;
@@ -2621,12 +3092,16 @@ body {
 /* Sidebar Tabs */
 .cms-sidebar-tabs {
   display: flex;
-  background: var(--bg-surface-hover);
-  border: 1px solid var(--border-subtle);
+  background: var(--glass-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-top: 1px solid var(--glass-border-top);
   border-radius: var(--radius-md);
   padding: 3px;
   gap: 3px;
   margin-bottom: 14px;
+  box-shadow: inset 0 1px 0 var(--glass-specular);
 }
 
 .cms-sidebar-tab {
@@ -2637,7 +3112,7 @@ body {
   gap: 4px;
   padding: 5px 6px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--text-tertiary);
   font-size: 11.5px;
@@ -2654,13 +3129,15 @@ body {
 
 .cms-sidebar-tab:hover {
   color: var(--text-primary);
-  background: var(--bg-surface-active);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .cms-sidebar-tab.active {
-  background: var(--accent-primary);
-  color: #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  background: var(--glass-surface-elevated);
+  border: 1px solid var(--glass-border);
+  border-top: 1px solid var(--glass-border-top);
+  color: var(--accent-primary);
+  box-shadow: var(--glass-shadow);
 }
 
 .cms-tab-badge {
@@ -3075,18 +3552,22 @@ body {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  background: var(--bg-surface-hover);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  border-top: 1px solid var(--glass-border-top);
+  border-radius: var(--radius-md, 8px);
   cursor: grab;
   user-select: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 var(--glass-specular);
   transition: all 0.15s var(--ease-smooth);
 }
 
 .palette-item:hover {
   border-color: var(--accent-primary);
-  background: var(--bg-surface-active);
+  border-top-color: rgba(255, 255, 255, 0.5);
+  background: var(--glass-surface-elevated);
   transform: translateY(-1px);
+  box-shadow: var(--glass-shadow-hover);
 }
 
 .palette-item:active {
@@ -7542,92 +8023,166 @@ body {
 }
 
 /* ==========================================================================
-/* Default Canvas Board Theme (Dynamic Grid Texture) */
+   AMBIENT THEME BACKGROUNDS & TEXTURES (FULL VIEWPORT & CANVAS)
+   Transforms body, board canvas, and workspace areas seamlessly.
+   ========================================================================== */
+
+/* 1. DEFAULT SLATE */
+body.ambient-theme-default,
+body[data-ambient-theme="default"],
 .board.board-theme-default,
 #board.board-theme-default {
-  background-color: var(--bg-app);
-  background-image: radial-gradient(var(--canvas-grid-dot) 1.2px, transparent 1.2px);
-  background-size: 24px 24px;
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(1100px circle at 12% 8%, rgba(82, 184, 166, 0.07) 0%, transparent 65%),
+    radial-gradient(900px circle at 88% 85%, rgba(56, 189, 248, 0.06) 0%, transparent 58%),
+    radial-gradient(var(--canvas-grid-dot, rgba(255, 250, 240, 0.07)) 1.2px, transparent 1.2px) !important;
+  background-size: 100% 100%, 100% 100%, 24px 24px !important;
+  background-attachment: fixed !important;
 }
 
+.theme-light body.ambient-theme-default,
+[data-theme="light"] body.ambient-theme-default,
+[data-theme="light"] body[data-ambient-theme="default"],
+.theme-light .board.board-theme-default,
+.theme-light #board.board-theme-default,
+[data-theme="light"] .board.board-theme-default,
+[data-theme="light"] #board.board-theme-default {
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(1100px circle at 12% 8%, rgba(47, 127, 112, 0.08) 0%, transparent 65%),
+    radial-gradient(900px circle at 88% 85%, rgba(56, 189, 248, 0.07) 0%, transparent 58%),
+    radial-gradient(var(--canvas-grid-dot, rgba(35, 30, 24, 0.1)) 1.2px, transparent 1.2px) !important;
+  background-size: 100% 100%, 100% 100%, 24px 24px !important;
+  background-attachment: fixed !important;
+}
+
+/* 2. AURORA */
+body.ambient-theme-aurora,
+body[data-ambient-theme="aurora"],
 .board.board-theme-aurora,
 #board.board-theme-aurora {
-  background-color: #080c12 !important;
-  background-image: radial-gradient(at 15% 20%, rgba(16, 185, 129, 0.04) 0px, transparent 40%),
-    radial-gradient(at 85% 75%, rgba(6, 182, 212, 0.03) 0px, transparent 45%),
-    linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px) !important;
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(at 15% 20%, rgba(16, 185, 129, 0.08) 0px, transparent 45%),
+    radial-gradient(at 85% 75%, rgba(6, 182, 212, 0.06) 0px, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px) !important;
   background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
+  background-attachment: fixed !important;
 }
 
+.theme-light body.ambient-theme-aurora,
+[data-theme="light"] body.ambient-theme-aurora,
+[data-theme="light"] body[data-ambient-theme="aurora"],
 .theme-light .board.board-theme-aurora,
 .theme-light #board.board-theme-aurora,
 [data-theme="light"] .board.board-theme-aurora,
 [data-theme="light"] #board.board-theme-aurora {
-  background-color: #f1f5f9 !important;
-  background-image: radial-gradient(at 15% 20%, rgba(16, 185, 129, 0.08) 0px, transparent 45%),
-    radial-gradient(at 85% 75%, rgba(6, 182, 212, 0.06) 0px, transparent 50%),
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(at 15% 20%, rgba(16, 185, 129, 0.09) 0px, transparent 45%),
+    radial-gradient(at 85% 75%, rgba(6, 182, 212, 0.07) 0px, transparent 50%),
     linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px) !important;
   background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
+  background-attachment: fixed !important;
 }
 
+/* 3. NEBULA */
+body.ambient-theme-nebula,
+body[data-ambient-theme="nebula"],
 .board.board-theme-nebula,
 #board.board-theme-nebula {
-  background-color: #090a12 !important;
-  background-image: radial-gradient(at 20% 25%, rgba(59, 130, 246, 0.04) 0px, transparent 50%),
-    radial-gradient(at 80% 70%, rgba(99, 102, 241, 0.03) 0px, transparent 50%),
-    linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px) !important;
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(at 20% 25%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+    radial-gradient(at 80% 70%, rgba(168, 85, 247, 0.09) 0px, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px) !important;
   background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
+  background-attachment: fixed !important;
 }
 
+.theme-light body.ambient-theme-nebula,
+[data-theme="light"] body.ambient-theme-nebula,
+[data-theme="light"] body[data-ambient-theme="nebula"],
 .theme-light .board.board-theme-nebula,
 .theme-light #board.board-theme-nebula,
 [data-theme="light"] .board.board-theme-nebula,
 [data-theme="light"] #board.board-theme-nebula {
-  background-color: #f1f5f9 !important;
-  background-image: radial-gradient(at 20% 25%, rgba(99, 102, 241, 0.07) 0px, transparent 50%),
-    radial-gradient(at 80% 70%, rgba(59, 130, 246, 0.06) 0px, transparent 50%),
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(at 20% 25%, rgba(99, 102, 241, 0.09) 0px, transparent 50%),
+    radial-gradient(at 80% 70%, rgba(168, 85, 247, 0.07) 0px, transparent 50%),
     linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px) !important;
   background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
+  background-attachment: fixed !important;
 }
 
+/* 4. CYBERPUNK */
+body.ambient-theme-cyberpunk,
+body[data-ambient-theme="cyberpunk"],
 .board.board-theme-cyberpunk,
 #board.board-theme-cyberpunk {
-  background-color: #08090d !important;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px) !important;
-  background-size: 28px 28px, 28px 28px !important;
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(at 20% 20%, rgba(245, 158, 11, 0.07) 0px, transparent 40%),
+    radial-gradient(at 80% 80%, rgba(239, 68, 68, 0.05) 0px, transparent 45%),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px) !important;
+  background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px !important;
+  background-attachment: fixed !important;
 }
 
+.theme-light body.ambient-theme-cyberpunk,
+[data-theme="light"] body.ambient-theme-cyberpunk,
+[data-theme="light"] body[data-ambient-theme="cyberpunk"],
 .theme-light .board.board-theme-cyberpunk,
 .theme-light #board.board-theme-cyberpunk,
 [data-theme="light"] .board.board-theme-cyberpunk,
 [data-theme="light"] #board.board-theme-cyberpunk {
-  background-color: #f8fafc !important;
-  background-image: linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(at 20% 20%, rgba(245, 158, 11, 0.08) 0px, transparent 40%),
+    radial-gradient(at 80% 80%, rgba(239, 68, 68, 0.05) 0px, transparent 45%),
+    linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px) !important;
-  background-size: 28px 28px, 28px 28px !important;
+  background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px !important;
+  background-attachment: fixed !important;
 }
 
+/* 5. BLUEPRINT */
+body.ambient-theme-blueprint,
+body[data-ambient-theme="blueprint"],
 .board.board-theme-blueprint,
 #board.board-theme-blueprint {
-  background-color: #070a10 !important;
-  background-image: linear-gradient(rgba(56, 189, 248, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.035) 1px, transparent 1px) !important;
-  background-size: 32px 32px, 32px 32px !important;
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(at 25% 25%, rgba(2, 132, 199, 0.09) 0px, transparent 50%),
+    radial-gradient(at 75% 75%, rgba(37, 99, 235, 0.07) 0px, transparent 50%),
+    linear-gradient(rgba(56, 189, 248, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.045) 1px, transparent 1px) !important;
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
+  background-attachment: fixed !important;
 }
 
+.theme-light body.ambient-theme-blueprint,
+[data-theme="light"] body.ambient-theme-blueprint,
+[data-theme="light"] body[data-ambient-theme="blueprint"],
 .theme-light .board.board-theme-blueprint,
 .theme-light #board.board-theme-blueprint,
 [data-theme="light"] .board.board-theme-blueprint,
 [data-theme="light"] #board.board-theme-blueprint {
-  background-color: #f0f7ff !important;
-  background-image: linear-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px),
+  background-color: var(--bg-app) !important;
+  background-image:
+    radial-gradient(at 25% 25%, rgba(2, 132, 199, 0.09) 0px, transparent 50%),
+    radial-gradient(at 75% 75%, rgba(37, 99, 235, 0.07) 0px, transparent 50%),
+    linear-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(37, 99, 235, 0.08) 1px, transparent 1px) !important;
-  background-size: 32px 32px, 32px 32px !important;
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px !important;
+  background-attachment: fixed !important;
 }
 
 /* ==========================================================================

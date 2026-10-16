@@ -31,21 +31,89 @@ export class KanbanViewComponent implements OnInit {
     return b.columns.map(c => 'col-' + c.id);
   });
 
+  selectedTagFilter = this.boardService.selectedTagFilter;
+
   filteredColumns = computed(() => {
     const b = this.activeBoard();
     if (!b || !b.columns) return [];
     const q = this.boardService.searchQuery().trim().toLowerCase();
-    if (!q) return b.columns;
+    const tagFilter = this.selectedTagFilter();
 
     return b.columns.map(c => {
-      const matchingCards = (c.cards || []).filter(card =>
-        card.title.toLowerCase().includes(q) ||
-        (card.description && card.description.toLowerCase().includes(q)) ||
-        (card.labels && card.labels.some(l => l.name.toLowerCase().includes(q)))
-      );
-      return { ...c, cards: matchingCards };
+      let cards = c.cards || [];
+      if (tagFilter) {
+        cards = cards.filter(card =>
+          card.labels && card.labels.some(l => l.name.toLowerCase() === tagFilter.toLowerCase())
+        );
+      }
+      if (q) {
+        cards = cards.filter(card =>
+          card.title.toLowerCase().includes(q) ||
+          (card.description && card.description.toLowerCase().includes(q)) ||
+          (card.labels && card.labels.some(l => l.name.toLowerCase().includes(q)))
+        );
+      }
+      return { ...c, cards };
     });
   });
+
+  toggleTagFilter(tagName: string) {
+    if (this.selectedTagFilter()?.toLowerCase() === tagName.toLowerCase()) {
+      this.selectedTagFilter.set(null);
+    } else {
+      this.selectedTagFilter.set(tagName);
+    }
+  }
+
+  clearTagFilter() {
+    this.selectedTagFilter.set(null);
+  }
+
+  onCardTagClick(tagName: string, event: MouseEvent) {
+    event.stopPropagation();
+    this.toggleTagFilter(tagName);
+  }
+
+  isDraggingCard = false;
+
+  onCardMouseMove(event: MouseEvent, cardEl: HTMLElement) {
+    if (this.isDraggingCard || cardEl.classList.contains('cdk-drag-dragging')) return;
+    const rect = cardEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+
+    // Fluid 3D tilt angles (-11deg to +11deg)
+    const rotateX = ((0.5 - y) * 14).toFixed(2);
+    const rotateY = ((x - 0.5) * 16).toFixed(2);
+    const glareX = (x * 100).toFixed(1);
+    const glareY = (y * 100).toFixed(1);
+
+    cardEl.style.setProperty('--rx', `${rotateX}deg`);
+    cardEl.style.setProperty('--ry', `${rotateY}deg`);
+    cardEl.style.setProperty('--mx', `${glareX}%`);
+    cardEl.style.setProperty('--my', `${glareY}%`);
+    cardEl.style.setProperty('--card-hover', '1');
+  }
+
+  onCardMouseLeave(cardEl: HTMLElement) {
+    cardEl.style.setProperty('--rx', '0deg');
+    cardEl.style.setProperty('--ry', '0deg');
+    cardEl.style.setProperty('--mx', '50%');
+    cardEl.style.setProperty('--my', '50%');
+    cardEl.style.setProperty('--card-hover', '0');
+  }
+
+  onCardDragStarted(cardEl: HTMLElement) {
+    this.isDraggingCard = true;
+    this.onCardMouseLeave(cardEl);
+  }
+
+  onCardDragEnded(cardEl: HTMLElement) {
+    this.isDraggingCard = false;
+    this.onCardMouseLeave(cardEl);
+  }
 
   constructor() {
     effect(() => {
@@ -81,6 +149,12 @@ export class KanbanViewComponent implements OnInit {
           });
         }
         this.activeBoard.set(fullBoard);
+        if (this.selectedCard) {
+          const fresh = (fullBoard.cards || []).find(c => c.id === this.selectedCard!.id);
+          if (fresh) {
+            this.selectedCard = fresh;
+          }
+        }
       },
       error: (err) => console.error('Failed to load board details:', err)
     });
@@ -98,15 +172,33 @@ export class KanbanViewComponent implements OnInit {
     }
   }
 
-  onColumnTitleBlur(col: Column, event: Event) {
+  editingColumnId: number | null = null;
+
+  startEditingColumn(columnId: number, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    this.editingColumnId = columnId;
+  }
+
+  finishEditingColumn(col: Column, event: Event) {
+    this.editingColumnId = null;
     const input = event.target as HTMLInputElement;
     const newName = input.value.trim() || col.name;
     if (newName !== col.name) {
       this.boardService.updateColumn(col.id, newName).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => { col.name = newName; },
+        next: () => {
+          col.name = newName;
+          const b = this.activeBoard();
+          if (b && b.columns) {
+            this.activeBoard.set({ ...b, columns: [...b.columns] });
+          }
+        },
         error: (err) => console.error('Failed to rename column:', err)
       });
     }
+  }
+
+  onColumnTitleBlur(col: Column, event: Event) {
+    this.finishEditingColumn(col, event);
   }
 
   deleteColumn(columnId: number) {
@@ -160,16 +252,39 @@ export class KanbanViewComponent implements OnInit {
     this.selectBoard(b.id);
   }
 
-  onColumnDrop(event: CdkDragDrop<Column[]>) {
+  onLabelsChanged() {
+    const b = this.activeBoard();
+    if (!b) return;
+    this.selectBoard(b.id);
+  }
+
+  onColumnDrop(event: CdkDragDrop<any>) {
     const b = this.activeBoard();
     if (!b || !b.columns) return;
-    moveItemInArray(b.columns, event.previousIndex, event.currentIndex);
-    const orderedIds = b.columns.map(c => c.id);
-    const movedColId = b.columns[event.currentIndex].id;
-    this.boardService.moveColumns(movedColId, b.id, orderedIds).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    if (event.previousIndex === event.currentIndex) return;
+
+    const newColumns = [...b.columns];
+    moveItemInArray(newColumns, event.previousIndex, event.currentIndex);
+    newColumns.forEach((c, idx) => { c.position = idx; });
+
+    // Explicitly update signal so computed() signals and the Angular template re-render!
+    this.activeBoard.set({
+      ...b,
+      columns: newColumns
+    });
+
+    const orderedIds = newColumns.map(c => c.id);
+    const movedCol = newColumns[event.currentIndex];
+    this.boardService.moveColumns(movedCol.id, b.id, orderedIds).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      error: (err) => {
+        console.error('Failed to persist column positions:', err);
+        this.selectBoard(b.id);
+      }
+    });
   }
 
   onCardDrop(event: CdkDragDrop<Card[]>, targetColumnId: number) {
+    this.isDraggingCard = false;
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
       const card = event.container.data[event.currentIndex];

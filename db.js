@@ -196,6 +196,44 @@ CREATE INDEX IF NOT EXISTS idx_checklist_card ON checklist_items(card_id);
 CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag);
 CREATE INDEX IF NOT EXISTS idx_automations_active ON automations(is_active);
 CREATE INDEX IF NOT EXISTS idx_automation_logs_auto ON automation_logs(automation_id);
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  email TEXT UNIQUE,
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  avatar_url TEXT DEFAULT '',
+  display_name TEXT DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id INTEGER PRIMARY KEY,
+  theme_mode TEXT NOT NULL DEFAULT 'auto',
+  ambient_theme TEXT NOT NULL DEFAULT 'default',
+  ai_provider TEXT NOT NULL DEFAULT 'opencode',
+  ai_api_key TEXT NOT NULL DEFAULT '',
+  ai_base_url TEXT NOT NULL DEFAULT 'https://api.groq.com/openai/v1',
+  ai_model TEXT NOT NULL DEFAULT 'qwen/qwen3.8-27b',
+  ai_ollama_base_url TEXT NOT NULL DEFAULT 'http://localhost:11434',
+  ai_ollama_model TEXT NOT NULL DEFAULT 'llama3.2',
+  sidebar_collapsed INTEGER NOT NULL DEFAULT 0,
+  settings_json TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
 `);
 
 try {
@@ -213,6 +251,27 @@ try {
 try {
   db.prepare("ALTER TABLE pages ADD COLUMN is_first_page INTEGER DEFAULT 0").run();
 } catch (_) { }
+try {
+  db.prepare("ALTER TABLE boards ADD COLUMN user_id INTEGER DEFAULT 1").run();
+} catch (_) { }
+try {
+  db.prepare("ALTER TABLE pages ADD COLUMN user_id INTEGER DEFAULT 1").run();
+} catch (_) { }
+try {
+  db.prepare("ALTER TABLE activities ADD COLUMN user_id INTEGER DEFAULT 1").run();
+} catch (_) { }
+try {
+  db.prepare("ALTER TABLE automations ADD COLUMN user_id INTEGER DEFAULT 1").run();
+} catch (_) { }
+try {
+  db.prepare("ALTER TABLE reusable_blocks ADD COLUMN user_id INTEGER DEFAULT 1").run();
+} catch (_) { }
+
+// Multi-tenant user indexes
+try { db.prepare("CREATE INDEX IF NOT EXISTS idx_boards_user ON boards(user_id)").run(); } catch (_) { }
+try { db.prepare("CREATE INDEX IF NOT EXISTS idx_pages_user ON pages(user_id)").run(); } catch (_) { }
+try { db.prepare("CREATE INDEX IF NOT EXISTS idx_activities_user ON activities(user_id)").run(); } catch (_) { }
+
 
 // Ensure a default first page is designated if pages exist
 try {
@@ -556,7 +615,121 @@ function seedAutomationsIfEmpty() {
   }
 }
 
+
+function seedUserWorkspace(userId, username, displayName) {
+  try {
+    const isSarah = username === 'sarah';
+
+    // 1. Seed Board if user has none
+    const bCount = db.prepare('SELECT COUNT(*) AS c FROM boards WHERE user_id = ?').get(userId)?.c || 0;
+    if (bCount === 0) {
+      const boardTitle = isSarah ? "Sarah's Marketing & Campaigns" : (displayName ? `${displayName}'s Workspace` : 'Personal Board');
+      const bInfo = db.prepare('INSERT INTO boards (name, user_id) VALUES (?, ?)').run(boardTitle, userId);
+      const boardId = Number(bInfo.lastInsertRowid);
+
+      const colNames = ['Backlog', 'In Progress', 'Review', 'Done'];
+      const colMap = {};
+      colNames.forEach((n, i) => {
+        const cInfo = db.prepare('INSERT INTO columns (board_id, name, position) VALUES (?, ?, ?)').run(boardId, n, i);
+        colMap[n] = Number(cInfo.lastInsertRowid);
+      });
+
+      // Custom tags / labels per user
+      const userLabels = isSarah
+        ? [
+            { name: 'marketing', color: '#ec4899' },
+            { name: 'campaign', color: '#8b5cf6' },
+            { name: 'design', color: '#3b82f6' },
+            { name: 'content', color: '#10b981' }
+          ]
+        : [
+            { name: 'feature', color: '#3b82f6' },
+            { name: 'bug', color: '#ef4444' },
+            { name: 'urgent', color: '#f59e0b' },
+            { name: 'docs', color: '#10b981' }
+          ];
+
+      const labelMap = {};
+      userLabels.forEach(l => {
+        const lInfo = db.prepare('INSERT INTO labels (board_id, name, color) VALUES (?, ?, ?)').run(boardId, l.name, l.color);
+        labelMap[l.name] = Number(lInfo.lastInsertRowid);
+      });
+
+      const userCards = isSarah
+        ? [
+            { col: 'Backlog', title: 'Q4 Product Launch Press Kit', desc: 'Prepare one-pager, media assets, and executive quotes.', priority: 'high', labels: ['marketing', 'campaign'] },
+            { col: 'In Progress', title: 'Interactive Product Teaser Video', desc: 'Create 30s teaser with motion graphics.', priority: 'urgent', labels: ['design', 'campaign'] },
+            { col: 'Review', title: 'Email Newsletter Copy v2', desc: 'Review subject lines and CTA clicks.', priority: 'medium', labels: ['content'] },
+            { col: 'Done', title: 'Competitor Analysis Brief', desc: 'Synthesized feedback from 20 user interviews.', priority: 'low', labels: ['marketing'] }
+          ]
+        : [
+            { col: 'Backlog', title: 'Setup project workspace', desc: 'Initial workspace structure and requirements.', priority: 'medium', labels: ['feature'] },
+            { col: 'In Progress', title: 'Configure AI integrations', desc: 'Connect preferred model and test output.', priority: 'high', labels: ['feature'] },
+            { col: 'Done', title: 'Account onboarding completed', desc: 'Welcome to Aladenflow Studio!', priority: 'low', labels: ['docs'] }
+          ];
+
+      userCards.forEach((c, idx) => {
+        const cInfo = db.prepare(`
+          INSERT INTO cards (column_id, title, description, priority, position)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(colMap[c.col], c.title, c.desc, c.priority, idx);
+        const cardId = Number(cInfo.lastInsertRowid);
+
+        c.labels.forEach(lbl => {
+          if (labelMap[lbl]) {
+            db.prepare('INSERT OR IGNORE INTO card_labels (card_id, label_id) VALUES (?, ?)').run(cardId, labelMap[lbl]);
+          }
+        });
+
+        db.prepare('INSERT INTO activities (card_id, board_id, message, user_id) VALUES (?, ?, ?, ?)').run(
+          cardId,
+          boardId,
+          `Card created: "${c.title}"`,
+          userId
+        );
+      });
+    }
+
+    // 2. Seed Pages if user has none
+    const pCount = db.prepare('SELECT COUNT(*) AS c FROM pages WHERE user_id = ?').get(userId)?.c || 0;
+    if (pCount === 0) {
+      const pageTitle = isSarah ? "Sarah's Creative Showcase" : (displayName ? `${displayName}'s Hub` : 'Getting Started');
+      const pageSlug = isSarah ? "sarah-showcase" : `hub-${username}`;
+      const pageTags = isSarah ? ['portfolio', 'design', 'campaign'] : ['starter', 'guide'];
+
+      const blocks = isSarah
+        ? [
+            { id: 'sb1', type: 'heading', props: { level: 1, text: "Sarah's Brand & Campaign Studio" } },
+            { id: 'sb2', type: 'paragraph', props: { text: "Welcome to my creative workspace. Here I design marketing funnels, landing experiences, and interactive brand components." } },
+            { id: 'sb3', type: 'button', props: { label: "Explore Campaigns", url: "#campaigns", variant: "primary" } }
+          ]
+        : [
+            { id: 'wb1', type: 'heading', props: { level: 1, text: `Welcome, ${displayName || username}!` } },
+            { id: 'wb2', type: 'paragraph', props: { text: "This is your private Aladenflow Studio workspace. Your boards, pages, and tags are isolated exclusively to your account." } }
+          ];
+
+      const pInfo = db.prepare(`
+        INSERT INTO pages (title, slug, blocks, status, is_first_page, user_id)
+        VALUES (?, ?, ?, 'published', 1, ?)
+      `).run(pageTitle, pageSlug, JSON.stringify(blocks), userId);
+
+      const pageId = Number(pInfo.lastInsertRowid);
+      pageTags.forEach(t => {
+        db.prepare('INSERT OR IGNORE INTO page_tags (page_id, tag) VALUES (?, ?)').run(pageId, t);
+      });
+    }
+  } catch (err) {
+    console.error('Error seeding user workspace:', err);
+  }
+}
+
+db.seedUserWorkspace = seedUserWorkspace;
+
 seedIfEmpty();
 seedAutomationsIfEmpty();
+
+// Ensure user 1 and user 2 have their own separate workspaces
+seedUserWorkspace(1, 'demo', 'Alex Mercer (Demo)');
+seedUserWorkspace(2, 'sarah', 'Sarah Chen');
 
 module.exports = db;

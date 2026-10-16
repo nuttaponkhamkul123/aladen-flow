@@ -10,6 +10,10 @@ export class ThemeService {
   themeMode = signal<ThemeMode>('auto');
   systemIsDark = signal<boolean>(true);
   ambientTheme = signal<AmbientTheme>('default');
+  activeUserId = signal<number | null>(null);
+
+  // Callback to sync setting changes to authenticated user's profile
+  onSettingsChange?: (patch: Record<string, any>) => void;
 
   // Resolved boolean whether dark theme is effectively active
   isDark = computed<boolean>(() => {
@@ -25,6 +29,11 @@ export class ThemeService {
     this.initTheme();
   }
 
+  keyFor(key: string): string {
+    const uid = this.activeUserId();
+    return uid ? `u_${uid}_${key}` : key;
+  }
+
   private initTheme() {
     // 1. Detect system preference
     if (typeof window !== 'undefined' && window.matchMedia) {
@@ -38,40 +47,67 @@ export class ThemeService {
       });
     }
 
-    // 2. Load stored preferences
-    let savedMode: ThemeMode = 'auto';
-    try {
-      const stored = localStorage.getItem('app-theme-mode');
-      if (stored === 'dark' || stored === 'light' || stored === 'auto') {
-        savedMode = stored;
-      } else {
-        // Migration from legacy app-theme key
-        const legacy = localStorage.getItem('app-theme');
-        if (legacy === 'theme-light') savedMode = 'light';
-        else if (legacy === 'theme-dark') savedMode = 'dark';
-      }
-    } catch (_) {}
-
-    this.themeMode.set(savedMode);
-
-    const savedAmbient = (localStorage.getItem('board-ambient-theme') as AmbientTheme) || 'default';
-    this.ambientTheme.set(savedAmbient);
-
     this.applyGlobalTheme();
   }
 
-  setThemeMode(mode: ThemeMode) {
+  setUser(userId: number | null, settings?: any) {
+    this.activeUserId.set(userId);
+    if (!userId) {
+      this.resetToDefaults();
+      return;
+    }
+
+    if (settings) {
+      const mode = (settings.theme_mode as ThemeMode) || 'dark';
+      const ambient = (settings.ambient_theme as AmbientTheme) || 'default';
+      this.themeMode.set(mode);
+      this.ambientTheme.set(ambient);
+      try {
+        localStorage.setItem(this.keyFor('app-theme-mode'), mode);
+        localStorage.setItem(this.keyFor('board-ambient-theme'), ambient);
+      } catch (_) {}
+      this.applyGlobalTheme();
+    } else {
+      let savedMode: ThemeMode = 'dark';
+      try {
+        const stored = localStorage.getItem(this.keyFor('app-theme-mode'));
+        if (stored === 'dark' || stored === 'light' || stored === 'auto') {
+          savedMode = stored;
+        }
+      } catch (_) {}
+      this.themeMode.set(savedMode);
+
+      let savedAmbient: AmbientTheme = 'default';
+      try {
+        const stored = localStorage.getItem(this.keyFor('board-ambient-theme')) as AmbientTheme;
+        if (stored) savedAmbient = stored;
+      } catch (_) {}
+      this.ambientTheme.set(savedAmbient);
+      this.applyGlobalTheme();
+    }
+  }
+
+  resetToDefaults() {
+    this.activeUserId.set(null);
+    this.themeMode.set('dark');
+    this.ambientTheme.set('default');
+    this.applyGlobalTheme();
+  }
+
+  setThemeMode(mode: ThemeMode, syncToUser = true) {
     this.themeMode.set(mode);
     try {
-      localStorage.setItem('app-theme-mode', mode);
+      localStorage.setItem(this.keyFor('app-theme-mode'), mode);
     } catch (_) {}
     this.applyGlobalTheme();
+    if (syncToUser && this.onSettingsChange) {
+      this.onSettingsChange({ theme_mode: mode });
+    }
   }
 
   toggleThemeMode() {
     const current = this.themeMode();
     if (current === 'auto') {
-      // Immediately switch away from current resolved appearance
       this.setThemeMode(this.systemIsDark() ? 'light' : 'dark');
     } else if (current === 'dark') {
       this.setThemeMode('light');
@@ -89,21 +125,22 @@ export class ThemeService {
     this.setThemeMode(currentlyDark ? 'light' : 'dark');
   }
 
-  setAmbientTheme(theme: AmbientTheme) {
+  setAmbientTheme(theme: AmbientTheme, syncToUser = true) {
     this.ambientTheme.set(theme);
     try {
-      localStorage.setItem('board-ambient-theme', theme);
+      localStorage.setItem(this.keyFor('board-ambient-theme'), theme);
     } catch (_) {}
+    this.applyGlobalTheme();
+    if (syncToUser && this.onSettingsChange) {
+      this.onSettingsChange({ ambient_theme: theme });
+    }
   }
 
   private applyGlobalTheme() {
     const dark = this.isDark();
     const themeClass = dark ? 'theme-dark' : 'theme-light';
     const themeAttr = dark ? 'dark' : 'light';
-
-    try {
-      localStorage.setItem('app-theme', themeClass);
-    } catch (_) {}
+    const ambient = this.ambientTheme();
 
     if (typeof document !== 'undefined') {
       document.body.classList.remove('theme-dark', 'theme-light');
@@ -111,6 +148,16 @@ export class ThemeService {
       document.documentElement.classList.remove('theme-dark', 'theme-light');
       document.documentElement.classList.add(themeClass);
       document.documentElement.setAttribute('data-theme', themeAttr);
+
+      document.documentElement.setAttribute('data-ambient-theme', ambient);
+      document.body.setAttribute('data-ambient-theme', ambient);
+      const allAmbients: AmbientTheme[] = ['default', 'aurora', 'nebula', 'cyberpunk', 'blueprint'];
+      allAmbients.forEach(a => {
+        document.body.classList.remove(`ambient-theme-${a}`, `board-theme-${a}`);
+        document.documentElement.classList.remove(`ambient-theme-${a}`, `board-theme-${a}`);
+      });
+      document.body.classList.add(`ambient-theme-${ambient}`, `board-theme-${ambient}`);
+      document.documentElement.classList.add(`ambient-theme-${ambient}`);
     }
   }
 }

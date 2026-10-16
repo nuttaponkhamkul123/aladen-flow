@@ -3,41 +3,878 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+
+  /* ========================================================
+     Dark Mode Glass Tokens (Default)
+     ======================================================== */
+  --kb-board-tags-bg: rgba(22, 20, 18, 0.75);
+  --kb-board-tags-border: rgba(255, 255, 255, 0.08);
+  --kb-chip-bg: rgba(255, 255, 255, 0.04);
+  --kb-chip-border: rgba(255, 255, 255, 0.09);
+
+  --kb-column-bg: linear-gradient(180deg, rgba(28, 26, 24, 0.72) 0%, rgba(19, 18, 17, 0.65) 100%);
+  --kb-column-border: rgba(255, 255, 255, 0.1);
+  --kb-column-border-top: rgba(255, 255, 255, 0.24);
+  --kb-column-border-left: rgba(255, 255, 255, 0.15);
+  --kb-column-shadow: 0 24px 50px -14px rgba(0, 0, 0, 0.65), 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1.5px rgba(255, 255, 255, 0.22), inset 0 -1px 1px rgba(0, 0, 0, 0.25);
+  --kb-column-shadow-hover: 0 28px 58px -12px rgba(0, 0, 0, 0.7), 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.28);
+  --kb-column-count-bg: rgba(255, 255, 255, 0.07);
+  --kb-column-count-border: rgba(255, 255, 255, 0.12);
+
+  --kb-card-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.015) 100%), rgba(25, 23, 21, 0.65);
+  --kb-card-border: rgba(255, 255, 255, 0.12);
+  --kb-card-border-top: rgba(255, 255, 255, 0.32);
+  --kb-card-border-left: rgba(255, 255, 255, 0.2);
+  --kb-card-shadow: 0 8px 24px -5px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25), inset 0 1px 1.5px rgba(255, 255, 255, 0.32), inset 0 -1px 1px rgba(0, 0, 0, 0.25);
+  --kb-card-shadow-hover: var(--glass-shadow-hover);
+  --kb-specular-glare: radial-gradient(circle 260px at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.08) 38%, transparent 72%);
+  --kb-rim-gradient: var(--glass-rim);
+  --kb-title-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+
+  --kb-add-card-bg: rgba(255, 255, 255, 0.035);
+  --kb-add-card-border: rgba(255, 255, 255, 0.15);
+  --kb-ghost-bg: rgba(255, 255, 255, 0.025);
+  --kb-ghost-border: rgba(255, 255, 255, 0.16);
+
+  --kb-preview-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 100%), rgba(30, 28, 25, 0.92);
+  --kb-preview-border: rgba(255, 255, 255, 0.32);
+  --kb-column-preview-bg: linear-gradient(180deg, rgba(28, 26, 24, 0.92) 0%, rgba(19, 18, 17, 0.88) 100%);
+  --kb-column-preview-border: rgba(255, 255, 255, 0.3);
 }
 
+/* ========================================================
+   Light Mode Glass Tokens (Clean Paper & Crystalline Frost)
+   ======================================================== */
+:host-context(.theme-light),
+:host-context([data-theme="light"]) {
+  --kb-board-tags-bg: rgba(255, 255, 255, 0.85);
+  --kb-board-tags-border: rgba(35, 30, 24, 0.09);
+  --kb-chip-bg: rgba(35, 30, 24, 0.04);
+  --kb-chip-border: rgba(35, 30, 24, 0.11);
+
+  --kb-column-bg: linear-gradient(180deg, rgba(248, 246, 242, 0.86) 0%, rgba(240, 237, 231, 0.8) 100%);
+  --kb-column-border: rgba(35, 30, 24, 0.1);
+  --kb-column-border-top: rgba(255, 255, 255, 0.95);
+  --kb-column-border-left: rgba(255, 255, 255, 0.85);
+  --kb-column-shadow: 0 16px 36px -10px rgba(35, 30, 24, 0.09), 0 3px 10px rgba(35, 30, 24, 0.04), inset 0 1px 1.5px #ffffff;
+  --kb-column-shadow-hover: 0 20px 42px -8px rgba(35, 30, 24, 0.14), 0 5px 14px rgba(35, 30, 24, 0.06), inset 0 1.5px 2px #ffffff;
+  --kb-column-count-bg: rgba(35, 30, 24, 0.06);
+  --kb-column-count-border: rgba(35, 30, 24, 0.12);
+
+  --kb-card-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.8) 100%), rgba(255, 255, 255, 0.88);
+  --kb-card-border: rgba(35, 30, 24, 0.09);
+  --kb-card-border-top: rgba(255, 255, 255, 0.95);
+  --kb-card-border-left: rgba(255, 255, 255, 0.85);
+  --kb-card-shadow: 0 6px 18px -4px rgba(35, 30, 24, 0.07), 0 2px 6px rgba(35, 30, 24, 0.04), inset 0 1px 1.5px #ffffff, inset 0 -1px 1px rgba(0, 0, 0, 0.03);
+  --kb-card-shadow-hover: var(--glass-shadow-hover);
+  --kb-specular-glare: radial-gradient(circle 260px at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.2) 40%, transparent 75%);
+  --kb-rim-gradient: var(--glass-rim);
+  --kb-title-shadow: none;
+
+  --kb-add-card-bg: rgba(35, 30, 24, 0.035);
+  --kb-add-card-border: rgba(35, 30, 24, 0.13);
+  --kb-ghost-bg: rgba(35, 30, 24, 0.02);
+  --kb-ghost-border: rgba(35, 30, 24, 0.14);
+
+  --kb-preview-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.88) 100%), #ffffff;
+  --kb-preview-border: rgba(35, 30, 24, 0.18);
+  --kb-column-preview-bg: linear-gradient(180deg, rgba(248, 246, 242, 0.95) 0%, rgba(240, 237, 231, 0.9) 100%);
+  --kb-column-preview-border: rgba(35, 30, 24, 0.16);
+}
+
+.kanban-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+  position: relative;
+}
+
+/* Board Tags Toolbar */
+.board-tags-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: var(--kb-board-tags-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--kb-board-tags-border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+  z-index: 10;
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.tag-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.board-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill, 9999px);
+  font-size: 11.5px;
+  font-weight: 500;
+  background: var(--kb-chip-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--kb-chip-border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.board-tag-chip:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.board-tag-chip.active {
+  background: var(--accent-primary-subtle);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: 600;
+  box-shadow: 0 0 14px rgba(82, 184, 166, 0.25);
+}
+
+.tag-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.tag-clear-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--color-danger-subtle, rgba(224, 87, 79, 0.1));
+  border: 1px dashed var(--color-danger, #e0574f);
+  color: var(--color-danger, #e0574f);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 4px;
+  transition: all 0.15s ease;
+}
+
+.tag-clear-filter-btn:hover {
+  background: rgba(224, 87, 79, 0.2);
+}
+
+/* ========================================================
+   Ambient Board Surface (Styles dynamically driven by .board-theme-*)
+   ======================================================== */
 .board {
   flex: 1;
   display: flex;
-  gap: 16px;
-  padding: 22px;
+  gap: 20px;
+  padding: 24px 28px;
   overflow-x: auto;
   overflow-y: hidden;
   align-items: flex-start;
   height: 100%;
+  position: relative;
+}
+
+/* Custom smooth scrollbar for horizontal board */
+.board::-webkit-scrollbar {
+  height: 9px;
+}
+.board::-webkit-scrollbar-track {
+  background: transparent;
+}
+.board::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.board::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+  background-clip: padding-box;
+}
+
+/* ========================================================
+   Columns Dock Container (cdkDropList for columns)
+   ======================================================== */
+.columns-dock {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  height: 100%;
+}
+
+/* ========================================================
+   iOS 27 Glass Column Dock
+   ======================================================== */
+.column {
+  background: var(--kb-column-bg);
+  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  border: 1px solid var(--kb-column-border);
+  border-top: 1px solid var(--kb-column-border-top);
+  border-left: 1px solid var(--kb-column-border-left);
+  border-radius: 20px;
+  width: 316px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 110px);
+  box-shadow: var(--kb-column-shadow);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  position: relative;
+}
+
+.column:hover {
+  border-color: var(--border-medium);
+  border-top-color: var(--kb-column-border-top);
+  box-shadow: var(--kb-column-shadow-hover);
+}
+
+.column.cdk-drag-dragging {
+  opacity: 0.25 !important;
+}
+
+/* Column Header */
+.column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: grab;
+  gap: 10px;
+}
+
+.column-header:active {
+  cursor: grabbing;
+}
+
+.column-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.column-drag-handle {
+  display: grid;
+  place-items: center;
+  color: var(--text-tertiary);
+  cursor: grab;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.column-header:hover .column-drag-handle {
+  opacity: 1;
+  color: var(--accent-primary);
+}
+
+.column-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  box-shadow: var(--accent-glow, 0 0 10px rgba(82, 184, 166, 0.75));
+  flex-shrink: 0;
+}
+
+.column-title {
+  font-weight: 700;
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  cursor: grab;
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.column-title:hover {
+  background: var(--bg-surface-hover);
+}
+
+.column-title-input {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  background: var(--input-bg, var(--bg-surface));
+  border: 1px solid var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
+  border-radius: 4px;
+  padding: 2px 6px;
+  width: 140px;
+}
+
+.column-count {
+  background: var(--kb-column-count-bg);
+  backdrop-filter: blur(12px);
+  color: var(--text-secondary);
+  border: 1px solid var(--kb-column-count-border);
+  border-radius: 9999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  flex-shrink: 0;
+}
+
+.column-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.column-menu {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.column-menu:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.column-menu.column-delete:hover {
+  background: var(--color-danger-subtle, rgba(224, 87, 79, 0.15));
+  color: var(--color-danger, #e0574f);
+}
+
+/* Card List */
+.card-list {
+  padding: 12px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  perspective: 1200px;
+}
+
+.card-list::-webkit-scrollbar {
+  width: 6px;
+}
+.card-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.card-list::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 6px;
+}
+
+/* ========================================================
+   iOS 27 Interactive 3D Glass Cards
+   ======================================================== */
+.card {
+  --rx: 0deg;
+  --ry: 0deg;
+  --mx: 50%;
+  --my: 50%;
+  --card-hover: 0;
+
+  position: relative;
+  background: var(--kb-card-bg);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid var(--kb-card-border);
+  border-top: 1px solid var(--kb-card-border-top);
+  border-left: 1px solid var(--kb-card-border-left);
+  border-radius: 14px;
+  padding: 13px 14px 12px;
+  cursor: grab;
+  user-select: none;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transform: perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry)) translateZ(calc(var(--card-hover) * 8px));
+  box-shadow: var(--kb-card-shadow);
+  overflow: hidden;
+  will-change: transform, box-shadow;
+  transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+/* Dynamic Spring vs Snappy Tracking Transitions */
+.card:hover {
+  transition:
+    transform 0.08s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.2s ease;
+  border-color: var(--border-focus, #52b8a6);
+  border-top-color: var(--kb-card-border-top);
+  box-shadow: var(--kb-card-shadow-hover);
+}
+
+.card:not(:hover) {
+  transition:
+    transform 0.48s cubic-bezier(0.18, 0.9, 0.3, 1.25),
+    box-shadow 0.35s ease,
+    border-color 0.25s ease;
+}
+
+/* Tactile Active Haptic Press (when not dragging) */
+.card:active:not(.cdk-drag-dragging) {
+  cursor: grabbing;
+  transform: perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(0.985, 0.985, 0.985) translateZ(0);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+/* Card Specular Light Flare Layer (follows cursor) */
+.card-glass-specular {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  background: var(--kb-specular-glare);
+  opacity: var(--card-hover, 0);
+  transition: opacity 0.22s ease;
+  mix-blend-mode: overlay;
+}
+
+/* iOS 27 Prismatic Illuminated Rim Edge */
+.card-glass-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  padding: 1px;
+  background: var(--kb-rim-gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: calc(0.35 + var(--card-hover, 0) * 0.65);
+  transition: opacity 0.22s ease;
+}
+
+/* 3D Content Depth Separation */
+.card-content-3d {
+  position: relative;
+  z-index: 3;
+  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Card Cover Banner */
+.card-cover-banner {
+  height: 120px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
+  transform: translateZ(4px);
+}
+
+/* Card Labels Container */
+.card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 9px;
+  transform: translateZ(9px);
+}
+
+.card-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2.5px 8.5px;
+  border-radius: var(--radius-pill, 9999px);
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.22),
+    inset 0 1px 1px rgba(255, 255, 255, 0.38);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.18s ease, box-shadow 0.18s ease;
+  user-select: none;
+}
+
+.card-label:hover {
+  filter: brightness(1.2);
+  transform: translateY(-1px) scale(1.05);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.5);
+}
+
+/* Card Title Typography */
+.card-title-text {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  line-height: 1.45;
+  word-break: break-word;
+  transform: translateZ(14px);
+  text-shadow: var(--kb-title-shadow);
+}
+
+/* Card Meta Information */
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+  transform: translateZ(7px);
+}
+
+/* Priority Badges */
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2.5px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  text-transform: capitalize;
+  letter-spacing: -0.01em;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.priority-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.badge.priority-low {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.badge.priority-low .priority-dot {
+  box-shadow: 0 0 6px #34d399;
+}
+
+.badge.priority-medium {
+  background: rgba(14, 165, 233, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.25);
+}
+.badge.priority-medium .priority-dot {
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.badge.priority-high {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+.badge.priority-high .priority-dot {
+  box-shadow: 0 0 8px #fbbf24;
+}
+
+.badge.priority-urgent {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.32);
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.2);
+}
+.badge.priority-urgent .priority-dot {
+  box-shadow: 0 0 8px #fb7185;
+}
+
+/* Checklist Progress Bar */
+.checklist-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--kb-chip-bg);
+  backdrop-filter: blur(8px);
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--kb-chip-border);
+  font-size: 11px;
+}
+
+.checklist-progress .bar {
+  width: 36px;
+  height: 5px;
+  background: var(--border-medium);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.checklist-progress .bar div {
+  height: 100%;
+  background: var(--accent-gradient, linear-gradient(90deg, #52b8a6, #34d399));
+  border-radius: 999px;
+  box-shadow: var(--accent-glow, 0 0 8px rgba(82, 184, 166, 0.7));
+  transition: width 0.3s ease;
+}
+
+/* Due Date */
+.card-meta .due {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--kb-chip-bg);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--kb-chip-border);
+  color: var(--text-secondary);
+}
+
+/* Add Card Trigger Button */
+.add-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--kb-add-card-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px dashed var(--kb-add-card-border);
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.add-card-btn:hover {
+  background: var(--accent-primary-subtle);
+  border-color: var(--accent-primary);
+  border-style: solid;
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(82, 184, 166, 0.15);
+}
+
+/* Add Card Inline Form */
+.add-card-form {
+  padding: 12px 14px;
+  margin: 0 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-surface-elevated);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--accent-primary);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.add-card-form textarea {
+  background: var(--input-bg, var(--bg-surface));
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  resize: vertical;
+  min-height: 56px;
+  outline: none;
+  font-family: inherit;
+}
+
+.add-card-form textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Add Column Ghost */
+.add-column-ghost {
+  min-width: 290px;
+  width: 290px;
+  height: 120px;
+  border-radius: 20px;
+  border: 1px dashed var(--kb-ghost-border);
+  background: var(--kb-ghost-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.add-column-ghost:hover {
+  border-color: var(--accent-primary);
+  border-style: solid;
+  background: var(--accent-primary-subtle);
+  color: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 36px -10px rgba(0, 0, 0, 0.4),
+    0 0 24px rgba(82, 184, 166, 0.15);
+}
+
+.ghost-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--kb-chip-bg);
+  border: 1px solid var(--kb-chip-border);
+  display: grid;
+  place-items: center;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.add-column-ghost:hover .ghost-icon {
+  transform: rotate(90deg) scale(1.1);
+  background: var(--accent-primary-subtle);
+  border-color: var(--accent-primary);
+}
+
+/* ========================================================
+   CDK Drag & Drop State Styling
+   ======================================================== */
+.card.cdk-drag-dragging {
+  --rx: 0deg !important;
+  --ry: 0deg !important;
+  --card-hover: 0 !important;
+  opacity: 0.25 !important;
 }
 
 .cdk-drag-preview {
-  box-sizing: border-box;
-  border-radius: var(--radius-md, 8px);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  opacity: 0.92;
-  z-index: 1000;
+  box-sizing: border-box !important;
+  border-radius: 16px !important;
+  background: var(--kb-preview-bg) !important;
+  backdrop-filter: blur(32px) saturate(210%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(210%) !important;
+  border: 1px solid var(--kb-preview-border) !important;
+  box-shadow:
+    0 32px 64px -14px rgba(0, 0, 0, 0.6),
+    var(--accent-glow) !important;
+  opacity: 0.98 !important;
+  z-index: 10000 !important;
+  cursor: grabbing !important;
+  pointer-events: none !important;
+}
+
+.cdk-drag-preview .card-content-3d {
+  transform: scale(1.025) rotate(1.8deg) !important;
+  transition: transform 0.18s ease;
 }
 
 .cdk-drag-placeholder {
-  opacity: 0.25;
-  border: 2px dashed var(--accent-primary, #3b82f6);
-  border-radius: var(--radius-md, 8px);
+  opacity: 0.45 !important;
+  border: 2px dashed var(--accent-primary) !important;
+  background: var(--accent-primary-subtle) !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 0 20px var(--accent-primary-subtle) !important;
+  backdrop-filter: blur(10px) !important;
 }
 
+/* Column Specific CDK Drag Preview & Placeholder */
+.cdk-drag-preview.column {
+  box-sizing: border-box !important;
+  width: 316px !important;
+  border-radius: 20px !important;
+  background: var(--kb-column-preview-bg) !important;
+  backdrop-filter: blur(32px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
+  border: 1px solid var(--kb-column-preview-border) !important;
+  box-shadow: 0 35px 70px -15px rgba(0, 0, 0, 0.65), var(--accent-glow) !important;
+  opacity: 0.96 !important;
+  z-index: 10000 !important;
+  cursor: grabbing !important;
+  pointer-events: none !important;
+}
+
+.column.cdk-drag-placeholder {
+  opacity: 0.35 !important;
+  border: 2px dashed var(--accent-primary) !important;
+  background: var(--accent-primary-subtle) !important;
+  border-radius: 20px !important;
+  min-height: 220px !important;
+}
+
+/* Animate dropped item returning to position */
 .cdk-drag-animating {
-  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
 }
 
+/* Animate columns reordering */
+.columns-dock.cdk-drop-list-dragging .column:not(.cdk-drag-placeholder),
 .board.cdk-drop-list-dragging .column:not(.cdk-drag-placeholder) {
-  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
 }
 
+/* Animate other cards sliding out of the way smoothly */
 .card-list.cdk-drop-list-dragging .card:not(.cdk-drag-placeholder) {
-  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+}
+
+/* Neutralize 3D tilt during active dragging so cards glide smoothly */
+.columns-dock.cdk-drop-list-dragging .card,
+.board.cdk-drop-list-dragging .card,
+.card-list.cdk-drop-list-dragging .card {
+  --rx: 0deg !important;
+  --ry: 0deg !important;
+  --card-hover: 0 !important;
 }

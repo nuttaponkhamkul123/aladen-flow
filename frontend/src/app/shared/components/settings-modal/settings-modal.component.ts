@@ -5,12 +5,14 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { ThemeService, ThemeMode, AmbientTheme } from '../../../core/services/theme.service';
 import { ToastService } from '../../../core/services/toast.service';
 
-type TabId = 'general' | 'ai' | 'canvas' | 'storage';
+import { AuthService } from '../../../core/services/auth.service';
+
+type TabId = 'general' | 'ai' | 'canvas' | 'storage' | 'account';
 
 interface TabDef {
   id: TabId;
   label: string;
-  icon: 'appearance' | 'ai' | 'layout' | 'storage';
+  icon: 'appearance' | 'ai' | 'layout' | 'storage' | 'account';
 }
 
 interface ThemeModeDef {
@@ -31,6 +33,7 @@ export class SettingsModalComponent implements OnInit, AfterViewInit, OnDestroy 
   settingsService = inject(SettingsService);
   themeService = inject(ThemeService);
   toastService = inject(ToastService);
+  authService = inject(AuthService);
   private host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   private previouslyFocused: HTMLElement | null = null;
@@ -41,7 +44,8 @@ export class SettingsModalComponent implements OnInit, AfterViewInit, OnDestroy 
     { id: 'general', label: 'Appearance', icon: 'appearance' },
     { id: 'ai', label: 'AI Engine', icon: 'ai' },
     { id: 'canvas', label: 'Sidebars & Layout', icon: 'layout' },
-    { id: 'storage', label: 'Storage', icon: 'storage' }
+    { id: 'storage', label: 'Storage', icon: 'storage' },
+    { id: 'account', label: 'User & Profile', icon: 'account' }
   ];
 
   readonly themeModes: ThemeModeDef[] = [
@@ -70,18 +74,17 @@ export class SettingsModalComponent implements OnInit, AfterViewInit, OnDestroy 
       this.ollamaModel() !== this.settingsService.aiOllamaModel()
   );
 
-  // Ambient themes list. The `id` values are persisted in localStorage and are
-  // deliberately left unchanged; only the presentation labels are tuned here.
-  ambientThemes: { id: AmbientTheme; label: string; desc: string }[] = [
-    { id: 'default', label: 'Paper', desc: 'Plain neutral canvas' },
-    { id: 'aurora', label: 'Sage', desc: 'Faint green cast' },
-    { id: 'nebula', label: 'Dusk', desc: 'Cool muted indigo cast' },
-    { id: 'cyberpunk', label: 'Graphite', desc: 'Grid-lined dark surface' },
-    { id: 'blueprint', label: 'Linen', desc: 'Fine dotted texture' }
+  ambientThemes: { id: AmbientTheme; label: string; desc: string; previewClass: string }[] = [
+    { id: 'nebula', label: 'Nebula', desc: 'Electric cobalt indigo & cosmic violet system atmosphere', previewClass: 'swatch-nebula' },
+    { id: 'aurora', label: 'Aurora', desc: 'Northern boreal emerald & mint cyan system atmosphere', previewClass: 'swatch-aurora' },
+    { id: 'default', label: 'Default Slate', desc: 'Warm graphite obsidian & studio verdigris palette', previewClass: 'swatch-default' },
+    { id: 'cyberpunk', label: 'Cyberpunk', desc: 'High-contrast matrix onyx & radiant cyber amber gold', previewClass: 'swatch-cyberpunk' },
+    { id: 'blueprint', label: 'Blueprint', desc: 'Architectural drafting navy & precision tech azure', previewClass: 'swatch-blueprint' }
   ];
 
   ngOnInit() {
     this.previouslyFocused = document.activeElement as HTMLElement | null;
+    this.revertAi();
   }
 
   ngOnDestroy() {
