@@ -9,6 +9,7 @@ import { CmsService } from '../../../core/services/cms.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { AutomationService } from '../../../core/services/automation.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { AnimationService } from '../../../core/services/animation.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -24,9 +25,17 @@ export class SidebarComponent {
   settingsService = inject(SettingsService);
   automationService = inject(AutomationService);
   authService = inject(AuthService);
+  animationService = inject(AnimationService);
   private router = inject(Router);
 
   isCollapsed = signal<boolean>(this.loadCollapsedState());
+
+  onTabClick(event: MouseEvent) {
+    const icon = (event.currentTarget as HTMLElement).querySelector('.nav-item-icon-pod') as HTMLElement;
+    if (icon) {
+      this.animationService.animateClick(icon);
+    }
+  }
 
   openSettings(tab: 'general' | 'ai' | 'canvas' | 'storage' = 'general') {
     this.settingsService.open(tab);

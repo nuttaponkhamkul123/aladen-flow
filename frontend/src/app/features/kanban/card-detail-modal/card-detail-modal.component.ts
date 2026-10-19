@@ -1,11 +1,14 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject, DestroyRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Card, Label, ChecklistItem, Activity } from '../../../core/models/board.model';
 import { BoardService } from '../../../core/services/board.service';
-import { parseMarkdown, MarkdownBlock, markdownToBlocks, blocksToMarkdown } from '../../../core/utils/markdown.util';
+import { CmsService } from '../../../core/services/cms.service';
+import { CmsPage } from '../../../core/models/cms.model';
+import { parseMarkdown, MarkdownBlock, markdownToBlocks, blocksToMarkdown, parseInlineMarkdown, generateBlockId } from '../../../core/utils/markdown.util';
 
 @Component({
   selector: 'app-card-detail-modal',
@@ -23,22 +26,56 @@ export class CardDetailModalComponent implements OnInit {
   @Output() labelsChanged = new EventEmitter<void>();
 
   private boardService = inject(BoardService);
+  private cmsService = inject(CmsService);
+  private router = inject(Router);
   private destroyRef = inject(DestroyRef);
   private domSanitizer = inject(DomSanitizer);
 
   activities: Activity[] = [];
+  showActivityHistory = false;
   newChecklistText = '';
 
-  // Mode: Block Editor, Rendered Preview, or Raw Markdown
-  descriptionMode: 'blocks' | 'preview' | 'raw' = 'blocks';
+  toggleActivityHistory() {
+    this.showActivityHistory = !this.showActivityHistory;
+  }
 
-  // Markdown Block State
+  // Linked CMS Page State
+  availableCmsPages: CmsPage[] = [];
+  linkedCmsPage: CmsPage | null = null;
+
+  // Document Blocks State (Unified Single-View Block System)
   blocks: MarkdownBlock[] = [];
+  editingBlockId: string | null = null;
   activeBlockMenuId: string | null = null;
   slashMenuBlockId: string | null = null;
   slashQuery = '';
   selectedSlashIndex = 0;
   private saveDebounceTimer: any = null;
+
+  startEditingBlock(blockId: string, idx: number) {
+    this.editingBlockId = blockId;
+    setTimeout(() => {
+      const el = document.querySelector(`[data-block-idx="${idx}"] textarea`) as HTMLTextAreaElement;
+      if (el) {
+        el.focus();
+        this.autoResizeBlock(el);
+      }
+    }, 30);
+  }
+
+  stopEditingBlock() {
+    this.editingBlockId = null;
+    this.syncBlocksToMarkdown(true, false);
+  }
+
+  getRenderedBlockHtml(block: MarkdownBlock): SafeHtml {
+    const text = block.text || '';
+    if (!text.trim()) {
+      return this.domSanitizer.bypassSecurityTrustHtml('<span class="block-empty-placeholder">Click to type...</span>');
+    }
+    return this.domSanitizer.bypassSecurityTrustHtml(parseInlineMarkdown(text));
+  }
+
 
   // Drag & Drop State for moving markdown blocks
   draggedBlockIndex: number | null = null;
@@ -84,6 +121,59 @@ export class CardDetailModalComponent implements OnInit {
   ngOnInit() {
     this.loadActivities();
     this.initBlocksFromDescription();
+    this.loadCmsPages();
+  }
+
+  loadCmsPages() {
+    this.cmsService.getPages().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (pages) => {
+        this.availableCmsPages = pages;
+        if (this.card.cms_page_id) {
+          this.linkedCmsPage = pages.find(p => p.id === this.card.cms_page_id) || null;
+        }
+      },
+      error: (err) => console.error('Failed to load CMS pages for card:', err)
+    });
+  }
+
+  onLinkCmsPage(event: any) {
+    const rawVal = event?.target ? event.target.value : event;
+    const pageId = Number(rawVal) || null;
+    this.card.cms_page_id = pageId;
+    this.linkedCmsPage = this.availableCmsPages.find(p => p.id === pageId) || null;
+    if (this.linkedCmsPage) {
+      this.card.cms_page_title = this.linkedCmsPage.title;
+      this.card.cms_page_slug = this.linkedCmsPage.slug;
+      this.card.cms_page_status = this.linkedCmsPage.status;
+    } else {
+      this.card.cms_page_title = undefined;
+      this.card.cms_page_slug = undefined;
+      this.card.cms_page_status = undefined;
+    }
+    this.boardService.updateCard(this.card.id, { cms_page_id: pageId } as any).subscribe({
+      next: () => {
+        this.cardUpdated.emit(this.card);
+        this.loadActivities();
+      }
+    });
+  }
+
+  createAndLinkCmsPage() {
+    const title = this.card.title.trim() || 'New Content Page';
+    this.cmsService.createPage(title).subscribe({
+      next: (page) => {
+        this.availableCmsPages.push(page);
+        this.onLinkCmsPage(page.id);
+      }
+    });
+  }
+
+  goToCmsStudio(pageId?: number) {
+    this.close.emit();
+    if (pageId) {
+      this.cmsService.switchPage(pageId);
+    }
+    this.router.navigate(['/cms']);
   }
 
   initBlocksFromDescription() {
@@ -108,19 +198,6 @@ export class CardDetailModalComponent implements OnInit {
       if (this.saveDebounceTimer) clearTimeout(this.saveDebounceTimer);
       this.saveCardField('description');
     }
-  }
-
-  switchMode(mode: 'blocks' | 'preview' | 'raw') {
-    if (this.descriptionMode === 'blocks' && mode === 'raw') {
-      this.syncBlocksToMarkdown(false);
-    } else if (this.descriptionMode === 'raw' && mode === 'blocks') {
-      this.initBlocksFromDescription();
-    } else if (mode === 'preview') {
-      this.syncBlocksToMarkdown(false);
-    }
-    this.descriptionMode = mode;
-    this.activeBlockMenuId = null;
-    this.slashMenuBlockId = null;
   }
 
   // Auto-resize block textarea to fit contents without internal scrollbars
@@ -185,6 +262,7 @@ export class CardDetailModalComponent implements OnInit {
 
     const [movedBlock] = this.blocks.splice(fromIdx, 1);
     this.blocks.splice(toIdx, 0, movedBlock);
+    this.recomputeBlockHierarchy();
 
     this.onBlockDragEnd();
     this.syncBlocksToMarkdown(true, false);
@@ -196,8 +274,92 @@ export class CardDetailModalComponent implements OnInit {
     this.dragDropPosition = null;
   }
 
-  onBlockInput(block: MarkdownBlock, textarea: HTMLTextAreaElement) {
+  onBlockInput(block: MarkdownBlock, textarea: HTMLTextAreaElement, idx: number) {
     this.autoResizeBlock(textarea);
+
+    const val = block.text;
+
+    // 1. Heading 1: '# '
+    if (val.startsWith('# ')) {
+      block.type = 'h1';
+      block.text = val.slice(2);
+      this.syncBlocksToMarkdown(true, false);
+      setTimeout(() => { textarea.value = block.text; this.autoResizeBlock(textarea); }, 0);
+      return;
+    }
+
+    // 2. Heading 2: '## '
+    if (val.startsWith('## ')) {
+      block.type = 'h2';
+      block.text = val.slice(3);
+      this.syncBlocksToMarkdown(true, false);
+      setTimeout(() => { textarea.value = block.text; this.autoResizeBlock(textarea); }, 0);
+      return;
+    }
+
+    // 3. Heading 3: '### '
+    if (val.startsWith('### ')) {
+      block.type = 'h3';
+      block.text = val.slice(4);
+      this.syncBlocksToMarkdown(true, false);
+      setTimeout(() => { textarea.value = block.text; this.autoResizeBlock(textarea); }, 0);
+      return;
+    }
+
+    // 4. Todo checkbox: '- [ ] ' or '[] ' or '- [x] '
+    if (val.startsWith('- [ ] ') || val.startsWith('[] ')) {
+      block.type = 'todo';
+      block.checked = false;
+      block.text = val.replace(/^(-\s*\[\s*\]\s*|\[\s*\]\s*)/, '');
+      this.syncBlocksToMarkdown(true, false);
+      setTimeout(() => { textarea.value = block.text; this.autoResizeBlock(textarea); }, 0);
+      return;
+    }
+    if (val.startsWith('- [x] ') || val.startsWith('- [X] ')) {
+      block.type = 'todo';
+      block.checked = true;
+      block.text = val.replace(/^-\s*\[[xX]\]\s*/, '');
+      this.syncBlocksToMarkdown(true, false);
+      setTimeout(() => { textarea.value = block.text; this.autoResizeBlock(textarea); }, 0);
+      return;
+    }
+
+    // 5. Bullet list: '- ' or '* '
+    if (val.startsWith('- ') || val.startsWith('* ')) {
+      block.type = 'bullet';
+      block.text = val.slice(2);
+      this.syncBlocksToMarkdown(true, false);
+      setTimeout(() => { textarea.value = block.text; this.autoResizeBlock(textarea); }, 0);
+      return;
+    }
+
+    // 6. Quote: '> '
+    if (val.startsWith('> ')) {
+      block.type = 'quote';
+      block.text = val.slice(2);
+      this.syncBlocksToMarkdown(true, false);
+      setTimeout(() => { textarea.value = block.text; this.autoResizeBlock(textarea); }, 0);
+      return;
+    }
+
+    // 7. Divider: '---' or '***'
+    if (val === '---' || val === '***') {
+      block.type = 'divider';
+      block.text = '';
+      this.syncBlocksToMarkdown(true, false);
+      this.addBlockBelow(idx, 'text');
+      return;
+    }
+
+    // 8. Code block: '```'
+    if (val.startsWith('```')) {
+      block.type = 'code';
+      block.lang = val.slice(3).trim() || 'ts';
+      block.text = '';
+      this.syncBlocksToMarkdown(true, false);
+      setTimeout(() => { textarea.value = block.text; this.autoResizeBlock(textarea); }, 0);
+      return;
+    }
 
     // Detect if slash command triggered at end
     if (block.text.endsWith('/')) {
@@ -216,6 +378,30 @@ export class CardDetailModalComponent implements OnInit {
     }
 
     this.syncBlocksToMarkdown(true, true);
+  }
+
+  onBlockPaste(event: ClipboardEvent, index: number) {
+    const text = event.clipboardData?.getData('text');
+    if (!text) return;
+
+    // If pasted text has multiple lines or contains markdown headers/lists/code
+    if (text.includes('\n') || /^#{1,6}\s|^\s*[-*]\s|^>\s|^```/m.test(text)) {
+      event.preventDefault();
+      const parsed = markdownToBlocks(text);
+      if (parsed.length > 0) {
+        if (this.blocks[index].type === 'text' && !this.blocks[index].text.trim()) {
+          this.blocks.splice(index, 1, ...parsed);
+        } else {
+          this.blocks.splice(index + 1, 0, ...parsed);
+        }
+        this.syncBlocksToMarkdown(true, false);
+        setTimeout(() => {
+          document.querySelectorAll<HTMLTextAreaElement>('.blocks-document-canvas textarea').forEach(ta => {
+            this.autoResizeBlock(ta);
+          });
+        }, 50);
+      }
+    }
   }
 
   onBlockKeydown(event: KeyboardEvent, index: number, block: MarkdownBlock) {
@@ -283,10 +469,28 @@ export class CardDetailModalComponent implements OnInit {
       return;
     }
 
+    // Tab key: Indent (become child) or Outdent (Shift+Tab)
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.outdentBlock(index);
+      } else {
+        this.indentBlock(index);
+      }
+      return;
+    }
+
     // Backspace handling
     if (event.key === 'Backspace') {
       const target = event.target as HTMLTextAreaElement;
       const atStart = !target || (target.selectionStart === 0 && target.selectionEnd === 0);
+
+      // If at start of an indented child block, outdent it first before turning to text / deleting
+      if (atStart && (block.level || 0) > 0) {
+        event.preventDefault();
+        this.outdentBlock(index);
+        return;
+      }
 
       // If at start of a formatted block (heading, bullet, quote, etc), turn it back to plain text
       if (atStart && block.type !== 'text') {
@@ -345,16 +549,133 @@ export class CardDetailModalComponent implements OnInit {
     this.syncBlocksToMarkdown(true, false);
   }
 
-  addBlockBelow(index: number, type: MarkdownBlock['type'] = 'text') {
-    const newId = `block_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  recomputeBlockHierarchy() {
+    const parentStack: { [level: number]: string } = {};
+    for (const b of this.blocks) {
+      b.level = Math.max(0, Math.min(b.level || 0, 4));
+      b.parentId = b.level > 0 ? (parentStack[b.level - 1] || null) : null;
+      parentStack[b.level] = b.id;
+      for (let l = b.level + 1; l <= 6; l++) {
+        delete parentStack[l];
+      }
+    }
+  }
+
+  indentBlock(index: number) {
+    if (index <= 0) return;
+    const current = this.blocks[index];
+    const prev = this.blocks[index - 1];
+    const maxLevel = (prev.level || 0) + 1;
+    if ((current.level || 0) < maxLevel && (current.level || 0) < 4) {
+      current.level = (current.level || 0) + 1;
+      this.recomputeBlockHierarchy();
+      this.syncBlocksToMarkdown(true, false);
+    }
+  }
+
+  outdentBlock(index: number) {
+    const current = this.blocks[index];
+    if ((current.level || 0) > 0) {
+      current.level = (current.level || 0) - 1;
+      this.recomputeBlockHierarchy();
+      this.syncBlocksToMarkdown(true, false);
+    }
+  }
+
+  addChildBlock(index: number) {
+    const parent = this.blocks[index];
+    if (!parent) return;
+    const newLevel = Math.min((parent.level || 0) + 1, 4);
+    parent.collapsed = false;
+
+    let childType: MarkdownBlock['type'] = 'text';
+    if (parent.type === 'todo') childType = 'todo';
+    else if (parent.type === 'bullet') childType = 'bullet';
+
     const newBlock: MarkdownBlock = {
-      id: newId,
-      type,
+      id: generateBlockId(),
+      type: childType,
       text: '',
+      level: newLevel,
+      parentId: parent.id,
       checked: false
     };
 
     this.blocks.splice(index + 1, 0, newBlock);
+    this.recomputeBlockHierarchy();
+    this.editingBlockId = newBlock.id;
+    this.activeBlockMenuId = null;
+    this.syncBlocksToMarkdown(true, false);
+
+    setTimeout(() => {
+      const el = document.querySelector(`[data-block-idx="${index + 1}"] textarea`) as HTMLTextAreaElement;
+      if (el) {
+        el.focus();
+        this.autoResizeBlock(el);
+      }
+    }, 40);
+  }
+
+  hasChildren(index: number): boolean {
+    const current = this.blocks[index];
+    if (!current || index >= this.blocks.length - 1) return false;
+    const next = this.blocks[index + 1];
+    return (next.level || 0) > (current.level || 0);
+  }
+
+  getChildrenCount(index: number): number {
+    const current = this.blocks[index];
+    if (!current) return 0;
+    const baseLevel = current.level || 0;
+    let count = 0;
+    for (let i = index + 1; i < this.blocks.length; i++) {
+      if ((this.blocks[i].level || 0) > baseLevel) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }
+
+  toggleBlockCollapse(block: MarkdownBlock, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    block.collapsed = !block.collapsed;
+  }
+
+  isBlockHidden(index: number): boolean {
+    const target = this.blocks[index];
+    if (!target || !target.level || target.level === 0) return false;
+
+    let currentLevel = target.level;
+    for (let i = index - 1; i >= 0; i--) {
+      const candidate = this.blocks[i];
+      if ((candidate.level || 0) < currentLevel) {
+        if (candidate.collapsed) return true;
+        currentLevel = candidate.level || 0;
+        if (currentLevel === 0) break;
+      }
+    }
+    return false;
+  }
+
+  addBlockBelow(index: number, type: MarkdownBlock['type'] = 'text') {
+    const prev = this.blocks[index];
+    const level = prev ? (prev.level || 0) : 0;
+    const parentId = prev ? (prev.parentId || null) : null;
+    const newId = generateBlockId();
+    const newBlock: MarkdownBlock = {
+      id: newId,
+      type,
+      text: '',
+      checked: false,
+      level,
+      parentId
+    };
+
+    this.blocks.splice(index + 1, 0, newBlock);
+    this.recomputeBlockHierarchy();
+    this.editingBlockId = newId;
     this.syncBlocksToMarkdown(true, false);
 
     setTimeout(() => {
@@ -370,8 +691,9 @@ export class CardDetailModalComponent implements OnInit {
     this.activeBlockMenuId = null;
     this.blocks.splice(index, 1);
     if (this.blocks.length === 0) {
-      this.blocks.push({ id: `block_${Date.now()}`, type: 'text', text: '' });
+      this.blocks.push({ id: generateBlockId(), type: 'text', text: '', level: 0, parentId: null });
     }
+    this.recomputeBlockHierarchy();
     this.syncBlocksToMarkdown(true, false);
   }
 
@@ -379,10 +701,11 @@ export class CardDetailModalComponent implements OnInit {
     const src = this.blocks[index];
     const copy: MarkdownBlock = {
       ...src,
-      id: `block_${Date.now()}_copy`,
+      id: generateBlockId(),
       text: src.text
     };
     this.blocks.splice(index + 1, 0, copy);
+    this.recomputeBlockHierarchy();
     this.activeBlockMenuId = null;
     this.syncBlocksToMarkdown(true, false);
   }
@@ -392,6 +715,7 @@ export class CardDetailModalComponent implements OnInit {
     if (targetIdx < 0 || targetIdx >= this.blocks.length) return;
     const [item] = this.blocks.splice(index, 1);
     this.blocks.splice(targetIdx, 0, item);
+    this.recomputeBlockHierarchy();
     this.activeBlockMenuId = null;
     this.syncBlocksToMarkdown(true, false);
   }
@@ -427,213 +751,6 @@ export class CardDetailModalComponent implements OnInit {
     return this.domSanitizer.bypassSecurityTrustHtml(parseMarkdown(this.card.description));
   }
 
-  // Floating bubble toolbar for highlighted blocks
-  floatingToolbarVisible = false;
-  floatingToolbarPos = { top: 0, left: 0 };
-  activeHighlightText = '';
-
-  onEditorSelectionChange(textarea: HTMLTextAreaElement, container: HTMLElement) {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value.substring(start, end).trim();
-
-    if (text.length > 0) {
-      this.activeHighlightText = text;
-      // Calculate position above textarea selection
-      const top = Math.max(6, textarea.offsetTop - 36);
-      const left = Math.min(container.clientWidth - 290, Math.max(12, textarea.offsetLeft + 20));
-      this.floatingToolbarPos = { top, left };
-      this.floatingToolbarVisible = true;
-    } else {
-      this.floatingToolbarVisible = false;
-    }
-  }
-
-  onPreviewBlockClick(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    const blockEl = target.closest('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, tr');
-    this.switchMode('blocks');
-    if (!blockEl) return;
-
-    const blockText = (blockEl.textContent || '').trim().slice(0, 30);
-    const matchingIdx = this.blocks.findIndex(b => b.text && b.text.includes(blockText));
-    setTimeout(() => {
-      const idxToFocus = matchingIdx !== -1 ? matchingIdx : 0;
-      const el = document.querySelector(`[data-block-idx="${idxToFocus}"] textarea`) as HTMLTextAreaElement;
-      if (el) {
-        el.focus();
-        this.autoResizeBlock(el);
-      }
-    }, 60);
-  }
-
-  alterBlock(action: string, textarea: HTMLTextAreaElement) {
-    if (!this.card.description) this.card.description = '';
-    const desc = this.card.description;
-    let start = textarea.selectionStart;
-    let end = textarea.selectionEnd;
-
-    // If no text selected, expand to current line
-    if (start === end) {
-      const lineStart = desc.lastIndexOf('\n', start - 1) + 1;
-      let lineEnd = desc.indexOf('\n', end);
-      if (lineEnd === -1) lineEnd = desc.length;
-      start = lineStart;
-      end = lineEnd;
-    }
-
-    const selectedText = desc.substring(start, end);
-    let newText = '';
-
-    if (action === 'bold') {
-      if (selectedText.startsWith('**') && selectedText.endsWith('**') && selectedText.length >= 4) {
-        newText = selectedText.slice(2, -2);
-      } else {
-        newText = `**${selectedText}**`;
-      }
-    } else if (action === 'italic') {
-      if (selectedText.startsWith('*') && selectedText.endsWith('*') && selectedText.length >= 2 && !selectedText.startsWith('**')) {
-        newText = selectedText.slice(1, -1);
-      } else {
-        newText = `*${selectedText}*`;
-      }
-    } else if (action === 'code') {
-      if (selectedText.startsWith('`') && selectedText.endsWith('`') && selectedText.length >= 2) {
-        newText = selectedText.slice(1, -1);
-      } else {
-        newText = `\`${selectedText}\``;
-      }
-    } else if (action === 'codeblock') {
-      if (selectedText.startsWith('```') && selectedText.endsWith('```')) {
-        newText = selectedText.replace(/^```[a-zA-Z0-9_-]*\r?\n?/, '').replace(/\r?\n?```$/, '');
-      } else {
-        newText = `\`\`\`ts\n${selectedText}\n\`\`\``;
-      }
-    } else if (action === 'h1' || action === 'h2' || action === 'h3') {
-      const prefix = action === 'h1' ? '# ' : action === 'h2' ? '## ' : '### ';
-      const lineStart = desc.lastIndexOf('\n', start - 1) + 1;
-      let lineEnd = desc.indexOf('\n', end);
-      if (lineEnd === -1) lineEnd = desc.length;
-
-      const lines = desc.substring(lineStart, lineEnd).split('\n');
-      const transformedLines = lines.map(line => {
-        const clean = line.replace(/^#{1,6}\s+/, '');
-        return line.startsWith(prefix) ? clean : prefix + clean;
-      });
-
-      newText = transformedLines.join('\n');
-      this.card.description = desc.substring(0, lineStart) + newText + desc.substring(lineEnd);
-      this.saveCardField('description');
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(lineStart, lineStart + newText.length);
-      }, 0);
-      return;
-    } else if (action === 'list') {
-      const lineStart = desc.lastIndexOf('\n', start - 1) + 1;
-      let lineEnd = desc.indexOf('\n', end);
-      if (lineEnd === -1) lineEnd = desc.length;
-
-      const lines = desc.substring(lineStart, lineEnd).split('\n');
-      const allBulleted = lines.every(l => /^[-*]\s+/.test(l));
-      const transformedLines = lines.map(line => {
-        return allBulleted ? line.replace(/^[-*]\s+/, '') : `- ${line.replace(/^[-*]\s+/, '')}`;
-      });
-
-      newText = transformedLines.join('\n');
-      this.card.description = desc.substring(0, lineStart) + newText + desc.substring(lineEnd);
-      this.saveCardField('description');
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(lineStart, lineStart + newText.length);
-      }, 0);
-      return;
-    } else if (action === 'task') {
-      const lineStart = desc.lastIndexOf('\n', start - 1) + 1;
-      let lineEnd = desc.indexOf('\n', end);
-      if (lineEnd === -1) lineEnd = desc.length;
-
-      const lines = desc.substring(lineStart, lineEnd).split('\n');
-      const transformedLines = lines.map(line => {
-        if (line.startsWith('- [ ] ')) return line.replace('- [ ] ', '- [x] ');
-        if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) return line.replace(/^-\s+\[[xX]\]\s+/, '');
-        return `- [ ] ${line.replace(/^[-*]\s+/, '')}`;
-      });
-
-      newText = transformedLines.join('\n');
-      this.card.description = desc.substring(0, lineStart) + newText + desc.substring(lineEnd);
-      this.saveCardField('description');
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(lineStart, lineStart + newText.length);
-      }, 0);
-      return;
-    } else if (action === 'quote') {
-      const lineStart = desc.lastIndexOf('\n', start - 1) + 1;
-      let lineEnd = desc.indexOf('\n', end);
-      if (lineEnd === -1) lineEnd = desc.length;
-
-      const lines = desc.substring(lineStart, lineEnd).split('\n');
-      const allQuoted = lines.every(l => l.startsWith('> ') || l.startsWith('>'));
-      const transformedLines = lines.map(line => {
-        return allQuoted ? line.replace(/^>\s?/, '') : `> ${line.replace(/^>\s?/, '')}`;
-      });
-
-      newText = transformedLines.join('\n');
-      this.card.description = desc.substring(0, lineStart) + newText + desc.substring(lineEnd);
-      this.saveCardField('description');
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(lineStart, lineStart + newText.length);
-      }, 0);
-      return;
-    } else if (action === 'link') {
-      newText = `[${selectedText || 'link text'}](https://)`;
-    } else if (action === 'strip') {
-      newText = selectedText
-        .replace(/\*\*([^*]+)\*\*/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1')
-        .replace(/`([^`]+)`/g, '$1')
-        .replace(/^#{1,6}\s+/gm, '')
-        .replace(/^[-*]\s+(\[[ xX]\]\s+)?/gm, '')
-        .replace(/^>\s?/gm, '');
-    }
-
-    this.card.description = desc.substring(0, start) + newText + desc.substring(end);
-    this.saveCardField('description');
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start, start + newText.length);
-    }, 0);
-  }
-
-  insertMarkdown(prefix: string, suffix: string = '', defaultText: string = '', textarea?: HTMLTextAreaElement) {
-    if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
-      this.alterBlock(prefix === '**' ? 'bold' : prefix === '*' ? 'italic' : prefix === '`' ? 'code' : 'link', textarea);
-      return;
-    }
-
-    if (!this.card.description) {
-      this.card.description = '';
-    }
-
-    if (textarea) {
-      const start = textarea.selectionStart || 0;
-      const end = textarea.selectionEnd || 0;
-      const selected = this.card.description.substring(start, end) || defaultText;
-      const replacement = `${prefix}${selected}${suffix}`;
-      this.card.description =
-        this.card.description.substring(0, start) + replacement + this.card.description.substring(end);
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
-      }, 0);
-    } else {
-      this.card.description = (this.card.description ? this.card.description + '\n' : '') + `${prefix}${defaultText}${suffix}`;
-    }
-    this.saveCardField('description');
-  }
-
   loadActivities() {
     this.boardService.getCardActivity(this.card.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: acts => this.activities = acts,
@@ -661,6 +778,46 @@ export class CardDetailModalComponent implements OnInit {
   setCover(val: string) {
     this.card.cover = val;
     this.saveCardField('cover');
+  }
+
+  isCoverGradient(cover?: string): boolean {
+    return !!cover && cover.startsWith('linear-gradient');
+  }
+
+  isCoverColorOrGradient(cover?: string): boolean {
+    if (!cover) return false;
+    return cover.startsWith('linear-gradient') || cover.startsWith('#') || cover.startsWith('rgb');
+  }
+
+  getCoverImageUrl(): string {
+    if (!this.card.cover || this.isCoverColorOrGradient(this.card.cover)) return '';
+    return this.card.cover;
+  }
+
+  setCoverImage(url: string) {
+    this.setCover(url.trim());
+  }
+
+  getCoverColorValue(): string {
+    if (this.card.cover && this.card.cover.startsWith('#')) {
+      return this.card.cover;
+    }
+    return '#52b8a6';
+  }
+
+  onCoverColorPicked(event: Event) {
+    const color = (event.target as HTMLInputElement)?.value;
+    if (color) {
+      this.setCover(color);
+    }
+  }
+
+  isCustomCoverActive(): boolean {
+    return !!this.card.cover && this.card.cover.startsWith('#');
+  }
+
+  getCompletedChecklistCount(): number {
+    return (this.card.checklist || []).filter(i => i.checked).length;
   }
 
   toggleChecklistItem(item: ChecklistItem) {

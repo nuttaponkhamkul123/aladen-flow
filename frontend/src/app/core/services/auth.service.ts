@@ -1,10 +1,12 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { Observable, tap, catchError, of } from 'rxjs';
 import { User, UserSettings, AuthResponse } from '../models/user.model';
 import { ThemeService, ThemeMode, AmbientTheme } from './theme.service';
 import { SettingsService } from './settings.service';
 import { ToastService } from './toast.service';
+import { AnimationService } from './animation.service';
 
 @Injectable({
   providedIn: 'root'
@@ -14,6 +16,8 @@ export class AuthService {
   private themeService = inject(ThemeService);
   private settingsService = inject(SettingsService);
   private toastService = inject(ToastService);
+  private router = inject(Router);
+  private animationService = inject(AnimationService);
 
   private readonly TOKEN_KEY = 'aladen_auth_token';
 
@@ -22,6 +26,7 @@ export class AuthService {
   token = signal<string | null>(this.getStoredToken());
   isLoggedIn = computed<boolean>(() => !!this.currentUser());
   authInitialized = signal<boolean>(false);
+  isTransitioningToDashboard = signal<boolean>(false);
 
   availableUsers = signal<any[]>([]);
   isAuthModalOpen = signal<boolean>(false);
@@ -105,7 +110,7 @@ export class AuthService {
     });
   }
 
-  login(credentials: { username: string; password: string }): Observable<AuthResponse> {
+  login(credentials: { username: string; password: string }, fromGate: boolean = false): Observable<AuthResponse> {
     this.isLoading.set(true);
     return this.http.post<AuthResponse>('/api/auth/login', credentials).pipe(
       tap({
@@ -113,6 +118,9 @@ export class AuthService {
           this.isLoading.set(false);
           this.setStoredToken(res.token);
           this.token.set(res.token);
+          if (fromGate || !this.currentUser()) {
+            this.isTransitioningToDashboard.set(true);
+          }
           this.currentUser.set(res.user);
           this.currentSettings.set(res.settings || null);
           if (res.settings) {
@@ -121,16 +129,27 @@ export class AuthService {
           this.toastService.show(`Welcome back, ${res.user.display_name}!`, 'success');
           this.closeModal();
           this.fetchAvailableUsers();
+
+          if (fromGate || this.isTransitioningToDashboard()) {
+            this.router.navigate(['/dashboard']).then(() => {
+              setTimeout(() => {
+                this.animationService.animateLoginToDashboard(() => {
+                  this.isTransitioningToDashboard.set(false);
+                });
+              }, 40);
+            });
+          }
         },
         error: (err) => {
           this.isLoading.set(false);
+          this.isTransitioningToDashboard.set(false);
           console.error('Login error:', err);
         }
       })
     );
   }
 
-  register(data: { username: string; password: string; email?: string; displayName?: string }): Observable<AuthResponse> {
+  register(data: { username: string; password: string; email?: string; displayName?: string }, fromGate: boolean = false): Observable<AuthResponse> {
     this.isLoading.set(true);
     return this.http.post<AuthResponse>('/api/auth/register', data).pipe(
       tap({
@@ -138,6 +157,9 @@ export class AuthService {
           this.isLoading.set(false);
           this.setStoredToken(res.token);
           this.token.set(res.token);
+          if (fromGate || !this.currentUser()) {
+            this.isTransitioningToDashboard.set(true);
+          }
           this.currentUser.set(res.user);
           this.currentSettings.set(res.settings || null);
           if (res.settings) {
@@ -146,23 +168,31 @@ export class AuthService {
           this.toastService.show(`Account created! Welcome, ${res.user.display_name}.`, 'success');
           this.closeModal();
           this.fetchAvailableUsers();
+
+          if (fromGate || this.isTransitioningToDashboard()) {
+            this.router.navigate(['/dashboard']).then(() => {
+              setTimeout(() => {
+                this.animationService.animateLoginToDashboard(() => {
+                  this.isTransitioningToDashboard.set(false);
+                });
+              }, 40);
+            });
+          }
         },
         error: (err) => {
           this.isLoading.set(false);
+          this.isTransitioningToDashboard.set(false);
           console.error('Registration error:', err);
         }
       })
     );
   }
 
-  quickSwitchUser(username: string) {
-    return this.login({ username, password: 'password123' }).subscribe();
-  }
-
   logout(): Observable<{ ok: boolean }> {
     return this.http.post<{ ok: boolean }>('/api/auth/logout', {}).pipe(
       catchError(() => of({ ok: true })),
       tap(() => {
+        this.isTransitioningToDashboard.set(false);
         this.setStoredToken(null);
         this.token.set(null);
         this.currentUser.set(null);
@@ -170,6 +200,7 @@ export class AuthService {
         this.themeService.resetToDefaults();
         this.settingsService.resetToDefaults();
         this.toastService.show('You have been signed out', 'info');
+        this.router.navigate(['/dashboard']);
       })
     );
   }

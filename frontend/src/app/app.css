@@ -155,6 +155,27 @@
   justify-content: center;
 }
 
+/* Seamless Login -> Dashboard Transition States */
+.auth-gate-wrapper.gate-leaving {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  background-color: transparent;
+  will-change: opacity;
+}
+
+.auth-gate-wrapper.gate-leaving .gate-branding-card,
+.auth-gate-wrapper.gate-leaving .gate-form-card {
+  will-change: opacity, transform, filter;
+}
+
+.app-shell.workspace-entering {
+  position: relative;
+  z-index: 1;
+  will-change: opacity, transform;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

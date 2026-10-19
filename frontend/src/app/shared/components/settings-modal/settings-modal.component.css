@@ -11,9 +11,7 @@
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.68);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(0, 0, 0, 0.7);
 }
 
 .settings-panel {
@@ -21,14 +19,10 @@
   z-index: 1051;
   width: 100%;
   max-width: 680px;
-  background: var(--glass-surface-elevated);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-top: 1px solid var(--glass-border-top);
-  border-left: 1px solid var(--glass-border-left);
+  background: var(--bg-surface-elevated, #211f1d);
+  border: 1px solid var(--border-medium, rgba(255, 250, 240, 0.14));
   border-radius: var(--radius-xl, 16px);
-  box-shadow: var(--glass-shadow-hover), 0 24px 60px -15px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.65);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -704,73 +698,6 @@
   color: var(--text-tertiary);
   margin-top: 10px;
   line-height: 1.4;
-}
-
-.accounts-switch-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.account-card-chip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md, 8px);
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.15s ease;
-}
-
-.account-card-chip:hover {
-  background: var(--bg-surface-hover, rgba(255, 255, 255, 0.08));
-  border-color: var(--accent-primary);
-}
-
-.account-card-chip.active {
-  border-color: var(--accent-primary);
-  background: rgba(99, 102, 241, 0.08);
-}
-
-.chip-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.chip-details {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.chip-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chip-sub {
-  font-size: 10.5px;
-  color: var(--text-tertiary);
-}
-
-.chip-active-dot {
-  font-size: 10px;
-  font-weight: 700;
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.15);
-  padding: 2px 6px;
-  border-radius: 9999px;
 }
 
 .user-action-row {

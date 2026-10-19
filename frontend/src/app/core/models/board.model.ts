@@ -25,6 +25,10 @@ export interface Card {
   archived?: number;
   labels?: Label[];
   checklist?: ChecklistItem[];
+  cms_page_id?: number | null;
+  cms_page_title?: string;
+  cms_page_slug?: string;
+  cms_page_status?: string;
 }
 
 export interface Column {

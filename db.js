@@ -266,6 +266,9 @@ try {
 try {
   db.prepare("ALTER TABLE reusable_blocks ADD COLUMN user_id INTEGER DEFAULT 1").run();
 } catch (_) { }
+try {
+  db.prepare("ALTER TABLE cards ADD COLUMN cms_page_id INTEGER DEFAULT NULL").run();
+} catch (_) { }
 
 // Multi-tenant user indexes
 try { db.prepare("CREATE INDEX IF NOT EXISTS idx_boards_user ON boards(user_id)").run(); } catch (_) { }

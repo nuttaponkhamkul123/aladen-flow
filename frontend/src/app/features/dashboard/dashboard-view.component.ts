@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BoardService } from '../../core/services/board.service';
+import { AnimationService } from '../../core/services/animation.service';
 
 @Component({
   selector: 'app-dashboard-view',
@@ -14,6 +15,7 @@ import { BoardService } from '../../core/services/board.service';
 export class DashboardViewComponent implements OnInit {
   Math = Math;
   boardService = inject(BoardService);
+  animationService = inject(AnimationService);
   private destroyRef = inject(DestroyRef);
 
   overview = signal<any>(null);
@@ -27,6 +29,9 @@ export class DashboardViewComponent implements OnInit {
       next: (data) => {
         this.overview.set(data);
         this.loading.set(false);
+        setTimeout(() => {
+          this.animationService.animateDashboardEntrance();
+        }, 20);
       },
       error: () => {
         this.loading.set(false);
@@ -34,18 +39,9 @@ export class DashboardViewComponent implements OnInit {
     });
   }
 
-  // 3D Card Interactive Tilt
-  onCardMouseMove(e: MouseEvent, el: HTMLElement) {
-    const rect = el.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    const rotateX = -(y / (rect.height / 2)) * 7;
-    const rotateY = (x / (rect.width / 2)) * 7;
-    el.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-4px) translateZ(8px)`;
-  }
-
-  onCardMouseLeave(el: HTMLElement) {
-    el.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0) translateZ(0)';
+  getPct(count: number, total: number): number {
+    if (!total || total <= 0 || !count || count <= 0) return 0;
+    return Math.round((count / total) * 100);
   }
 
   // Calculate SVG Donut stroke-dasharray
@@ -64,13 +60,6 @@ export class DashboardViewComponent implements OnInit {
     }
     const offset = (prevCount / total) * this.DONUT_CIRCUMFERENCE;
     return -offset;
-  }
-
-  // Isometric 3D Pillar Height (in pixels)
-  getPillarHeight(count: number, total: number): number {
-    if (!total || total <= 0 || !count || count <= 0) return 30;
-    const ratio = count / total;
-    return Math.max(34, Math.round(ratio * 130));
   }
 
   getTimeAgo(dateStr: string): string {

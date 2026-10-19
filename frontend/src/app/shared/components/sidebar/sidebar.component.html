@@ -47,7 +47,7 @@
     }
 
     <!-- 1. Dashboard Nav Tab -->
-    <a routerLink="/dashboard" class="sidebar-nav-item" routerLinkActive="active"
+    <a routerLink="/dashboard" class="sidebar-nav-item" routerLinkActive="active" (click)="onTabClick($event)"
        [title]="isCollapsed() ? 'Telemetry Dashboard' : ''">
       <div class="nav-item-icon-pod">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -68,7 +68,7 @@
     </a>
 
     <!-- 2. Boards Nav Tab -->
-    <a routerLink="/kanban" class="sidebar-nav-item" routerLinkActive="active"
+    <a routerLink="/kanban" class="sidebar-nav-item" routerLinkActive="active" (click)="onTabClick($event)"
        [title]="isCollapsed() ? 'Kanban Boards (' + boardsCount() + ')' : ''">
       <div class="nav-item-icon-pod">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -90,7 +90,7 @@
     </a>
 
     <!-- 3. Site Builder Nav Tab -->
-    <a routerLink="/cms" class="sidebar-nav-item" routerLinkActive="active"
+    <a routerLink="/cms" class="sidebar-nav-item" routerLinkActive="active" (click)="onTabClick($event)"
        [title]="isCollapsed() ? 'Site Builder (' + pagesCount() + ')' : ''">
       <div class="nav-item-icon-pod">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -112,7 +112,7 @@
     </a>
 
     <!-- 4. Automations Nav Tab -->
-    <a routerLink="/automations" class="sidebar-nav-item" routerLinkActive="active"
+    <a routerLink="/automations" class="sidebar-nav-item" routerLinkActive="active" (click)="onTabClick($event)"
        [title]="isCollapsed() ? 'Flow Automations (' + automationsCount() + ')' : ''">
       <div class="nav-item-icon-pod">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"

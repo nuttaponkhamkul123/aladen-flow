@@ -6,9 +6,11 @@
       <span class="splash-text">Starting Aladenflow Studio...</span>
     </div>
   </div>
-} @else if (authService.isLoggedIn()) {
-  <!-- Main Workspace (Available only when authenticated) -->
-  <div class="app-shell">
+}
+
+@if (authService.isLoggedIn() || authService.isTransitioningToDashboard()) {
+  <!-- Main Workspace (Available when authenticated or during handover transition) -->
+  <div class="app-shell" [class.workspace-entering]="authService.isTransitioningToDashboard()">
     <app-sidebar></app-sidebar>
     <div class="app-content-pane">
       <app-header></app-header>
@@ -23,9 +25,12 @@
   }
 
   <app-auth-modal></app-auth-modal>
-} @else {
+  <app-command-palette></app-command-palette>
+}
+
+@if (!authService.isLoggedIn() || authService.isTransitioningToDashboard()) {
   <!-- Full-Page Authentication Gate: User MUST log in first -->
-  <div class="auth-gate-wrapper">
+  <div class="auth-gate-wrapper" [class.gate-leaving]="authService.isTransitioningToDashboard()">
     <div class="gate-branding-card">
       <div class="gate-logo-badge">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">

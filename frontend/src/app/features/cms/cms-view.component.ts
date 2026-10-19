@@ -8,6 +8,8 @@ import { CmsService } from '../../core/services/cms.service';
 import { ToastService } from '../../core/services/toast.service';
 import { ThemeService, ThemeMode } from '../../core/services/theme.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { BoardService } from '../../core/services/board.service';
+import { Board, Column } from '../../core/models/board.model';
 import { CmsPage, ReusableBlock, Block, BlockCategory, BLOCK_DEFAULTS } from '../../core/models/cms.model';
 import { AiModalComponent } from './components/ai-modal/ai-modal.component';
 import { PROP_SCHEMAS, PropField } from './cms-prop-schema';
@@ -27,8 +29,13 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   toastService = inject(ToastService);
   themeService = inject(ThemeService);
   settingsService = inject(SettingsService);
+  boardService = inject(BoardService);
   private destroyRef = inject(DestroyRef);
   private sanitizer = inject(DomSanitizer);
+
+  // Kanban Board Integration for Form Blocks
+  availableBoards = signal<Board[]>([]);
+  columnsByBoard = signal<Record<number, Column[]>>({});
 
   // Common Custom Select Options
   readonly bgPresetOptions: SelectOption[] = [
@@ -188,7 +195,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   leftSidebarCollapsed = signal<boolean>(false);
   rightSidebarCollapsed = signal<boolean>(false);
 
-  leftSidebarWidth = signal<number>(this.loadSidebarWidth('cms_left_sidebar_w', 280));
+  leftSidebarWidth = signal<number>(this.loadSidebarWidth('cms_left_sidebar_w', 290));
   rightSidebarWidth = signal<number>(this.loadSidebarWidth('cms_right_sidebar_w', 300));
   isResizingLeft = signal<boolean>(false);
   isResizingRight = signal<boolean>(false);
@@ -239,6 +246,7 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   showPagesPopup = false;
   showAiModal = false;
   showSaveReusableModal = signal<boolean>(false);
+  showTemplatesModal = signal<boolean>(false);
   targetReusableBlock = signal<Block | null>(null);
   reusableNameInput = signal<string>('');
   reusableCategoryInput = signal<string>('custom');
@@ -911,6 +919,66 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit() {
     this.loadPages();
     this.loadReusableBlocks();
+    this.loadBoardsForIntegration();
+  }
+
+  loadBoardsForIntegration() {
+    this.boardService.getBoards().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (boards) => {
+        this.availableBoards.set(boards);
+        boards.forEach(b => {
+          this.boardService.getBoard(b.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+            next: (fullBoard) => {
+              if (fullBoard && fullBoard.columns) {
+                this.columnsByBoard.update(map => ({ ...map, [b.id]: fullBoard.columns || [] }));
+              }
+            }
+          });
+        });
+      },
+      error: (err) => console.error('Failed to load boards for CMS form integration:', err)
+    });
+  }
+
+  getBoardColumns(boardId: any): Column[] {
+    const id = Number(boardId);
+    if (!id) {
+      const firstB = this.availableBoards()[0];
+      return firstB ? (this.columnsByBoard()[firstB.id] || []) : [];
+    }
+    return this.columnsByBoard()[id] || [];
+  }
+
+  getBoardName(boardId: any): string {
+    const id = Number(boardId);
+    const b = this.availableBoards().find(x => x.id === id);
+    return b ? b.name : (this.availableBoards()[0]?.name || 'Auto (First Board)');
+  }
+
+  getColumnName(boardId: any, colId: any): string {
+    const cId = Number(colId);
+    const cols = this.getBoardColumns(boardId);
+    if (!cId) return cols[0]?.name || 'First Column (Auto)';
+    const col = cols.find(c => c.id === cId);
+    return col ? col.name : (cols[0]?.name || 'First Column (Auto)');
+  }
+
+  onFormBoardChange(block: Block, event: any) {
+    const rawVal = event?.target ? event.target.value : event;
+    const boardId = Number(rawVal) || 0;
+    this.setProp(block, 'targetBoardId', boardId);
+    const cols = this.getBoardColumns(boardId);
+    if (cols.length > 0) {
+      this.setProp(block, 'targetColumnId', cols[0].id);
+    } else {
+      this.setProp(block, 'targetColumnId', 0);
+    }
+  }
+
+  onFormColumnChange(block: Block, event: any) {
+    const rawVal = event?.target ? event.target.value : event;
+    const colId = Number(rawVal) || 0;
+    this.setProp(block, 'targetColumnId', colId);
   }
 
   loadPages() {
@@ -999,11 +1067,11 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   resetLeftSidebarWidth() {
-    this.leftSidebarWidth.set(280);
+    this.leftSidebarWidth.set(290);
     try {
-      localStorage.setItem('cms_left_sidebar_w', '280');
+      localStorage.setItem('cms_left_sidebar_w', '290');
     } catch (_) {}
-    this.toastService.show('Left sidebar reset to 280px', 'info');
+    this.toastService.show('Left sidebar reset to 290px', 'info');
   }
 
   startRightResize(event: MouseEvent) {
@@ -2316,6 +2384,425 @@ export class CmsViewComponent implements OnInit, AfterViewInit, OnDestroy {
         this.switchPage(res.page.id);
       }
     });
+  }
+
+  starterTemplates = [
+    {
+      id: 'saas-landing',
+      name: 'SaaS Product Landing Page',
+      category: 'Software & SaaS',
+      badge: 'High Conversion',
+      description: 'Complete high-converting product page featuring a dynamic hero section, interactive bento grid, stats counter, pricing table, FAQ accordion, and Kanban-routed lead capture form.',
+      includedTypes: ['Header', 'Hero Heading', 'Bento Grid', 'Stats Counter', 'Pricing Plan', 'Accordion FAQ', 'Kanban Lead Form', 'Footer'],
+      blocks: [
+        {
+          type: 'header',
+          props: {
+            brandName: 'Aladenflow Cloud',
+            links: [
+              { label: 'Overview', url: '#overview' },
+              { label: 'Features', url: '#features' },
+              { label: 'Pricing', url: '#pricing' },
+              { label: 'FAQ', url: '#faq' }
+            ],
+            ctaLabel: 'Start Free Trial',
+            ctaUrl: '#demo',
+            sticky: true
+          }
+        },
+        {
+          type: 'heading',
+          props: {
+            level: 1,
+            kicker: 'NEXT-GEN WORKSPACE PLATFORM',
+            kickerStyle: 'glow',
+            text: 'Ship Faster with Connected Visual Studio & Kanban',
+            subtitle: 'Unify visual content creation, high-performance landing pages, and agile Kanban sprint workflows in one seamless workspace.',
+            align: 'center',
+            gradient: true,
+            gradientPreset: 'electric',
+            marginTop: 32,
+            margin: 16
+          }
+        },
+        {
+          type: 'button',
+          props: {
+            label: 'Request Live Demo',
+            url: '#demo',
+            variant: 'filled',
+            size: 'large',
+            color: '#f97316',
+            textColor: '#ffffff',
+            align: 'center',
+            borderRadius: 8
+          }
+        },
+        {
+          type: 'marquee',
+          props: {
+            speed: 'normal',
+            items: [
+              { text: 'Angular 19 & Signals', icon: 'zap' },
+              { text: 'SQLite High Performance', icon: 'database' },
+              { text: 'Kanban Sprint Boards', icon: 'layers' },
+              { text: 'Dynamic Dark Glassmorphism', icon: 'sparkles' },
+              { text: 'Instant /p/ Publishing', icon: 'globe' }
+            ]
+          }
+        },
+        {
+          type: 'heading',
+          props: {
+            level: 2,
+            text: 'Engineered for Modern Product Teams',
+            subtitle: 'Experience why fast-moving agile teams choose Aladenflow to power their digital presence.',
+            align: 'center',
+            marginTop: 48,
+            anchorId: 'features'
+          }
+        },
+        {
+          type: 'bento',
+          props: {
+            items: [
+              { title: 'Sub-Millisecond Engine', subtitle: 'Ultra-fast node:sqlite native queries with zero latency overhead.', icon: 'zap', tag: 'Performance', metric: '< 0.5ms', span: 2, tall: false, image: '' },
+              { title: 'Kanban Pipeline', subtitle: 'Public forms automatically generate prioritized cards and checklists on your board.', icon: 'layers', tag: 'Workflow', metric: '100% Auto', span: 1, tall: false, image: '' },
+              { title: 'Live Edge Deployment', subtitle: 'Publish live public pages with a single card drag into the Done column.', icon: 'globe', tag: 'DevOps', metric: 'Instant', span: 1, tall: false, image: '' },
+              { title: 'Aesthetic Design System', subtitle: 'Crafted with harmonious HSL tones, dark glassmorphism, and responsive viewports.', icon: 'sparkles', tag: 'UI / UX', metric: '60 FPS', span: 2, tall: false, image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop' }
+            ]
+          }
+        },
+        {
+          type: 'stat',
+          props: {
+            label: 'Platform Availability & Uptime',
+            value: '99.99%',
+            subtext: 'Monitored across 18 edge data centers',
+            trend: '+0.2% vs industry avg',
+            trendType: 'up'
+          }
+        },
+        {
+          type: 'heading',
+          props: {
+            level: 2,
+            text: 'Simple, Transparent Pricing',
+            subtitle: 'Everything included from day one. Scale with confidence.',
+            align: 'center',
+            marginTop: 48,
+            anchorId: 'pricing'
+          }
+        },
+        {
+          type: 'pricing',
+          props: {
+            planName: 'Team Pro Suite',
+            price: '$29',
+            period: '/month',
+            description: 'Full workspace suite for creators, developers, and agile product teams.',
+            features: [
+              'Unlimited visual pages & blocks',
+              'Kanban boards with Calendar & Timeline views',
+              'Form submission automations & card routing',
+              'Global command palette with ⌘K search',
+              'Custom CSS & instant live public routes'
+            ],
+            buttonLabel: 'Get Started Today',
+            buttonUrl: '#demo',
+            highlight: true,
+            badge: 'Most Popular'
+          }
+        },
+        {
+          type: 'heading',
+          props: {
+            level: 2,
+            text: 'Frequently Asked Questions',
+            subtitle: 'Everything you need to know about Aladenflow and our workflow platform.',
+            align: 'center',
+            marginTop: 48,
+            anchorId: 'faq'
+          }
+        },
+        {
+          type: 'accordion',
+          props: {
+            items: [
+              { title: 'How does the Kanban Form integration work?', content: 'When visitors fill out your published forms, the system automatically creates a rich card in your selected Kanban board column with contact details, priority tags, and follow-up checklists.' },
+              { title: 'Can I publish pages to custom URLs?', content: 'Yes! Every page receives an instant live public endpoint /p/:slug that renders blazing fast semantic HTML optimized for SEO and accessibility.' },
+              { title: 'Can I switch between Board, Calendar, and Timeline views?', content: 'Absolutely! Our new Kanban view mode toggle allows switching seamlessly between classic sprint columns, month calendar grids, and roadmap timelines.' }
+            ]
+          }
+        },
+        {
+          type: 'form',
+          props: {
+            title: 'Schedule an Architecture Deep-Dive',
+            subtitle: 'Connect with our team to discover how Aladenflow accelerates your product delivery.',
+            buttonLabel: 'Book My Session',
+            successMessage: 'Thank you! Your inquiry was received and routed directly to our Kanban sprint board.',
+            leadPriority: 'high',
+            fields: [
+              { name: 'name', label: 'Full Name', type: 'text', placeholder: 'Alex Mercer', required: true },
+              { name: 'email', label: 'Work Email', type: 'email', placeholder: 'alex@company.com', required: true },
+              { name: 'company', label: 'Company / Project', type: 'text', placeholder: 'Acme Corp', required: false },
+              { name: 'notes', label: 'Project Requirements', type: 'textarea', placeholder: 'Tell us about your team size and timeline...', required: false }
+            ]
+          }
+        },
+        {
+          type: 'footer',
+          props: {
+            brandName: 'Aladenflow Cloud',
+            tagline: 'Modern workspaces combining visual building with agile sprint tracking.',
+            copyright: '© 2026 Aladenflow Studio. All rights reserved.',
+            columns: [
+              { title: 'Product', links: [{ label: 'Visual Studio', url: '#' }, { label: 'Kanban Boards', url: '#' }, { label: 'Automations', url: '#' }] },
+              { title: 'Resources', links: [{ label: 'Documentation', url: '#' }, { label: 'Templates', url: '#' }, { label: 'Status', url: '#' }] }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      id: 'agency-portfolio',
+      name: 'Creative Studio & Developer Showcase',
+      category: 'Design & Agency',
+      badge: 'Visual Showcase',
+      description: 'Showcase digital artifacts, client work, interactive 3D perspectives, client endorsements, and project inquiry forms.',
+      includedTypes: ['Header', 'Display Hero', '3D Tilt Card', 'Bento Showcase', 'Testimonials', 'Inquiry Form', 'Footer'],
+      blocks: [
+        {
+          type: 'header',
+          props: {
+            brandName: 'Studio Chroma',
+            links: [
+              { label: 'Work', url: '#work' },
+              { label: 'Craft', url: '#craft' },
+              { label: 'Client Praise', url: '#testimonials' },
+              { label: 'Contact', url: '#contact' }
+            ],
+            ctaLabel: 'Start a Project',
+            ctaUrl: '#contact',
+            sticky: true
+          }
+        },
+        {
+          type: 'heading',
+          props: {
+            level: 1,
+            kicker: 'DIGITAL ATELIER & LAB',
+            kickerStyle: 'glow',
+            text: 'Crafting Bespoke Digital Artifacts That Captivate',
+            subtitle: 'We engineer memorable web applications, brand identities, and immersive interactive spatial experiences.',
+            align: 'center',
+            gradient: true,
+            gradientPreset: 'sunset',
+            marginTop: 32,
+            margin: 16
+          }
+        },
+        {
+          type: 'tilt-card',
+          props: {
+            badge: 'Interactive Specimen',
+            title: 'Dynamic Spatial Perspective',
+            subtitle: 'Hover and drag across this card to experience natural depth, light refraction, and physics-based tilt dynamics.',
+            ctaLabel: 'Explore Interactive Artifacts',
+            ctaUrl: '#work'
+          }
+        },
+        {
+          type: 'heading',
+          props: {
+            level: 2,
+            text: 'Selected Work & Capabilities',
+            subtitle: 'A glimpse into our recent design systems and interactive web installations.',
+            align: 'center',
+            marginTop: 48,
+            anchorId: 'work'
+          }
+        },
+        {
+          type: 'bento',
+          props: {
+            items: [
+              { title: 'Art Direction', subtitle: 'Curated typography, bespoke motion, and brand design systems.', icon: 'sparkles', tag: 'Branding', metric: '40+ Projects', span: 2, tall: false, image: '' },
+              { title: 'Physics Animation', subtitle: 'Hardware-accelerated micro-interactions and smooth 60fps physics.', icon: 'zap', tag: 'Motion', metric: '60 FPS', span: 1, tall: false, image: '' },
+              { title: 'Lighthouse 100/100', subtitle: 'Blazing fast load times with pristine accessibility compliance.', icon: 'chart', tag: 'Quality', metric: '100 Score', span: 1, tall: false, image: '' },
+              { title: 'Global Reach', subtitle: 'Serving forward-thinking founders and tech innovators across 12 countries.', icon: 'globe', tag: 'Reach', metric: 'Global', span: 2, tall: false, image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop' }
+            ]
+          }
+        },
+        {
+          type: 'testimonial',
+          props: {
+            quote: 'Working with Studio Chroma felt like having an elite design and engineering team overnight. Our conversion rate tripled immediately.',
+            author: 'Elena Rostova',
+            role: 'Co-Founder & CEO at Veloce Dynamics',
+            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop',
+            rating: 5
+          }
+        },
+        {
+          type: 'form',
+          props: {
+            title: 'Let’s Build Something Extraordinary',
+            subtitle: 'Have a project or vision in mind? Tell us about your timeline and objectives.',
+            buttonLabel: 'Send Project Proposal',
+            successMessage: 'Inquiry received! We will review your brief and get back to you within 24 hours.',
+            leadPriority: 'urgent',
+            fields: [
+              { name: 'name', label: 'Your Name', type: 'text', placeholder: 'Sophia Hayes', required: true },
+              { name: 'email', label: 'Email Address', type: 'email', placeholder: 'sophia@studio.com', required: true },
+              { name: 'budget', label: 'Estimated Budget', type: 'text', placeholder: '$10k - $25k', required: false },
+              { name: 'details', label: 'Project Brief', type: 'textarea', placeholder: 'Tell us about your product, timeline, and goals...', required: true }
+            ]
+          }
+        },
+        {
+          type: 'footer',
+          props: {
+            brandName: 'Studio Chroma',
+            tagline: 'Crafting bespoke digital futures with obsession over craft.',
+            copyright: '© 2026 Studio Chroma Atelier. All rights reserved.',
+            columns: [
+              { title: 'Studio', links: [{ label: 'Work', url: '#' }, { label: 'Philosophy', url: '#' }, { label: 'Careers', url: '#' }] },
+              { title: 'Connect', links: [{ label: 'Twitter / X', url: '#' }, { label: 'GitHub', url: '#' }, { label: 'Dribbble', url: '#' }] }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      id: 'waitlist-launch',
+      name: 'Product Waitlist & Early Beta Launch',
+      category: 'Launch & Marketing',
+      badge: 'Lead Magnet',
+      description: 'Generate momentum before launch with an enticing early beta announcement, live reservation counter, FAQ, and Kanban-synced waitlist form.',
+      includedTypes: ['Header', 'Launch Hero', 'Waitlist Stat', 'Waitlist Form', 'Accordion FAQ', 'Footer'],
+      blocks: [
+        {
+          type: 'header',
+          props: {
+            brandName: 'Novaflow',
+            links: [
+              { label: 'Vision', url: '#vision' },
+              { label: 'Perks', url: '#perks' },
+              { label: 'FAQ', url: '#faq' }
+            ],
+            ctaLabel: 'Join Beta',
+            ctaUrl: '#waitlist',
+            sticky: true
+          }
+        },
+        {
+          type: 'heading',
+          props: {
+            level: 1,
+            kicker: 'LIMITED EARLY BETA ACCESS',
+            kickerStyle: 'glow',
+            text: 'Experience the Future of Visual Building & Sprint Tracking',
+            subtitle: 'Be among the first 1,000 teams to access Novaflow. Early adopters receive lifetime premium benefits.',
+            align: 'center',
+            gradient: true,
+            gradientPreset: 'cyber',
+            marginTop: 36,
+            margin: 16
+          }
+        },
+        {
+          type: 'stat',
+          props: {
+            label: 'Waitlist Reservations Claimed',
+            value: '4,892 / 5,000',
+            subtext: 'Beta invitations release weekly',
+            trend: '+340 this week',
+            trendType: 'up'
+          }
+        },
+        {
+          type: 'form',
+          props: {
+            title: 'Claim Your Early Beta Spot',
+            subtitle: 'Priority onboarding, direct founder channel access, and lifetime free tier perks.',
+            buttonLabel: 'Request Beta Invitation',
+            successMessage: 'Welcome aboard! Your spot on the waitlist is secured and logged to our Kanban sprint board.',
+            leadPriority: 'high',
+            fields: [
+              { name: 'name', label: 'Your Name', type: 'text', placeholder: 'Jordan Lee', required: true },
+              { name: 'email', label: 'Email Address', type: 'email', placeholder: 'jordan@startup.io', required: true },
+              { name: 'role', label: 'Role / Occupation', type: 'text', placeholder: 'Founding Engineer / Designer', required: false }
+            ]
+          }
+        },
+        {
+          type: 'heading',
+          props: {
+            level: 2,
+            text: 'Beta Access Details',
+            subtitle: 'Frequently asked questions regarding our early access rollout.',
+            align: 'center',
+            marginTop: 40,
+            anchorId: 'faq'
+          }
+        },
+        {
+          type: 'accordion',
+          props: {
+            items: [
+              { title: 'When will invitations be sent?', content: 'Invitations are dispatched in rolling batches every Tuesday. Early waitlist subscribers receive priority.' },
+              { title: 'Is the early access version free?', content: 'Yes, all beta testers enjoy 100% free access to all Pro features throughout the testing phase and receive a lifetime grandfathered rate.' },
+              { title: 'Can I invite my teammates?', content: 'Yes! Once you receive your beta invite link, you can invite up to 10 colleagues to join your workspace.' }
+            ]
+          }
+        },
+        {
+          type: 'footer',
+          props: {
+            brandName: 'Novaflow',
+            tagline: 'Empowering makers to build faster with visual tools.',
+            copyright: '© 2026 Novaflow Inc. All rights reserved.',
+            columns: [
+              { title: 'Product', links: [{ label: 'Waitlist', url: '#' }, { label: 'Roadmap', url: '#' }] },
+              { title: 'Company', links: [{ label: 'About', url: '#' }, { label: 'Privacy', url: '#' }] }
+            ]
+          }
+        }
+      ]
+    }
+  ];
+
+  applyStarterTemplate(templateId: string) {
+    const tpl = this.starterTemplates.find(t => t.id === templateId);
+    if (!tpl) return;
+    this.recordHistory();
+
+    const firstBoard = this.availableBoards()[0];
+    const firstCol = firstBoard ? this.getBoardColumns(firstBoard.id)[0] : null;
+
+    const newBlocks: Block[] = tpl.blocks.map(bDef => {
+      const defaults = BLOCK_DEFAULTS[bDef.type] ? JSON.parse(JSON.stringify(BLOCK_DEFAULTS[bDef.type])) : {};
+      const props = { ...defaults, ...(bDef.props || {}) };
+
+      if (bDef.type === 'form' && firstBoard) {
+        if (!props['targetBoardId']) props['targetBoardId'] = firstBoard.id;
+        if (!props['targetColumnId'] && firstCol) props['targetColumnId'] = firstCol.id;
+      }
+
+      return {
+        id: 'b' + Math.random().toString(36).slice(2, 10),
+        type: bDef.type,
+        props
+      };
+    });
+
+    this.currentBlocks.set(newBlocks);
+    this.selectedBlock.set(newBlocks[0] || null);
+    this.savePageDebounced();
+    this.showTemplatesModal.set(false);
+    this.toastService.success(`Applied "${tpl.name}" starter template!`);
   }
 
   private computeInsertIndex(event: DragEvent): number {

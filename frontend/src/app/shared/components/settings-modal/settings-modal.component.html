@@ -320,29 +320,6 @@
                   <p class="pref-note">Any adjustments made in Appearance or AI Engine tabs are automatically isolated and saved to this account in the database.</p>
                 </div>
 
-                <!-- Switch User Strip -->
-                <div class="setting-group--spaced">
-                  <span class="setting-label">Switch To Another Profile</span>
-                  <p class="setting-desc">Switch accounts instantly to test multi-user preference isolation.</p>
-                  <div class="accounts-switch-grid">
-                    @for (u of authService.availableUsers(); track u.id) {
-                      <button type="button"
-                              class="account-card-chip"
-                              [class.active]="u.id === user.id"
-                              (click)="authService.quickSwitchUser(u.username)">
-                        <img [src]="u.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64'" class="chip-avatar" />
-                        <div class="chip-details">
-                          <span class="chip-name">{{ u.display_name }}</span>
-                          <span class="chip-sub">{{ u.theme_mode === 'dark' ? 'Dark' : 'Light' }} · {{ (u.ambient_theme || 'default') | titlecase }}</span>
-                        </div>
-                        @if (u.id === user.id) {
-                          <span class="chip-active-dot">Current</span>
-                        }
-                      </button>
-                    }
-                  </div>
-                </div>
-
                 <!-- Action row: sign out / new user -->
                 <div class="user-action-row">
                   <button type="button" class="btn btn-secondary" (click)="authService.openRegister()">

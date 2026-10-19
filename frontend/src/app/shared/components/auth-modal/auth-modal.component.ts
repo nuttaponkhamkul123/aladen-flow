@@ -2,6 +2,7 @@ import { Component, inject, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
+import { AnimationService } from '../../../core/services/animation.service';
 
 @Component({
   selector: 'app-auth-modal',
@@ -12,6 +13,7 @@ import { AuthService } from '../../../core/services/auth.service';
 })
 export class AuthModalComponent {
   authService = inject(AuthService);
+  animationService = inject(AnimationService);
 
   @Input() isGate: boolean = false;
 
@@ -44,11 +46,14 @@ export class AuthModalComponent {
     }
 
     if (this.authService.authModalMode() === 'login') {
-      this.authService.login({ username: u, password: p }).subscribe({
+      this.authService.login({ username: u, password: p }, this.isGate).subscribe({
         next: () => {
           this.username = '';
           this.password = '';
           this.errorMessage = '';
+          if (!this.isGate) {
+            this.animationService.animateWorkspaceEnter();
+          }
         },
         error: (err) => {
           this.errorMessage = err?.error?.error || 'Invalid credentials. Please try again.';
@@ -60,22 +65,21 @@ export class AuthModalComponent {
         password: p,
         email: this.email.trim() || undefined,
         displayName: this.displayName.trim() || undefined
-      }).subscribe({
+      }, this.isGate).subscribe({
         next: () => {
           this.username = '';
           this.password = '';
           this.email = '';
           this.displayName = '';
           this.errorMessage = '';
+          if (!this.isGate) {
+            this.animationService.animateWorkspaceEnter();
+          }
         },
         error: (err) => {
           this.errorMessage = err?.error?.error || 'Registration failed. Please check inputs.';
         }
       });
     }
-  }
-
-  quickLogin(uname: string) {
-    this.authService.quickSwitchUser(uname);
   }
 }

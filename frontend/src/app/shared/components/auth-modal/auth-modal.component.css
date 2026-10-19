@@ -24,9 +24,7 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(10, 10, 9, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(10, 10, 9, 0.7);
   animation: fadeIn 0.18s ease-out;
 }
 
@@ -39,14 +37,10 @@
 .gate-panel.auth-panel {
   position: relative;
   width: min(440px, 94vw);
-  background: var(--glass-surface-elevated);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-top: 1px solid var(--glass-border-top);
-  border-left: 1px solid var(--glass-border-left);
+  background: var(--bg-surface-elevated, #211f1d);
+  border: 1px solid var(--border-medium, rgba(255, 250, 240, 0.14));
   border-radius: var(--radius-xl, 14px);
-  box-shadow: var(--glass-shadow-hover), 0 24px 60px -15px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.65);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -129,89 +123,6 @@
 .close-btn:hover {
   background: var(--bg-surface-hover, #272523);
   color: var(--text-primary, #f4f2ef);
-}
-
-/* Demo Accounts Strip */
-.demo-accounts-strip {
-  padding: 12px 22px;
-  background: var(--bg-surface-subtle, #171614);
-  border-bottom: 1px solid var(--border-subtle, rgba(255, 250, 240, 0.07));
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.strip-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent-primary, #52b8a6);
-}
-
-.demo-chips {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.demo-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--radius-md, 6px);
-  background: var(--bg-surface, #1a1917);
-  border: 1px solid var(--border-subtle, rgba(255, 250, 240, 0.07));
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.15s ease;
-}
-
-.demo-chip:hover {
-  border-color: var(--accent-primary, #52b8a6);
-  background: var(--bg-surface-hover, #272523);
-  transform: translateY(-1px);
-}
-
-.chip-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid var(--border-medium, rgba(255, 250, 240, 0.13));
-  flex-shrink: 0;
-}
-
-.chip-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.chip-name {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-primary, #f4f2ef);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chip-meta {
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.dark-mode-tag {
-  color: var(--accent-primary, #52b8a6);
-}
-
-.light-mode-tag {
-  color: var(--color-warning, #d99a3d);
 }
 
 /* Tabs */

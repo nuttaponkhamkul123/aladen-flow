@@ -278,26 +278,49 @@ export interface MarkdownBlock {
   text: string;
   checked?: boolean;
   lang?: string;
+  level?: number;
+  parentId?: string | null;
+  collapsed?: boolean;
 }
 
 let blockCounter = 0;
-function generateBlockId(): string {
+export function generateBlockId(): string {
   blockCounter++;
   return `block_${Date.now()}_${blockCounter}`;
 }
 
 export function markdownToBlocks(md: string | null | undefined): MarkdownBlock[] {
   if (!md || !md.trim()) {
-    return [{ id: generateBlockId(), type: 'text', text: '' }];
+    return [{ id: generateBlockId(), type: 'text', text: '', level: 0, parentId: null }];
   }
 
   const lines = md.split(/\r?\n/);
   const blocks: MarkdownBlock[] = [];
+  const parentStack: { [level: number]: string } = {};
   let i = 0;
+
+  const pushBlock = (block: MarkdownBlock) => {
+    block.level = Math.max(0, Math.min(block.level || 0, 4));
+    block.parentId = block.level > 0 ? (parentStack[block.level - 1] || null) : null;
+    parentStack[block.level] = block.id;
+    for (let l = block.level + 1; l <= 6; l++) {
+      delete parentStack[l];
+    }
+    blocks.push(block);
+  };
 
   while (i < lines.length) {
     const raw = lines[i];
     const trimmed = raw.trim();
+
+    // Calculate indentation level (2 spaces or 1 tab = 1 level)
+    const indentMatch = raw.match(/^([ \t]+)/);
+    let level = 0;
+    if (indentMatch) {
+      const whitespace = indentMatch[1];
+      const spaceCount = whitespace.replace(/\t/g, '  ').length;
+      level = Math.min(Math.floor(spaceCount / 2), 4);
+    }
 
     // Code blocks
     if (trimmed.startsWith('```')) {
@@ -308,11 +331,12 @@ export function markdownToBlocks(md: string | null | undefined): MarkdownBlock[]
         codeLines.push(lines[i]);
         i++;
       }
-      blocks.push({
+      pushBlock({
         id: generateBlockId(),
         type: 'code',
         text: codeLines.join('\n'),
-        lang
+        lang,
+        level
       });
       i++;
       continue;
@@ -330,10 +354,11 @@ export function markdownToBlocks(md: string | null | undefined): MarkdownBlock[]
         noteLines.push(lines[i].trim().replace(/^>\s?/, ''));
         i++;
       }
-      blocks.push({
+      pushBlock({
         id: generateBlockId(),
         type: 'callout',
-        text: noteLines.join('\n')
+        text: noteLines.join('\n'),
+        level
       });
       continue;
     }
@@ -346,34 +371,35 @@ export function markdownToBlocks(md: string | null | undefined): MarkdownBlock[]
         quoteLines.push(lines[i].trim().replace(/^>\s?/, ''));
         i++;
       }
-      blocks.push({
+      pushBlock({
         id: generateBlockId(),
         type: 'quote',
-        text: quoteLines.join('\n')
+        text: quoteLines.join('\n'),
+        level
       });
       continue;
     }
 
     // Horizontal Rule / Divider
     if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
-      blocks.push({ id: generateBlockId(), type: 'divider', text: '' });
+      pushBlock({ id: generateBlockId(), type: 'divider', text: '', level });
       i++;
       continue;
     }
 
     // Headings
     if (trimmed.startsWith('# ')) {
-      blocks.push({ id: generateBlockId(), type: 'h1', text: trimmed.slice(2) });
+      pushBlock({ id: generateBlockId(), type: 'h1', text: trimmed.slice(2), level });
       i++;
       continue;
     }
     if (trimmed.startsWith('## ')) {
-      blocks.push({ id: generateBlockId(), type: 'h2', text: trimmed.slice(3) });
+      pushBlock({ id: generateBlockId(), type: 'h2', text: trimmed.slice(3), level });
       i++;
       continue;
     }
     if (trimmed.startsWith('### ')) {
-      blocks.push({ id: generateBlockId(), type: 'h3', text: trimmed.slice(4) });
+      pushBlock({ id: generateBlockId(), type: 'h3', text: trimmed.slice(4), level });
       i++;
       continue;
     }
@@ -381,19 +407,21 @@ export function markdownToBlocks(md: string | null | undefined): MarkdownBlock[]
     // Task Checklist
     const taskMatch = trimmed.match(/^[-*]\s+\[([ xX])\]\s*(.*)$/);
     if (taskMatch) {
-      blocks.push({
+      pushBlock({
         id: generateBlockId(),
         type: 'todo',
         checked: taskMatch[1].toLowerCase() === 'x',
-        text: taskMatch[2]
+        text: taskMatch[2],
+        level
       });
       i++;
       continue;
     }
 
     // Bullet List
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      blocks.push({ id: generateBlockId(), type: 'bullet', text: trimmed.slice(2) });
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ') || trimmed.startsWith('•')) {
+      const cleanText = trimmed.replace(/^([-*•])\s*/, '');
+      pushBlock({ id: generateBlockId(), type: 'bullet', text: cleanText, level });
       i++;
       continue;
     }
@@ -405,12 +433,12 @@ export function markdownToBlocks(md: string | null | undefined): MarkdownBlock[]
     }
 
     // Plain text block
-    blocks.push({ id: generateBlockId(), type: 'text', text: raw });
+    pushBlock({ id: generateBlockId(), type: 'text', text: trimmed, level });
     i++;
   }
 
   if (blocks.length === 0) {
-    blocks.push({ id: generateBlockId(), type: 'text', text: '' });
+    blocks.push({ id: generateBlockId(), type: 'text', text: '', level: 0, parentId: null });
   }
 
   return blocks;
@@ -438,6 +466,14 @@ export function blocksToMarkdown(blocks: MarkdownBlock[]): string {
         break;
     }
 
+    const indentStr = '  '.repeat(b.level || 0);
+    if (indentStr) {
+      serialized = serialized
+        .split('\n')
+        .map(line => line.trim() ? indentStr + line : line)
+        .join('\n');
+    }
+
     if (i === 0) {
       result = serialized;
     } else {
@@ -448,4 +484,61 @@ export function blocksToMarkdown(blocks: MarkdownBlock[]): string {
     }
   }
   return result;
+}
+
+export function parseInlineMarkdown(text: string | null | undefined): string {
+  if (!text) return '';
+
+  const escapeHtml = (str: string): string => {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
+  // Protect inline code
+  const inlineCodes: string[] = [];
+  let s = text.replace(/`([^`\n]+)`/g, (_, code) => {
+    const placeholder = `__INLINE_CODE_${inlineCodes.length}__`;
+    inlineCodes.push(`<code class="md-inline-code">${escapeHtml(code)}</code>`);
+    return placeholder;
+  });
+
+  // Escape normal text
+  s = escapeHtml(s);
+
+  // Numbered list prefix: e.g. "1. " or "2. "
+  s = s.replace(/^(\d+)\.\s+/, '<strong class="md-num-prefix">$1.</strong> ');
+
+  // Links: [text](url)
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (__, textContent, url) => {
+    const cleanUrl = url.trim().replace(/"/g, '&quot;');
+    if (/^(https?:|\/|mailto:)/i.test(cleanUrl)) {
+      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="md-link">${textContent}</a>`;
+    }
+    return textContent;
+  });
+
+  // Bold + Italic: ***text***
+  s = s.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+
+  // Bold: **text** or __text__
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+  // Italic: *text* or _text_
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  s = s.replace(/(^|[^_])_([^_]+)_(?!_)/g, '$1<em>$2</em>');
+
+  // Strikethrough: ~~text~~
+  s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+
+  // Restore inline codes
+  inlineCodes.forEach((codeHtml, idx) => {
+    s = s.replace(`__INLINE_CODE_${idx}__`, codeHtml);
+  });
+
+  return s;
 }

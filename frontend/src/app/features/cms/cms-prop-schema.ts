@@ -471,7 +471,18 @@ export const PROP_SCHEMAS: Record<string, PropField[]> = {
   form: [
     { key: 'title', label: 'Heading', type: 'text', placeholder: 'Get in Touch' },
     { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Form intro text...' },
-    { key: 'buttonLabel', label: 'Submit Button Label', type: 'text', placeholder: 'Send Message' }
+    { key: 'buttonLabel', label: 'Submit Button Label', type: 'text', placeholder: 'Send Message' },
+    { key: 'priority', label: 'Card Priority', type: 'select', options: [
+      { value: 'low', label: 'Low Priority' },
+      { value: 'medium', label: 'Medium Priority' },
+      { value: 'high', label: 'High Priority' },
+      { value: 'urgent', label: 'Urgent Priority' }
+    ] },
+    { key: 'labelName', label: 'Card Tag / Label', type: 'text', placeholder: 'Website Lead' },
+    { key: 'includeSubject', label: 'Include Subject Field', type: 'toggle', onLabel: 'Yes' },
+    { key: 'includePhone', label: 'Include Phone Field', type: 'toggle', onLabel: 'Yes' },
+    { key: 'createChecklist', label: 'Auto-add Follow-up Checklist to Card', type: 'toggle', onLabel: 'Yes' },
+    { key: 'successMessage', label: 'Success Notification Message', type: 'text', placeholder: 'Thank you! We received your message.' }
   ],
 
   audio: [

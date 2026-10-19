@@ -17,11 +17,8 @@
   width: 100%;
   min-height: 28px;
   padding: 5px 9px;
-  background: var(--glass-surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  border-top: 1px solid var(--glass-border-top);
+  background: var(--bg-surface-elevated, #211f1d);
+  border: 1px solid var(--border-subtle, rgba(255, 250, 240, 0.08));
   border-radius: var(--radius-sm, 6px);
   color: var(--text-primary, #f1f5f9);
   font-family: inherit;
@@ -36,7 +33,7 @@
   box-sizing: border-box;
   text-align: left;
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 1px 0 var(--glass-specular);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .custom-select-container.size-md .custom-select-trigger {
@@ -115,14 +112,10 @@
   min-width: 100%;
   box-sizing: border-box;
   z-index: 9999;
-  background: var(--glass-surface-elevated);
-  border: 1px solid var(--glass-border);
-  border-top: 1px solid var(--glass-border-top);
-  border-left: 1px solid var(--glass-border-left);
+  background: var(--bg-surface-elevated, #211f1d);
+  border: 1px solid var(--border-medium, rgba(255, 250, 240, 0.14));
   border-radius: var(--radius-md, 8px);
-  box-shadow: var(--glass-shadow-hover), 0 18px 40px rgba(0, 0, 0, 0.55);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   padding: 4px;
   overflow: hidden;
   box-sizing: border-box;

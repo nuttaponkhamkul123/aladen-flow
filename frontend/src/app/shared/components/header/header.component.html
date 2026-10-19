@@ -1,225 +1,243 @@
 <header class="topbar">
   <div class="topbar-left">
     @if (currentRoute() === '/kanban') {
-      <div class="topbar-context-badge">
-        <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M9 3v18" />
-          <path d="M15 3v18" />
-        </svg>
-        <span class="context-label">Boards</span>
-      </div>
+    <div class="topbar-context-badge">
+      <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M9 3v18" />
+        <path d="M15 3v18" />
+      </svg>
+      <span class="context-label">Boards</span>
+    </div>
     } @else if (currentRoute() === '/dashboard') {
-      <div class="topbar-context-badge">
-        <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1"/>
-          <rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/>
-          <rect x="14" y="14" width="7" height="7" rx="1"/>
-        </svg>
-        <span class="context-label">Dashboard</span>
-      </div>
+    <div class="topbar-context-badge">
+      <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </svg>
+      <span class="context-label">Dashboard</span>
+    </div>
     } @else if (currentRoute() === '/automations') {
-      <div class="topbar-context-badge">
-        <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-        </svg>
-        <span class="context-label">Automations</span>
-      </div>
+    <div class="topbar-context-badge">
+      <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+      <span class="context-label">Automations</span>
+    </div>
     } @else {
-      <div class="topbar-context-badge">
-        <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-          <path d="M12 4v16" />
-          <path d="M4 12h8" />
-        </svg>
-        <span class="context-label">Site Builder</span>
-      </div>
+    <div class="topbar-context-badge">
+      <svg class="context-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+        <path d="M12 4v16" />
+        <path d="M4 12h8" />
+      </svg>
+      <span class="context-label">Site Builder</span>
+    </div>
 
-      <!-- Site Builder Sub-Tab Group (Pages Dropdown Trigger) -->
-      <div class="cms-sub-tabs-group">
-          <span class="tabs-sub-divider" aria-hidden="true">/</span>
-          <button type="button" id="cmsPagesDropdownTrigger" class="cms-sub-tab" [class.open]="showPagesPopup"
-                  (click)="togglePagesPopup()" title="Pages & Documents Explorer">
-            <span id="cmsHeaderStatusDot" class="header-status-dot"
-                  [class.published]="cmsService.activePage()?.status === 'published'"
-                  [class.draft]="cmsService.activePage()?.status !== 'published'"></span>
-            @if (cmsService.activePage()?.is_first_page) {
-              <svg id="cmsHeaderFirstPageStar" class="header-star-icon" width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5" title="Site Homepage">
-    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-  </svg>
-            }
-            <svg class="tab-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Site Builder Sub-Tab Group (Pages Dropdown Trigger) -->
+    <div class="cms-sub-tabs-group">
+      <span class="tabs-sub-divider" aria-hidden="true">/</span>
+      <button type="button" id="cmsPagesDropdownTrigger" class="cms-sub-tab" [class.open]="showPagesPopup"
+        (click)="togglePagesPopup()" title="Pages & Documents Explorer">
+        <span id="cmsHeaderStatusDot" class="header-status-dot"
+          [class.published]="cmsService.activePage()?.status === 'published'"
+          [class.draft]="cmsService.activePage()?.status !== 'published'"></span>
+        @if (cmsService.activePage()?.is_first_page) {
+        <svg id="cmsHeaderFirstPageStar" class="header-star-icon" width="12" height="12" viewBox="0 0 24 24"
+          fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5" title="Site Homepage">
+          <polygon
+            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+        }
+        <svg class="tab-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+        <span id="cmsCurrentPageLabel" class="cms-current-page-name">{{ cmsService.activePage()?.title || 'Pages'
+          }}</span>
+        <span id="cmsTopPagesCount" class="tab-badge">{{ cmsService.pages().length }}</span>
+        <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      <!-- Pages Dropdown Popup -->
+      @if (showPagesPopup) {
+      <div id="cmsPagesPopup" class="cms-pages-popup" (click)="$event.stopPropagation()">
+        <div class="cms-popup-header">
+          <div class="cms-popup-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
               <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            <span id="cmsCurrentPageLabel" class="cms-current-page-name">{{ cmsService.activePage()?.title || 'Pages' }}</span>
-            <span id="cmsTopPagesCount" class="tab-badge">{{ cmsService.pages().length }}</span>
-            <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m6 9 6 6 6-6" />
+            <span>Pages & Documents</span>
+          </div>
+          <button type="button" (click)="showPagesPopup = false" class="cms-popup-close-btn" title="Close">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
+        </div>
 
-          <!-- Pages Dropdown Popup -->
-          @if (showPagesPopup) {
-            <div id="cmsPagesPopup" class="cms-pages-popup" (click)="$event.stopPropagation()">
-              <div class="cms-popup-header">
-                <div class="cms-popup-title">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                  <span>Pages & Documents</span>
-                </div>
-                <button type="button" (click)="showPagesPopup = false" class="cms-popup-close-btn" title="Close">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
-  </button>
-              </div>
-
-              <!-- Active Page Settings Card -->
-              @if (cmsService.activePage(); as page) {
-                <div class="cms-active-page-card">
-                  <div class="active-page-card-header">
-                    <div class="active-page-title-row">
-                      <span class="badge" style="font-size:11px;font-weight:700;">{{ page.title }}</span>
-                    </div>
-                    <button type="button" (click)="toggleFirstPage(page)" class="btn ghost btn-xs"
-                            [style.color]="page.is_first_page ? '#f59e0b' : 'inherit'" title="Set as Site Homepage">
-                      @if (page.is_first_page) {
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-    </svg>
-    <span>Homepage</span>
-  } @else {
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-    </svg>
-    <span>Make Homepage</span>
-  }
-                    </button>
-                  </div>
-
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                    <div>
-                      <label style="font-size:10.5px;color:var(--text-tertiary);display:block;margin-bottom:3px;">URL Slug</label>
-                      <div style="display:flex;align-items:center;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-pill);padding:0 8px;height:26px;">
-                        <span style="font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);">/p/</span>
-                        <input [value]="page.slug" (change)="updatePageSlug(page, $event)"
-                               style="border:none;background:transparent;color:var(--accent-primary);font-family:var(--font-mono);font-size:11px;outline:none;width:100%;" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style="font-size:10.5px;color:var(--text-tertiary);display:block;margin-bottom:3px;">Status</label>
-                      <select [value]="page.status" (change)="updatePageStatus(page, $event)"
-                              style="width:100%;height:26px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-pill);color:var(--text-primary);font-size:11.5px;padding:0 8px;outline:none;">
-                        <option value="draft">Draft</option>
-                        <option value="published">Published</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style="display:flex;justify-content:flex-end;margin-top:4px;">
-                    <a [href]="'/p/' + page.slug" target="_blank" class="btn ghost btn-xs" style="gap:4px;">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                      <span>Open Live Page</span>
-                    </a>
-                  </div>
-                </div>
+        <!-- Active Page Settings Card -->
+        @if (cmsService.activePage(); as page) {
+        <div class="cms-active-page-card">
+          <div class="active-page-card-header">
+            <div class="active-page-title-row">
+              <span class="badge" style="font-size:11px;font-weight:700;">{{ page.title }}</span>
+            </div>
+            <button type="button" (click)="toggleFirstPage(page)" class="btn ghost btn-xs"
+              [style.color]="page.is_first_page ? '#f59e0b' : 'inherit'" title="Set as Site Homepage">
+              @if (page.is_first_page) {
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5">
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              <span>Homepage</span>
+              } @else {
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              <span>Make Homepage</span>
               }
+            </button>
+          </div>
 
-              <div style="padding:6px 14px;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;">All Pages ({{ cmsService.pages().length }})</span>
-                <button type="button" (click)="createPage()" class="btn primary btn-xs">
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    <span>New Page</span>
-  </button>
-              </div>
-
-              <div class="cms-pages-list" style="padding:0 14px 14px;max-height:220px;overflow-y:auto;">
-                @for (p of cmsService.pages(); track p.id) {
-                  <div class="cms-page-item" [class.selected]="p.id === cmsService.activePage()?.id" (click)="switchPage(p.id)">
-                    <div class="page-node-info">
-                      <div style="display:flex;align-items:center;gap:4px;">
-                        @if (p.is_first_page) {
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                          </svg>
-                        }
-                        <span class="p-title">{{ p.title }}</span>
-                      </div>
-                      <div class="p-meta">
-                        <span class="p-status" [style.background]="p.status === 'published' ? '#10b98122' : '#64748b22'"
-                              [style.color]="p.status === 'published' ? '#10b981' : '#94a3b8'">{{ p.status }}</span>
-                        <span class="p-slug">/p/{{ p.slug }}</span>
-                      </div>
-                    </div>
-                  </div>
-                }
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:10.5px;color:var(--text-tertiary);display:block;margin-bottom:3px;">URL
+                Slug</label>
+              <div
+                style="display:flex;align-items:center;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-pill);padding:0 8px;height:26px;">
+                <span style="font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);">/p/</span>
+                <input [value]="page.slug" (change)="updatePageSlug(page, $event)"
+                  style="border:none;background:transparent;color:var(--accent-primary);font-family:var(--font-mono);font-size:11px;outline:none;width:100%;" />
               </div>
             </div>
+
+            <div>
+              <label style="font-size:10.5px;color:var(--text-tertiary);display:block;margin-bottom:3px;">Status</label>
+              <select [value]="page.status" (change)="updatePageStatus(page, $event)"
+                style="width:100%;height:26px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-pill);color:var(--text-primary);font-size:11.5px;padding:0 8px;outline:none;">
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+            <a [href]="'/p/' + page.slug" target="_blank" class="btn ghost btn-xs" style="gap:4px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              <span>Open Live Page</span>
+            </a>
+          </div>
+        </div>
+        }
+
+        <div style="padding:6px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;">All Pages
+            ({{ cmsService.pages().length }})</span>
+          <button type="button" (click)="createPage()" class="btn primary btn-xs">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>New Page</span>
+          </button>
+        </div>
+
+        <div class="cms-pages-list" style="padding:0 14px 14px;max-height:220px;overflow-y:auto;">
+          @for (p of cmsService.pages(); track p.id) {
+          <div class="cms-page-item" [class.selected]="p.id === cmsService.activePage()?.id" (click)="switchPage(p.id)">
+            <div class="page-node-info">
+              <div style="display:flex;align-items:center;gap:4px;">
+                @if (p.is_first_page) {
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5">
+                  <polygon
+                    points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+                }
+                <span class="p-title">{{ p.title }}</span>
+              </div>
+              <div class="p-meta">
+                <span class="p-status" [style.background]="p.status === 'published' ? '#10b98122' : '#64748b22'"
+                  [style.color]="p.status === 'published' ? '#10b981' : '#94a3b8'">{{ p.status }}</span>
+                <span class="p-slug">/p/{{ p.slug }}</span>
+              </div>
+            </div>
+          </div>
           }
         </div>
+      </div>
       }
+    </div>
+    }
   </div>
 
   <div class="topbar-actions">
     @if (currentRoute() === '/kanban') {
-      <div class="board-switcher">
-        <div class="select-wrapper">
-          <svg class="select-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2" />
-            <polyline points="2 17 12 22 22 17" />
-            <polyline points="2 12 12 17 22 12" />
-          </svg>
-          <select [value]="boardService.activeBoardId()" (change)="onBoardSelect($event)">
-            @for (b of boardService.boards(); track b.id) {
-              <option [value]="b.id">{{ b.name }}</option>
-            }
-          </select>
-          <svg class="chevron-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </div>
-        <button (click)="createBoard()" class="btn-icon" title="Create new board">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
-        <button (click)="deleteBoard()" class="btn-icon danger" title="Delete current board">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="search-wrap">
-        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <div class="board-switcher">
+      <div class="select-wrapper">
+        <svg class="select-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.3-4.3" />
+          <polygon points="12 2 2 7 12 12 22 7 12 2" />
+          <polyline points="2 17 12 22 22 17" />
+          <polyline points="2 12 12 17 22 12" />
         </svg>
-        <input id="searchInput" [value]="boardService.searchQuery()" (input)="onSearchInput($event)" placeholder="Search cards..." />
-        <kbd class="shortcut-tag">⌘K</kbd>
+        <select [value]="boardService.activeBoardId()" (change)="onBoardSelect($event)">
+          @for (b of boardService.boards(); track b.id) {
+          <option [value]="b.id">{{ b.name }}</option>
+          }
+        </select>
+        <svg class="chevron-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </div>
+      <button (click)="createBoard()" class="btn-icon" title="Create new board">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </button>
+      <button (click)="deleteBoard()" class="btn-icon danger" title="Delete current board">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        </svg>
+      </button>
+    </div>
 
-      <div class="board-theme-picker" style="display:flex;align-items:center;">
+    <div class="search-wrap" (click)="commandPalette.open()" title="Open Command Palette (⌘K / Ctrl+K)">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
+      <input id="searchInput" [value]="boardService.searchQuery()" (click)="$event.stopPropagation(); commandPalette.open()" (input)="onSearchInput($event)"
+        placeholder="Search cards, actions... (⌘K)" />
+      <kbd class="shortcut-tag" (click)="commandPalette.open()">⌘K</kbd>
+    </div>
+
+    <!-- <div class="board-theme-picker" style="display:flex;align-items:center;">
         <div class="select-wrapper">
           <svg class="select-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -241,119 +259,120 @@
             <path d="m6 9 6 6 6-6" />
           </svg>
         </div>
-      </div>
+      </div> -->
     }
 
     <button (click)="themeService.toggleThemeMode()" class="btn-icon theme-mode-btn"
-            [title]="'Theme: ' + (themeService.themeMode() === 'auto' ? 'Auto (System: ' + (themeService.systemIsDark() ? 'Dark' : 'Light') + ')' : (themeService.themeMode() === 'dark' ? 'Dark' : 'Light')) + ' — Click to switch'">
+      [title]="'Theme: ' + (themeService.themeMode() === 'auto' ? 'Auto (System: ' + (themeService.systemIsDark() ? 'Dark' : 'Light') + ')' : (themeService.themeMode() === 'dark' ? 'Dark' : 'Light')) + ' — Click to switch'">
       @if (themeService.themeMode() === 'auto') {
-        <svg class="auto-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
+      <svg class="auto-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+      </svg>
       } @else if (themeService.themeMode() === 'dark') {
-        <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
+      <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+      </svg>
       } @else {
-        <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2" /><path d="M12 20v2" />
-          <path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" />
-          <path d="M2 12h2" /><path d="M20 12h2" />
-          <path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
-        </svg>
+      <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2" />
+        <path d="M12 20v2" />
+        <path d="m4.93 4.93 1.41 1.41" />
+        <path d="m17.66 17.66 1.41 1.41" />
+        <path d="M2 12h2" />
+        <path d="M20 12h2" />
+        <path d="m6.34 17.66-1.41 1.41" />
+        <path d="m19.07 4.93-1.41 1.41" />
+      </svg>
       }
     </button>
 
     <!-- User Profile Dropdown / Sign In Trigger -->
     @if (authService.currentUser(); as user) {
-      <div class="user-profile-menu-wrap">
-        <button type="button" class="user-profile-btn" (click)="toggleUserMenu()" [class.open]="showUserMenu()" title="Account & User Settings">
-          @if (user.avatar_url) {
-            <img [src]="user.avatar_url" [alt]="user.display_name" class="user-avatar-img" />
-          } @else {
-            <span class="user-avatar-initials">{{ (user.display_name.charAt(0) || user.username.charAt(0)).toUpperCase() }}</span>
-          }
-          <span class="user-name-label">{{ user.display_name || user.username }}</span>
-          <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </button>
+    <div class="user-profile-menu-wrap">
+      <button type="button" class="user-profile-btn" (click)="toggleUserMenu($event)" [class.open]="showUserMenu()"
+        title="Account & User Settings">
+        @if (user.avatar_url) {
+        <img [src]="user.avatar_url" [alt]="user.display_name" class="user-avatar-img" />
+        } @else {
+        <span class="user-avatar-initials">{{ (user.display_name.charAt(0) || user.username.charAt(0)).toUpperCase()
+          }}</span>
+        }
+        <span class="user-name-label">{{ user.display_name || user.username }}</span>
+        <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
 
-        @if (showUserMenu()) {
-          <div class="user-dropdown-menu" (click)="$event.stopPropagation()">
-            <div class="user-dropdown-header">
-              <span class="dropdown-user-name">{{ user.display_name }}</span>
-              <span class="dropdown-user-username">@{{ user.username }}</span>
-              <div class="dropdown-user-badges">
-                <button type="button" class="dropdown-badge theme-badge clickable" (click)="themeService.toggleThemeMode()" title="Click to toggle Theme Mode">
-                  {{ themeService.themeMode() | titlecase }} ⇄
-                </button>
-                <button type="button" class="dropdown-badge ambient-badge clickable" (click)="cycleAmbientTheme()" title="Click to cycle Canvas Atmosphere">
-                  {{ themeService.ambientTheme() | titlecase }} ↺
-                </button>
-              </div>
-            </div>
-
-            <!-- System Atmosphere Theme Switcher inside Dropdown -->
-            <div class="dropdown-ambient-section">
-              <div class="dropdown-section-title">System Atmosphere Theme</div>
-              <div class="dropdown-ambient-grid">
-                @for (amb of ambientThemes; track amb.id) {
-                  <button type="button" class="dropdown-ambient-btn"
-                          [class.active]="themeService.ambientTheme() === amb.id"
-                          (click)="setAmbient(amb.id)"
-                          [title]="amb.label + ' — ' + amb.desc">
-                    <span class="ambient-dot" [class]="amb.id"></span>
-                    <span class="ambient-name">{{ amb.label }}</span>
-                  </button>
-                }
-              </div>
-            </div>
-
-            <!-- Switch to available demo users -->
-            <div class="dropdown-section-title">Switch Account</div>
-            <div class="dropdown-users-list">
-              @for (u of authService.availableUsers(); track u.id) {
-                @if (u.id !== user.id) {
-                  <button type="button" class="dropdown-user-item" (click)="switchAccount(u.username)">
-                    <img [src]="u.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64'" class="dropdown-item-avatar" />
-                    <div class="dropdown-item-details">
-                      <span class="dropdown-item-name">{{ u.display_name || u.username }}</span>
-                      <span class="dropdown-item-meta">{{ u.theme_mode === 'dark' ? 'Dark Mode' : 'Light Mode' }} · {{ (u.ambient_theme || 'default') | titlecase }}</span>
-                    </div>
-                  </button>
-                }
-              }
-            </div>
-
-            <div class="dropdown-divider"></div>
-
-            <button type="button" class="dropdown-action-btn" (click)="openAccountSettings()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83 2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-              <span>User Settings & AI Config</span>
+      @if (showUserMenu()) {
+      <div class="user-dropdown-menu" (click)="$event.stopPropagation()">
+        <div class="user-dropdown-header">
+          <span class="dropdown-user-name">{{ user.display_name }}</span>
+          <span class="dropdown-user-username">@{{ user.username }}</span>
+          <div class="dropdown-user-badges">
+            <button type="button" class="dropdown-badge theme-badge clickable" (click)="themeService.toggleThemeMode()"
+              title="Click to toggle Theme Mode">
+              {{ themeService.themeMode() | titlecase }} ⇄
             </button>
-
-            <button type="button" class="dropdown-action-btn danger" (click)="logout()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-              <span>Sign Out</span>
+            <button type="button" class="dropdown-badge ambient-badge clickable" (click)="cycleAmbientTheme()"
+              title="Click to cycle Canvas Atmosphere">
+              {{ themeService.ambientTheme() | titlecase }} ↺
             </button>
           </div>
-        }
+        </div>
+
+        <!-- System Atmosphere Theme Switcher inside Dropdown -->
+        <!-- <div class="dropdown-ambient-section">
+          <div class="dropdown-section-title">System Atmosphere Theme</div>
+          <div class="dropdown-ambient-grid">
+            @for (amb of ambientThemes; track amb.id) {
+            <button type="button" class="dropdown-ambient-btn" [class.active]="themeService.ambientTheme() === amb.id"
+              (click)="setAmbient(amb.id)" [title]="amb.label + ' — ' + amb.desc">
+              <span class="ambient-dot" [class]="amb.id"></span>
+              <span class="ambient-name">{{ amb.label }}</span>
+            </button>
+            }
+          </div>
+        </div> -->
+
+        <div class="dropdown-divider"></div>
+
+        <button type="button" class="dropdown-action-btn" (click)="openAccountSettings()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83 2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span>User Settings & AI Config</span>
+        </button>
+
+        <button type="button" class="dropdown-action-btn danger" (click)="logout()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <span>Sign Out</span>
+        </button>
       </div>
+      }
+    </div>
     } @else {
-      <button type="button" class="btn primary btn-sm btn-header-signin" (click)="authService.openLogin()" title="Sign in to sync your personal settings">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
-        </svg>
-        <span>Sign In</span>
-      </button>
+    <button type="button" class="btn primary btn-sm btn-header-signin" (click)="authService.openLogin()"
+      title="Sign in to sync your personal settings">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+        <polyline points="10 17 15 12 10 7" />
+        <line x1="15" y1="12" x2="3" y2="12" />
+      </svg>
+      <span>Sign In</span>
+    </button>
     }
   </div>
 </header>

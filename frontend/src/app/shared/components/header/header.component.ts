@@ -9,6 +9,8 @@ import { BoardService } from '../../../core/services/board.service';
 import { CmsService } from '../../../core/services/cms.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { CommandPaletteService } from '../../../core/services/command-palette.service';
+import { AnimationService } from '../../../core/services/animation.service';
 import { CmsPage } from '../../../core/models/cms.model';
 
 @Component({
@@ -24,6 +26,8 @@ export class HeaderComponent {
   cmsService = inject(CmsService);
   authService = inject(AuthService);
   settingsService = inject(SettingsService);
+  commandPalette = inject(CommandPaletteService);
+  animationService = inject(AnimationService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
 
@@ -183,18 +187,25 @@ export class HeaderComponent {
     });
   }
 
-  toggleUserMenu() {
-    this.showUserMenu.set(!this.showUserMenu());
+  toggleUserMenu(event?: MouseEvent) {
+    if (event?.currentTarget) {
+      this.animationService.animateClick(event.currentTarget as HTMLElement);
+    }
+    const next = !this.showUserMenu();
+    this.showUserMenu.set(next);
+    if (next) {
+      setTimeout(() => {
+        const menuEl = document.querySelector('.user-dropdown-menu') as HTMLElement;
+        if (menuEl) {
+          this.animationService.animateUserMenu(menuEl);
+        }
+      }, 15);
+    }
   }
 
   openAccountSettings() {
     this.showUserMenu.set(false);
     this.settingsService.open('account');
-  }
-
-  switchAccount(username: string) {
-    this.showUserMenu.set(false);
-    this.authService.quickSwitchUser(username);
   }
 
   logout() {

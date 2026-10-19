@@ -8,6 +8,20 @@ import { BoardService } from '../../core/services/board.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { CardDetailModalComponent } from './card-detail-modal/card-detail-modal.component';
 
+export interface CalendarDay {
+  date: Date;
+  dateStr: string;
+  dayNum: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  cards: Card[];
+}
+
+export interface TimelineGroup {
+  column: Column;
+  cards: Card[];
+}
+
 @Component({
   selector: 'app-kanban-view',
   standalone: true,
@@ -24,6 +38,126 @@ export class KanbanViewComponent implements OnInit {
   addingCardColumnId: number | null = null;
   newCardTitle = '';
   selectedCard: Card | null = null;
+
+  // View Mode: 'board' (Columns), 'calendar' (Month grid), 'timeline' (Gantt schedule)
+  currentView = signal<'board' | 'calendar' | 'timeline'>('board');
+  calendarDate = signal<Date>(new Date());
+
+  calendarMonthLabel = computed(() => {
+    return this.calendarDate().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  });
+
+  allCards = computed(() => {
+    const b = this.activeBoard();
+    if (!b || !b.columns) return [];
+    const res: Card[] = [];
+    b.columns.forEach(col => {
+      if (col.cards) res.push(...col.cards);
+    });
+    return res;
+  });
+
+  calendarDays = computed<CalendarDay[]>(() => {
+    const baseDate = this.calendarDate();
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+
+    // Monday is index 0
+    let startDayOfWeek = firstDayOfMonth.getDay() - 1;
+    if (startDayOfWeek === -1) startDayOfWeek = 6;
+
+    const days: CalendarDay[] = [];
+    const all = this.allCards();
+
+    // Previous month padding
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const dNum = prevMonthLastDay - i;
+      const d = new Date(year, month - 1, dNum);
+      const dStr = d.toISOString().slice(0, 10);
+      days.push({
+        date: d,
+        dateStr: dStr,
+        dayNum: dNum,
+        isCurrentMonth: false,
+        isToday: dStr === todayStr,
+        cards: all.filter(c => c.due_date === dStr)
+      });
+    }
+
+    // Current month days
+    for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+      const d = new Date(year, month, i);
+      const dStr = d.toISOString().slice(0, 10);
+      days.push({
+        date: d,
+        dateStr: dStr,
+        dayNum: i,
+        isCurrentMonth: true,
+        isToday: dStr === todayStr,
+        cards: all.filter(c => c.due_date === dStr)
+      });
+    }
+
+    // Next month padding (total cells to reach multiple of 7, up to 35 or 42)
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      const d = new Date(year, month + 1, i);
+      const dStr = d.toISOString().slice(0, 10);
+      days.push({
+        date: d,
+        dateStr: dStr,
+        dayNum: i,
+        isCurrentMonth: false,
+        isToday: dStr === todayStr,
+        cards: all.filter(c => c.due_date === dStr)
+      });
+    }
+
+    return days;
+  });
+
+  timelineCards = computed(() => {
+    return this.allCards()
+      .filter(c => !!c.due_date)
+      .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+  });
+
+  prevMonth() {
+    const d = new Date(this.calendarDate());
+    d.setMonth(d.getMonth() - 1);
+    this.calendarDate.set(d);
+  }
+
+  nextMonth() {
+    const d = new Date(this.calendarDate());
+    d.setMonth(d.getMonth() + 1);
+    this.calendarDate.set(d);
+  }
+
+  goToToday() {
+    this.calendarDate.set(new Date());
+  }
+
+  quickAddCardForDate(dateStr: string) {
+    const b = this.activeBoard();
+    if (!b || !b.columns || !b.columns.length) return;
+    const title = prompt(`Enter title for new card due on ${dateStr}:`);
+    if (!title || !title.trim()) return;
+
+    const firstCol = b.columns[0];
+    this.boardService.createCard(firstCol.id, {
+      title: title.trim(),
+      due_date: dateStr,
+      priority: 'medium'
+    }).subscribe({
+      next: () => this.selectBoard(b.id)
+    });
+  }
 
   connectedDropLists = computed(() => {
     const b = this.activeBoard();
@@ -74,46 +208,6 @@ export class KanbanViewComponent implements OnInit {
     this.toggleTagFilter(tagName);
   }
 
-  isDraggingCard = false;
-
-  onCardMouseMove(event: MouseEvent, cardEl: HTMLElement) {
-    if (this.isDraggingCard || cardEl.classList.contains('cdk-drag-dragging')) return;
-    const rect = cardEl.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-
-    const x = (event.clientX - rect.left) / rect.width;
-    const y = (event.clientY - rect.top) / rect.height;
-
-    // Fluid 3D tilt angles (-11deg to +11deg)
-    const rotateX = ((0.5 - y) * 14).toFixed(2);
-    const rotateY = ((x - 0.5) * 16).toFixed(2);
-    const glareX = (x * 100).toFixed(1);
-    const glareY = (y * 100).toFixed(1);
-
-    cardEl.style.setProperty('--rx', `${rotateX}deg`);
-    cardEl.style.setProperty('--ry', `${rotateY}deg`);
-    cardEl.style.setProperty('--mx', `${glareX}%`);
-    cardEl.style.setProperty('--my', `${glareY}%`);
-    cardEl.style.setProperty('--card-hover', '1');
-  }
-
-  onCardMouseLeave(cardEl: HTMLElement) {
-    cardEl.style.setProperty('--rx', '0deg');
-    cardEl.style.setProperty('--ry', '0deg');
-    cardEl.style.setProperty('--mx', '50%');
-    cardEl.style.setProperty('--my', '50%');
-    cardEl.style.setProperty('--card-hover', '0');
-  }
-
-  onCardDragStarted(cardEl: HTMLElement) {
-    this.isDraggingCard = true;
-    this.onCardMouseLeave(cardEl);
-  }
-
-  onCardDragEnded(cardEl: HTMLElement) {
-    this.isDraggingCard = false;
-    this.onCardMouseLeave(cardEl);
-  }
 
   constructor() {
     effect(() => {
@@ -284,7 +378,6 @@ export class KanbanViewComponent implements OnInit {
   }
 
   onCardDrop(event: CdkDragDrop<Card[]>, targetColumnId: number) {
-    this.isDraggingCard = false;
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
       const card = event.container.data[event.currentIndex];

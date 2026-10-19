@@ -265,7 +265,15 @@ export const BLOCK_DEFAULTS: Record<string, any> = {
   form: {
     title: 'Connect With Our Team',
     description: 'Have questions, ideas, or feedback? Send us a message and we will respond within 24 hours.',
-    buttonLabel: 'Send Message'
+    buttonLabel: 'Send Message',
+    targetBoardId: 0,
+    targetColumnId: 0,
+    priority: 'medium',
+    labelName: 'Website Lead',
+    includeSubject: true,
+    includePhone: false,
+    createChecklist: true,
+    successMessage: "Thank you! Your inquiry has been received and added to our workflow."
   },
   audio: {
     title: 'Midnight Synth Wave - Ambient Session 04',

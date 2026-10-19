@@ -13,11 +13,8 @@
   width: 224px;
   min-width: 224px;
   height: 100vh;
-  background: var(--glass-surface);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-right: 1px solid var(--glass-border);
-  box-shadow: 1px 0 0 var(--glass-specular), 4px 0 24px rgba(0, 0, 0, 0.25);
+  background: var(--bg-surface, #1a1917);
+  border-right: 1px solid var(--border-subtle, rgba(255, 250, 240, 0.08));
   display: flex;
   flex-direction: column;
   transition: width 0.24s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.24s cubic-bezier(0.16, 1, 0.3, 1);
@@ -77,16 +74,12 @@
   border-radius: 9px;
   background: var(--glass-surface-elevated);
   border: 1px solid var(--accent-primary-subtle, rgba(82, 184, 166, 0.4));
-  border-top: 1px solid rgba(255, 255, 255, 0.45);
-  box-shadow:
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.35);
+  border-top: 1px solid var(--border-subtle);
   display: grid;
   place-items: center;
   color: var(--accent-primary, #52b8a6);
   flex-shrink: 0;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
-  backdrop-filter: blur(8px);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
 }
 
 .sidebar-brand:hover .logo-pod-3d {
@@ -229,26 +222,17 @@
 
 /* Icon Pod */
 .nav-item-icon-pod {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm, 6px);
-  background: var(--glass-surface);
-  border: 1px solid var(--glass-border);
-  border-top: 1px solid var(--glass-border-top);
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   color: var(--text-tertiary, #8d8880);
   flex-shrink: 0;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: color 0.18s ease;
 }
 
 .sidebar-nav-item:hover:not(.active) .nav-item-icon-pod {
   color: var(--text-primary, #f4f2ef);
-  border-color: var(--glass-border);
-  border-top-color: var(--glass-border-top);
-  background: var(--glass-surface-elevated);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .nav-item-label {
@@ -293,29 +277,15 @@
    -------------------------------------------------------------------------- */
 
 .sidebar-nav-item.active {
-  background: var(--glass-surface-elevated);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--glass-border);
-  border-top: 1px solid var(--glass-border-top);
-  border-left: 1px solid var(--glass-border-left);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.28),
-    0 6px 16px -2px rgba(0, 0, 0, 0.35),
-    var(--accent-glow);
+  background: var(--bg-surface-elevated, #211f1d);
+  border: 1px solid var(--border-medium, rgba(255, 250, 240, 0.14));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   color: var(--text-primary, #f4f2ef);
   font-weight: 600;
 }
 
 .sidebar-nav-item.active .nav-item-icon-pod {
-  background: var(--accent-primary-subtle);
-  border: 1px solid var(--accent-primary);
-  border-top: 1px solid rgba(255, 255, 255, 0.45);
   color: var(--accent-primary, #52b8a6);
-  box-shadow:
-    var(--accent-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transform: scale(1.06);
 }
 
 .sidebar-nav-item.active .nav-item-badge {
@@ -354,15 +324,11 @@
 
 .context-hardware-capsule {
   position: relative;
-  background: var(--glass-surface-elevated);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-top: 1px solid var(--glass-border-top);
-  border-left: 1px solid var(--glass-border-left);
+  background: var(--bg-surface-elevated, #211f1d);
+  border: 1px solid var(--border-subtle, rgba(255, 250, 240, 0.08));
   border-radius: var(--radius-lg, 8px);
   padding: 10px 12px;
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -521,13 +487,9 @@
 }
 
 .sidebar-rack-btn:hover {
-  background: var(--glass-surface-elevated);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-color: var(--glass-border);
-  border-top-color: var(--glass-border-top);
+  background: var(--bg-surface-hover, #272523);
+  border-color: var(--border-medium, rgba(255, 250, 240, 0.14));
   color: var(--text-primary, #f4f2ef);
-  box-shadow: var(--glass-shadow);
 }
 
 .rack-btn-icon {

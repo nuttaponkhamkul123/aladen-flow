@@ -201,12 +201,13 @@ app.patch('/api/users/settings', (req, res) => {
 // ==================== AUTHENTICATION GATE MIDDLEWARE ====================
 // Protect all /api/ workspace & feature routes so unauthenticated users cannot access features
 app.use('/api', (req, res, next) => {
-  // Allow public auth endpoints
+  // Allow public auth endpoints and website form submissions
   if (
     req.path.startsWith('/auth/login') ||
     req.path.startsWith('/auth/register') ||
     req.path.startsWith('/auth/users') ||
-    req.path.startsWith('/auth/me')
+    req.path.startsWith('/auth/me') ||
+    req.path.startsWith('/forms/submit')
   ) {
     return next();
   }
@@ -378,7 +379,11 @@ app.get('/api/boards/:id', (req, res) => {
     const placeholders = columnIds.map(() => '?').join(',');
     const allCards = db
       .prepare(
-        `SELECT * FROM cards WHERE column_id IN (${placeholders}) AND archived = 0 ORDER BY column_id, position ASC`
+        `SELECT c.*, p.title as cms_page_title, p.slug as cms_page_slug, p.status as cms_page_status
+         FROM cards c
+         LEFT JOIN pages p ON p.id = c.cms_page_id
+         WHERE c.column_id IN (${placeholders}) AND c.archived = 0
+         ORDER BY c.column_id, c.position ASC`
       )
       .all(...columnIds);
 
@@ -466,7 +471,7 @@ app.post('/api/columns/:id/cards', (req, res) => {
 
 app.patch('/api/cards/:id', (req, res) => {
   const id = Number(req.params.id);
-  const { title, description, due_date, priority, archived, labelIds, cover } = req.body;
+  const { title, description, due_date, priority, archived, labelIds, cover, cms_page_id } = req.body;
 
   const existing = db.prepare('SELECT * FROM cards WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'not found' });
@@ -497,6 +502,16 @@ app.patch('/api/cards/:id', (req, res) => {
       updates.push('priority = ?');
       params.push(priority);
       if (existing.priority !== priority) logActivity(id, null, `Priority changed to ${priority}`);
+    }
+    if (cms_page_id !== undefined) {
+      updates.push('cms_page_id = ?');
+      params.push(cms_page_id ? Number(cms_page_id) : null);
+      if (cms_page_id) {
+        const page = db.prepare('SELECT title FROM pages WHERE id = ?').get(cms_page_id);
+        logActivity(id, null, `Linked to CMS Page "${page ? page.title : '#' + cms_page_id}"`);
+      } else if (existing.cms_page_id) {
+        logActivity(id, null, 'Unlinked from CMS Page');
+      }
     }
     if (archived !== undefined) {
       updates.push('archived = ?');
@@ -530,6 +545,34 @@ app.delete('/api/cards/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Auto-publishes or reverts linked CMS page when a card moves columns
+function checkCmsPagePublishOnCardMove(cardId, targetColId) {
+  try {
+    const card = db.prepare('SELECT id, title, column_id, cms_page_id FROM cards WHERE id = ?').get(cardId);
+    if (!card || !card.cms_page_id) return;
+
+    const col = db.prepare('SELECT name FROM columns WHERE id = ?').get(targetColId);
+    if (!col) return;
+
+    const colName = col.name.trim().toLowerCase();
+    const isDoneOrPublished = colName === 'done' || colName.includes('publish') || colName.includes('completed') || colName.includes('live');
+
+    const page = db.prepare('SELECT id, title, status, user_id FROM pages WHERE id = ?').get(card.cms_page_id);
+    if (!page) return;
+
+    if (isDoneOrPublished && page.status !== 'published') {
+      db.prepare("UPDATE pages SET status = 'published', updated_at = datetime('now') WHERE id = ?").run(page.id);
+      logActivity(card.id, null, `🚀 CMS Page "${page.title}" auto-published via Kanban workflow (column: "${col.name}")!`, page.user_id);
+      runAutomationsForTrigger('cms_page_published', { page_id: page.id, card_id: card.id });
+    } else if (!isDoneOrPublished && page.status === 'published') {
+      db.prepare("UPDATE pages SET status = 'draft', updated_at = datetime('now') WHERE id = ?").run(page.id);
+      logActivity(card.id, null, `📝 CMS Page "${page.title}" reverted to draft (column: "${col.name}")`, page.user_id);
+    }
+  } catch (err) {
+    console.error('Error in checkCmsPagePublishOnCardMove:', err);
+  }
+}
+
 app.post('/api/cards/:id/move', (req, res) => {
   const id = Number(req.params.id);
   const targetCol = req.body.column_id ?? req.body.target_column_id;
@@ -546,6 +589,8 @@ app.post('/api/cards/:id/move', (req, res) => {
       db.prepare("UPDATE cards SET updated_at = datetime('now') WHERE id = ?").run(id);
     });
     tx();
+
+    checkCmsPagePublishOnCardMove(id, newCol);
 
     try {
       runAutomationsForTrigger('card_moved', { card_id: id });
@@ -569,6 +614,8 @@ app.post('/api/cards/:id/move', (req, res) => {
     db.prepare("UPDATE cards SET updated_at = datetime('now') WHERE id = ?").run(id);
   });
   tx();
+
+  checkCmsPagePublishOnCardMove(id, newCol);
 
   try {
     runAutomationsForTrigger('card_moved', { card_id: id });
@@ -1337,7 +1384,7 @@ app.post('/api/pages', (req, res) => {
   (tags || []).forEach(t => {
     if (t && typeof t === 'string') insertTag.run(info.lastInsertRowid, t.trim().toLowerCase());
   });
-  res.json({ id: info.lastInsertRowid, slug, is_first_page: isFirstPage });
+  res.json({ id: info.lastInsertRowid, title: title.trim(), slug, status, is_first_page: isFirstPage, blocks: [] });
 });
 
 app.patch('/api/pages/:id', (req, res) => {
@@ -1457,6 +1504,178 @@ app.delete('/api/pages/:id', (req, res) => {
     }
   }
   res.json({ ok: true });
+});
+
+// ==================== CMS FORM TO KANBAN SUBMISSION API ====================
+app.post('/api/forms/submit', (req, res) => {
+  try {
+    const {
+      pageSlug,
+      name = '',
+      email = '',
+      phone = '',
+      subject = '',
+      message = '',
+      boardId,
+      columnId,
+      priority = 'medium',
+      labelName = 'Website Lead',
+      createChecklist = true
+    } = req.body;
+
+    const trimmedName = String(name || '').trim();
+    const trimmedEmail = String(email || '').trim();
+    const trimmedPhone = String(phone || '').trim();
+    const trimmedSubject = String(subject || '').trim();
+    const trimmedMessage = String(message || '').trim();
+
+    if (!trimmedName && !trimmedEmail && !trimmedMessage) {
+      return res.status(400).json({ error: 'At least one contact field (Name, Email, or Message) is required.' });
+    }
+
+    // 1. Resolve Target Board & Column
+    let targetColId = Number(columnId) || 0;
+    let targetBoardId = Number(boardId) || 0;
+    let targetUserId = 1;
+
+    // Check if columnId is valid
+    if (targetColId > 0) {
+      const col = db.prepare('SELECT id, board_id FROM columns WHERE id = ?').get(targetColId);
+      if (col) {
+        targetBoardId = col.board_id;
+      } else {
+        targetColId = 0;
+      }
+    }
+
+    // If column not resolved yet, check boardId
+    if (!targetColId && targetBoardId > 0) {
+      const firstCol = db.prepare('SELECT id FROM columns WHERE board_id = ? ORDER BY position ASC LIMIT 1').get(targetBoardId);
+      if (firstCol) {
+        targetColId = firstCol.id;
+      }
+    }
+
+    // If still no column or board, attempt to find board from page owner
+    if (!targetColId) {
+      if (pageSlug) {
+        const page = db.prepare('SELECT user_id FROM pages WHERE slug = ? COLLATE NOCASE').get(pageSlug);
+        if (page && page.user_id) targetUserId = page.user_id;
+      }
+      const userBoard = db.prepare('SELECT id FROM boards WHERE user_id = ? ORDER BY id ASC LIMIT 1').get(targetUserId)
+        || db.prepare('SELECT id FROM boards ORDER BY id ASC LIMIT 1').get();
+      if (userBoard) {
+        targetBoardId = userBoard.id;
+        const firstCol = db.prepare('SELECT id FROM columns WHERE board_id = ? ORDER BY position ASC LIMIT 1').get(targetBoardId);
+        if (firstCol) targetColId = firstCol.id;
+      }
+    }
+
+    if (!targetColId) {
+      return res.status(400).json({ error: 'No available Kanban board column to route form submission.' });
+    }
+
+    // 2. Determine Title
+    let cardTitle = trimmedSubject;
+    if (!cardTitle) {
+      if (trimmedName && trimmedEmail) {
+        cardTitle = `[Lead] ${trimmedName} (${trimmedEmail})`;
+      } else if (trimmedName) {
+        cardTitle = `[Lead] Inquiry from ${trimmedName}`;
+      } else if (trimmedEmail) {
+        cardTitle = `[Lead] Inquiry from ${trimmedEmail}`;
+      } else {
+        cardTitle = `[Lead] Website Form Submission`;
+      }
+    } else {
+      cardTitle = `[Lead] ${cardTitle}`;
+    }
+
+    // 3. Format Rich Description
+    const formattedDate = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    const description = [
+      `### 📬 Website Form Submission`,
+      `**From:** ${trimmedName || 'Anonymous'}`,
+      `**Email:** ${trimmedEmail || 'None provided'}`,
+      trimmedPhone ? `**Phone:** ${trimmedPhone}` : null,
+      pageSlug ? `**Source Page:** [/p/${pageSlug}](/p/${pageSlug})` : null,
+      `**Received:** ${formattedDate}`,
+      `\n---\n`,
+      `**Message / Inquiry:**\n${trimmedMessage || '*(No message text provided)*'}`
+    ].filter(Boolean).join('\n');
+
+    // 4. Calculate Position & Priority
+    const maxPos = db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM cards WHERE column_id = ?').get(targetColId)?.m || -1;
+    const validPriorities = ['low', 'medium', 'high', 'urgent'];
+    const cardPriority = validPriorities.includes(priority) ? priority : 'medium';
+
+    // 5. Insert Card
+    const info = db.prepare(`
+      INSERT INTO cards (column_id, title, description, priority, position, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `).run(targetColId, cardTitle, description, cardPriority, maxPos + 1);
+
+    const cardId = Number(info.lastInsertRowid);
+
+    // 6. Label Management (Attach or create label like "Website Lead")
+    const finalLabel = String(labelName || '').trim() || 'Website Lead';
+    let label = db.prepare('SELECT id FROM labels WHERE board_id = ? AND name = ? COLLATE NOCASE').get(targetBoardId, finalLabel);
+    if (!label) {
+      const labelColors = ['#10b981', '#6366f1', '#06b6d4', '#f59e0b', '#ec4899'];
+      const chosenColor = labelColors[Math.floor(Math.random() * labelColors.length)];
+      try {
+        const lInfo = db.prepare('INSERT INTO labels (board_id, name, color) VALUES (?, ?, ?)').run(targetBoardId, finalLabel, chosenColor);
+        label = { id: Number(lInfo.lastInsertRowid) };
+      } catch (_) {}
+    }
+    if (label && label.id) {
+      db.prepare('INSERT OR IGNORE INTO card_labels (card_id, label_id) VALUES (?, ?)').run(cardId, label.id);
+    }
+
+    // 7. Auto-create Follow-up Checklist Items
+    if (createChecklist) {
+      const items = [
+        `Review inquiry details from ${trimmedName || trimmedEmail || 'customer'}`,
+        trimmedEmail ? `Send email reply to ${trimmedEmail}` : `Follow up with contact`,
+        `Update lead status in pipeline`
+      ];
+      const insertChecklist = db.prepare('INSERT INTO checklist_items (card_id, text, position) VALUES (?, ?, ?)');
+      items.forEach((txt, idx) => insertChecklist.run(cardId, txt, idx));
+    }
+
+    // 8. Log Board Activity
+    const board = db.prepare('SELECT name, user_id FROM boards WHERE id = ?').get(targetBoardId);
+    logActivity(cardId, targetBoardId, `New lead received from website form: "${cardTitle}"`, board?.user_id || targetUserId);
+
+    // 9. Run Automations
+    try {
+      runAutomationsForTrigger('form_submitted', {
+        card_id: cardId,
+        board_id: targetBoardId,
+        column_id: targetColId,
+        page_slug: pageSlug,
+        name: trimmedName,
+        email: trimmedEmail,
+        phone: trimmedPhone,
+        subject: trimmedSubject,
+        message: trimmedMessage
+      });
+      runAutomationsForTrigger('card_created', { card_id: cardId });
+    } catch (autoErr) {
+      console.error('Automation error on form submit:', autoErr);
+    }
+
+    res.json({
+      ok: true,
+      cardId,
+      boardId: targetBoardId,
+      columnId: targetColId,
+      message: 'Thank you! Your inquiry has been received.'
+    });
+  } catch (err) {
+    console.error('Error submitting form to kanban:', err);
+    res.status(500).json({ error: 'Failed to process submission. ' + err.message });
+  }
 });
 
 // Reusable Blocks API
@@ -2853,7 +3072,7 @@ function renderBlockInnerHtml(b) {
       // Subtitle
       let subtitleHtml = '';
       if (p.subtitle) {
-        const subColor = p.subtitleColor ? `color:${escHtml(p.subtitleColor)};` : 'color:#94a3b8;';
+        const subColor = p.subtitleColor ? `color:${escHtml(p.subtitleColor)};` : 'color:var(--text-secondary);';
         const subSize = p.subtitleSize === 'small' ? 'font-size:13px;' : (p.subtitleSize === 'large' ? 'font-size:18px;' : 'font-size:15px;');
         subtitleHtml = `<p style="margin:8px 0 0;line-height:1.6;text-align:${align};${subColor}${subSize}">${parseRichTextHtml(p.subtitle)}</p>`;
       }
@@ -2867,7 +3086,7 @@ function renderBlockInnerHtml(b) {
         } else if (p.divider === 'gradient') {
           dividerHtml = `<div style="display:flex;justify-content:${justify};margin-top:14px;"><div style="width:${w};height:3px;border-radius:999px;background:linear-gradient(90deg,#6366f1,#06b6d4);"></div></div>`;
         } else {
-          dividerHtml = `<div style="display:flex;justify-content:${justify};margin-top:14px;"><div style="width:${w};height:2px;border-radius:999px;background:rgba(255,255,255,0.2);"></div></div>`;
+          dividerHtml = `<div style="display:flex;justify-content:${justify};margin-top:14px;"><div style="width:${w};height:2px;border-radius:999px;background:var(--border-subtle);"></div></div>`;
         }
       }
 
@@ -3028,9 +3247,9 @@ function renderBlockInnerHtml(b) {
       const padding = p.padding != null ? Number(p.padding) : 16;
       const borderRadius = p.borderRadius != null ? Number(p.borderRadius) : 8;
       const gap = p.gap != null ? Number(p.gap) : 16;
-      const borderStyle = p.border ? 'border:1px solid #e2e8f0;' : '';
+      const borderStyle = p.border ? 'border:1px solid var(--border-subtle);' : '';
       const shadowStyle = p.shadow ? 'box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);' : '';
-      const bgStyle = p.bg === 'surface' ? 'background:#f1f5f9;' : p.bg === 'subtle' ? 'background:#f8fafc;' : p.bg === 'dark' ? 'background:#0f172a;color:#fff;' : 'background:transparent;';
+      const bgStyle = p.bg === 'surface' ? 'background:var(--bg-surface-elevated);' : p.bg === 'subtle' ? 'background:var(--bg-surface);' : p.bg === 'dark' ? 'background:#0f172a;color:#f8fafc;' : 'background:transparent;';
 
       let layoutStyle = `display:${mode === 'grid' ? 'grid' : 'flex'};gap:${gap}px;padding:${padding}px;border-radius:${borderRadius}px;${borderStyle}${shadowStyle}${bgStyle}margin:16px 0;box-sizing:border-box;${customCss}`;
       if (mode === 'grid') {
@@ -3072,12 +3291,12 @@ function renderBlockInnerHtml(b) {
       const itemsHtml = items.map((it, idx) => {
         const isOpen = idx === 0 || it.isOpen;
         return `
-          <div class="cms-accordion-item" style="border:1px solid rgba(255,255,255,0.1);border-radius:8px;margin-bottom:8px;overflow:hidden;background:rgba(255,255,255,0.02);">
-            <button type="button" class="cms-accordion-trigger" style="width:100%;text-align:left;padding:14px 16px;background:transparent;border:none;color:inherit;font-size:15px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+          <div class="cms-accordion-item" style="border:1px solid var(--border-subtle);border-radius:8px;margin-bottom:8px;overflow:hidden;background:var(--bg-surface-elevated);">
+            <button type="button" class="cms-accordion-trigger" style="width:100%;text-align:left;padding:14px 16px;background:transparent;border:none;color:var(--text-primary);font-size:15px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
               <span>${escHtml(it.title || 'FAQ Item')}</span>
-              <span class="cms-accordion-arrow" style="transition:transform 0.2s ease;display:inline-block;font-size:12px;">&#9660;</span>
+              <span class="cms-accordion-arrow" style="transition:transform 0.2s ease;display:inline-block;font-size:12px;color:var(--text-secondary);">&#9660;</span>
             </button>
-            <div class="cms-accordion-panel" style="padding:0 16px 14px;font-size:14px;line-height:1.6;opacity:0.9;display:${isOpen ? 'block' : 'none'};">
+            <div class="cms-accordion-panel" style="padding:0 16px 14px;font-size:14px;line-height:1.6;color:var(--text-secondary);display:${isOpen ? 'block' : 'none'};">
               ${parseRichTextHtml(it.content || '')}
             </div>
           </div>
@@ -3094,18 +3313,18 @@ function renderBlockInnerHtml(b) {
       const navHtml = tabs.map((t, idx) => {
         const isActive = idx === 0;
         const pillStyle = variant === 'underline'
-          ? `padding:8px 16px;border-bottom:2px solid ${isActive ? '#6366f1' : 'transparent'};background:transparent;color:${isActive ? '#6366f1' : 'inherit'};font-weight:600;cursor:pointer;border-top:none;border-left:none;border-right:none;`
-          : `padding:8px 16px;border-radius:6px;background:${isActive ? '#6366f1' : 'rgba(255,255,255,0.06)'};color:#fff;font-weight:600;border:none;cursor:pointer;`;
+          ? `padding:8px 16px;border-bottom:2px solid ${isActive ? '#6366f1' : 'transparent'};background:transparent;color:${isActive ? '#6366f1' : 'var(--text-secondary)'};font-weight:600;cursor:pointer;border-top:none;border-left:none;border-right:none;`
+          : `padding:8px 16px;border-radius:6px;background:${isActive ? '#6366f1' : 'var(--bg-surface-elevated)'};border:1px solid ${isActive ? '#6366f1' : 'var(--border-subtle)'};color:${isActive ? '#fff' : 'var(--text-secondary)'};font-weight:600;cursor:pointer;`;
         return `<button type="button" class="cms-tab-btn ${isActive ? 'active' : ''}" data-target="${tabsId}_pane_${idx}" style="${pillStyle}">${escHtml(t.label || `Tab ${idx + 1}`)}</button>`;
       }).join('');
 
       const panesHtml = tabs.map((t, idx) => {
         const isShown = idx === 0 ? 'display:block;' : 'display:none;';
-        return `<div id="${tabsId}_pane_${idx}" class="cms-tab-pane" style="${isShown}padding:16px 4px;font-size:14.5px;line-height:1.6;">${parseRichTextHtml(t.content || '')}</div>`;
+        return `<div id="${tabsId}_pane_${idx}" class="cms-tab-pane" style="${isShown}padding:16px 4px;font-size:14.5px;line-height:1.6;color:var(--text-primary);">${parseRichTextHtml(t.content || '')}</div>`;
       }).join('');
 
       return `<div id="${tabsId}" class="cms-tabs-wrap" style="margin:16px 0;${customCss}">
-        <div class="cms-tabs-nav" style="display:flex;gap:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;overflow-x:auto;">${navHtml}</div>
+        <div class="cms-tabs-nav" style="display:flex;gap:8px;border-bottom:1px solid var(--border-subtle);padding-bottom:8px;overflow-x:auto;">${navHtml}</div>
         <div class="cms-tabs-content">${panesHtml}</div>
       </div>`;
     }
@@ -3113,25 +3332,25 @@ function renderBlockInnerHtml(b) {
       const plan = escHtml(p.planName || 'Standard Plan');
       const price = escHtml(p.price || '$29');
       const period = escHtml(p.period || '/ month');
-      const desc = p.description ? `<p style="margin:6px 0 16px;font-size:13.5px;opacity:0.8;">${escHtml(p.description)}</p>` : '';
+      const desc = p.description ? `<p style="margin:6px 0 16px;font-size:13.5px;color:var(--text-secondary);">${escHtml(p.description)}</p>` : '';
       const badge = p.badge ? `<div style="display:inline-block;padding:4px 10px;font-size:11px;font-weight:700;border-radius:20px;background:linear-gradient(135deg, #6366f1, #ec4899);color:#fff;margin-bottom:12px;letter-spacing:0.4px;">${escHtml(p.badge)}</div>` : '';
       const features = Array.isArray(p.features) ? p.features : [];
       const featsHtml = features.map(f => `<li style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13.5px;"><span style="color:#10b981;font-weight:bold;">✓</span> <span>${escHtml(f)}</span></li>`).join('');
       const btnLabel = escHtml(p.buttonLabel || 'Get Started');
       const btnUrl = escHtml(p.buttonUrl || '#');
       const target = p.newTab !== false && !btnUrl.startsWith('/p/') ? ' target="_blank" rel="noopener noreferrer"' : '';
-      const borderStyle = p.highlight ? 'border:2px solid #6366f1;box-shadow:0 12px 32px rgba(99,102,241,0.25);' : 'border:1px solid rgba(255,255,255,0.12);';
+      const borderStyle = p.highlight ? 'border:2px solid #6366f1;box-shadow:0 12px 32px rgba(99,102,241,0.25);' : 'border:1px solid var(--border-subtle);';
 
-      return `<div class="cms-pricing-card" style="border-radius:14px;padding:26px;background:rgba(255,255,255,0.03);${borderStyle}box-sizing:border-box;margin:16px 0;${customCss}">
+      return `<div class="cms-pricing-card" style="border-radius:14px;padding:26px;background:var(--bg-surface-elevated);${borderStyle}box-sizing:border-box;margin:16px 0;${customCss}">
         ${badge}
-        <h3 style="margin:0 0 6px;font-size:20px;">${plan}</h3>
+        <h3 style="margin:0 0 6px;font-size:20px;color:var(--text-primary);">${plan}</h3>
         <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px;">
-          <span style="font-size:32px;font-weight:800;letter-spacing:-0.5px;">${price}</span>
-          <span style="font-size:14px;opacity:0.7;">${period}</span>
+          <span style="font-size:32px;font-weight:800;letter-spacing:-0.5px;color:var(--text-primary);">${price}</span>
+          <span style="font-size:14px;color:var(--text-secondary);">${period}</span>
         </div>
         ${desc}
-        <ul style="list-style:none;padding:0;margin:16px 0 22px;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">${featsHtml}</ul>
-        <a href="${btnUrl}"${target} style="display:block;text-align:center;padding:12px;border-radius:8px;background:${p.highlight ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'rgba(255,255,255,0.1)'};color:#fff;text-decoration:none;font-weight:600;font-size:14px;">${btnLabel} &rarr;</a>
+        <ul style="list-style:none;padding:0;margin:16px 0 22px;border-top:1px solid var(--border-subtle);padding-top:16px;color:var(--text-primary);">${featsHtml}</ul>
+        <a href="${btnUrl}"${target} style="display:block;text-align:center;padding:12px;border-radius:8px;background:${p.highlight ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : '#6366f1'};color:#fff;text-decoration:none;font-weight:600;font-size:14px;">${btnLabel} &rarr;</a>
       </div>`;
     }
     case 'stat': {
@@ -3140,11 +3359,11 @@ function renderBlockInnerHtml(b) {
       const trend = p.trend ? `<span style="font-size:11.5px;padding:2px 8px;border-radius:999px;background:${p.trendType === 'down' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'};color:${p.trendType === 'down' ? '#f87171' : '#34d399'};font-weight:600;">${escHtml(p.trend)}</span>` : '';
       const icon = p.icon ? `<div style="font-size:22px;margin-bottom:8px;">${escHtml(p.icon)}</div>` : '';
 
-      return `<div class="cms-stat-card" style="padding:20px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.02);margin:12px 0;${customCss}">
+      return `<div class="cms-stat-card" style="padding:20px;border-radius:12px;border:1px solid var(--border-subtle);background:var(--bg-surface-elevated);margin:12px 0;${customCss}">
         ${icon}
-        <div style="font-size:36px;font-weight:800;letter-spacing:-1px;line-height:1.1;margin-bottom:6px;">${val}</div>
+        <div style="font-size:36px;font-weight:800;letter-spacing:-1px;line-height:1.1;margin-bottom:6px;color:var(--text-primary);">${val}</div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-          <span style="font-size:13.5px;opacity:0.8;font-weight:500;">${label}</span>
+          <span style="font-size:13.5px;color:var(--text-secondary);font-weight:500;">${label}</span>
           ${trend}
         </div>
       </div>`;
@@ -3153,18 +3372,18 @@ function renderBlockInnerHtml(b) {
       const quote = parseRichTextHtml(p.quote || 'This platform has dramatically accelerated our team workflow.');
       const author = escHtml(p.author || 'Jane Doe');
       const role = escHtml(p.role || 'Product Lead at Acme Corp');
-      const avatar = p.avatar ? `<img src="${escHtml(p.avatar)}" alt="${author}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.2);" />` : '';
+      const avatar = p.avatar ? `<img src="${escHtml(p.avatar)}" alt="${author}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--border-subtle);" />` : '';
       const rating = Math.min(5, Math.max(1, Number(p.rating) || 5));
       const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
 
-      return `<div class="cms-testimonial-card" style="border-radius:14px;padding:22px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);margin:16px 0;${customCss}">
+      return `<div class="cms-testimonial-card" style="border-radius:14px;padding:22px;border:1px solid var(--border-subtle);background:var(--bg-surface-elevated);margin:16px 0;${customCss}">
         <div style="color:#f59e0b;font-size:16px;letter-spacing:2px;margin-bottom:12px;">${stars}</div>
-        <p style="font-size:15px;line-height:1.6;font-style:italic;margin:0 0 16px;">&ldquo;${quote}&rdquo;</p>
+        <p style="font-size:15px;line-height:1.6;font-style:italic;margin:0 0 16px;color:var(--text-primary);">&ldquo;${quote}&rdquo;</p>
         <div style="display:flex;align-items:center;gap:12px;">
           ${avatar}
           <div>
-            <div style="font-weight:700;font-size:14px;">${author}</div>
-            <div style="font-size:12px;opacity:0.75;">${role}</div>
+            <div style="font-weight:700;font-size:14px;color:var(--text-primary);">${author}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">${role}</div>
           </div>
         </div>
       </div>`;
@@ -3225,20 +3444,20 @@ function renderBlockInnerHtml(b) {
       items.forEach((item, idx) => {
         const spanClass = item.span === 2 ? 'grid-column: span 2;' : '';
         const tallClass = item.tall ? 'grid-row: span 2;' : '';
-        const bg = item.bg || 'rgba(255,255,255,0.03)';
+        const bg = item.bg || 'var(--bg-surface-elevated)';
         const icon = item.icon ? `<div style="font-size:24px;margin-bottom:12px;">${escHtml(item.icon)}</div>` : '';
-        const metric = item.metric ? `<div style="font-size:32px;font-weight:800;color:#fff;margin:8px 0;letter-spacing:-0.02em;">${escHtml(item.metric)}</div>` : '';
+        const metric = item.metric ? `<div style="font-size:32px;font-weight:800;color:var(--text-primary);margin:8px 0;letter-spacing:-0.02em;">${escHtml(item.metric)}</div>` : '';
         const tag = item.tag ? `<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#818cf8;background:rgba(99,102,241,0.15);padding:3px 8px;border-radius:999px;border:1px solid rgba(99,102,241,0.3);">${escHtml(item.tag)}</span>` : '';
         const img = item.image ? `<div style="width:100%;height:140px;border-radius:10px;background-image:url('${escHtml(item.image)}');background-size:cover;background-position:center;margin-top:14px;"></div>` : '';
 
-        cardsHtml += `<div class="cms-bento-card" style="background:${bg};border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:24px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 10px 30px rgba(0,0,0,0.25);position:relative;overflow:hidden;${spanClass}${tallClass}">
+        cardsHtml += `<div class="cms-bento-card" style="background:${bg};border:1px solid var(--border-subtle);border-radius:18px;padding:24px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 10px 30px rgba(0,0,0,0.06);position:relative;overflow:hidden;${spanClass}${tallClass}">
           <div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
               ${icon}
               ${tag}
             </div>
-            <h4 style="font-size:18px;font-weight:700;color:#fff;margin:0 0 6px 0;">${escHtml(item.title || 'Feature Tile')}</h4>
-            <p style="font-size:13.5px;color:#94a3b8;line-height:1.5;margin:0;">${parseRichTextHtml(item.subtitle || '')}</p>
+            <h4 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 6px 0;">${escHtml(item.title || 'Feature Tile')}</h4>
+            <p style="font-size:13.5px;color:var(--text-secondary);line-height:1.5;margin:0;">${parseRichTextHtml(item.subtitle || '')}</p>
             ${metric}
           </div>
           ${img}
@@ -3270,16 +3489,16 @@ function renderBlockInnerHtml(b) {
     case 'tilt-card': {
       const title = escHtml(p.title || 'Interactive 3D Card');
       const subtitle = parseRichTextHtml(p.subtitle || 'Move your cursor across this card to experience natural depth and specular reflections.');
-      const badge = p.badge ? `<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#38bdf8;background:rgba(56,189,248,0.15);padding:3px 9px;border-radius:999px;border:1px solid rgba(56,189,248,0.3);">${escHtml(p.badge)}</span>` : '';
+      const badge = p.badge ? `<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#38bdf8;background:rgba(56,189,248,0.15);padding:3px 9px;border-radius:999px;border:1px solid rgba(56,189,248,0.3);display:inline-block;">${escHtml(p.badge)}</span>` : '';
       const cta = p.ctaLabel ? `<a href="${escHtml(p.ctaUrl || '#')}" style="display:inline-flex;align-items:center;gap:6px;background:#6366f1;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;margin-top:16px;box-shadow:0 4px 14px rgba(99,102,241,0.4);">${escHtml(p.ctaLabel)} →</a>` : '';
 
       return `<div class="cms-tilt-wrap" style="perspective:1000px;margin:24px 0;${customCss}">
-        <div class="cms-tilt-card" style="position:relative;background:linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:36px 30px;box-shadow:0 20px 50px rgba(0,0,0,0.5);transform-style:preserve-3d;transition:transform 0.1s ease-out;overflow:hidden;">
-          <div class="cms-tilt-glare" style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15), transparent 70%);opacity:0;pointer-events:none;transition:opacity 0.2s;"></div>
+        <div class="cms-tilt-card" style="position:relative;background:var(--pub-tilt-bg, linear-gradient(135deg, rgba(99,102,241,0.08), rgba(0,0,0,0.02)));border:1px solid var(--border-subtle);border-radius:20px;padding:36px 30px;box-shadow:var(--pub-tilt-shadow, 0 16px 40px rgba(0,0,0,0.08));transform-style:preserve-3d;transition:transform 0.1s ease-out;overflow:hidden;">
+          <div class="cms-tilt-glare" style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2), transparent 70%);opacity:0;pointer-events:none;transition:opacity 0.2s;"></div>
           <div style="transform:translateZ(30px);">
             <div style="margin-bottom:12px;">${badge}</div>
-            <h3 style="font-size:22px;font-weight:800;color:#fff;margin:0 0 8px 0;letter-spacing:-0.01em;">${title}</h3>
-            <p style="font-size:14.5px;color:#94a3b8;line-height:1.6;margin:0;">${subtitle}</p>
+            <h3 style="font-size:22px;font-weight:800;color:var(--text-primary);margin:0 0 8px 0;letter-spacing:-0.01em;">${title}</h3>
+            <p style="font-size:14.5px;color:var(--text-secondary);line-height:1.6;margin:0;">${subtitle}</p>
             ${cta}
           </div>
         </div>
@@ -3300,7 +3519,7 @@ function renderBlockInnerHtml(b) {
       let itemsHtml = '';
       items.forEach(it => {
         const icon = it.icon ? `<span style="font-size:16px;">${escHtml(it.icon)}</span>` : '✦';
-        itemsHtml += `<div style="display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;color:#f1f5f9;font-size:13.5px;font-weight:600;white-space:nowrap;margin-right:14px;flex-shrink:0;user-select:none;">
+        itemsHtml += `<div style="display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:999px;color:var(--text-primary);font-size:13.5px;font-weight:600;white-space:nowrap;margin-right:14px;flex-shrink:0;user-select:none;">
           ${icon}
           <span>${escHtml(it.text || 'Item')}</span>
         </div>`;
@@ -3320,28 +3539,28 @@ function renderBlockInnerHtml(b) {
       const title = escHtml(p.title || 'Next Milestone Launch');
       const subtitle = escHtml(p.subtitle || 'Counting down every second to release');
 
-      return `<div class="cms-countdown-container" data-target="${escHtml(targetDate)}" style="text-align:center;padding:32px 24px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:20px;margin:24px 0;box-shadow:0 14px 40px rgba(0,0,0,0.3);${customCss}">
-        <h3 style="font-size:20px;font-weight:800;color:#fff;margin:0 0 6px 0;">${title}</h3>
-        <p style="font-size:13px;color:#94a3b8;margin:0 0 20px 0;">${subtitle}</p>
+      return `<div class="cms-countdown-container" data-target="${escHtml(targetDate)}" style="text-align:center;padding:32px 24px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:20px;margin:24px 0;box-shadow:0 14px 40px rgba(0,0,0,0.08);${customCss}">
+        <h3 style="font-size:20px;font-weight:800;color:var(--text-primary);margin:0 0 6px 0;">${title}</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px 0;">${subtitle}</p>
         <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;">
-          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;">
-            <div class="cd-val cd-days" style="font-size:32px;font-weight:800;color:#6366f1;line-height:1;">00</div>
-            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;">Days</div>
+          <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px;padding:14px 18px;min-width:70px;">
+            <div class="cd-val cd-days" style="font-size:32px;font-weight:800;color:var(--accent-primary, #6366f1);line-height:1;">00</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-top:4px;">Days</div>
           </div>
-          <div style="font-size:24px;font-weight:bold;color:#6366f1;opacity:0.6;">:</div>
-          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;">
-            <div class="cd-val cd-hours" style="font-size:32px;font-weight:800;color:#6366f1;line-height:1;">00</div>
-            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;">Hours</div>
+          <div style="font-size:24px;font-weight:bold;color:var(--accent-primary, #6366f1);opacity:0.6;">:</div>
+          <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px;padding:14px 18px;min-width:70px;">
+            <div class="cd-val cd-hours" style="font-size:32px;font-weight:800;color:var(--accent-primary, #6366f1);line-height:1;">00</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-top:4px;">Hours</div>
           </div>
-          <div style="font-size:24px;font-weight:bold;color:#6366f1;opacity:0.6;">:</div>
-          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;">
-            <div class="cd-val cd-minutes" style="font-size:32px;font-weight:800;color:#6366f1;line-height:1;">00</div>
-            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;">Mins</div>
+          <div style="font-size:24px;font-weight:bold;color:var(--accent-primary, #6366f1);opacity:0.6;">:</div>
+          <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px;padding:14px 18px;min-width:70px;">
+            <div class="cd-val cd-minutes" style="font-size:32px;font-weight:800;color:var(--accent-primary, #6366f1);line-height:1;">00</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-top:4px;">Mins</div>
           </div>
-          <div style="font-size:24px;font-weight:bold;color:#6366f1;opacity:0.6;">:</div>
-          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px 18px;min-width:70px;">
-            <div class="cd-val cd-seconds" style="font-size:32px;font-weight:800;color:#6366f1;line-height:1;">00</div>
-            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-top:4px;">Secs</div>
+          <div style="font-size:24px;font-weight:bold;color:var(--accent-primary, #6366f1);opacity:0.6;">:</div>
+          <div style="background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px;padding:14px 18px;min-width:70px;">
+            <div class="cd-val cd-seconds" style="font-size:32px;font-weight:800;color:var(--accent-primary, #6366f1);line-height:1;">00</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-top:4px;">Secs</div>
           </div>
         </div>
       </div>`;
@@ -3356,18 +3575,18 @@ function renderBlockInnerHtml(b) {
         const date = item.date ? `<div style="font-size:12px;font-weight:700;color:${statusColor};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${escHtml(item.date)}</div>` : '';
 
         nodesHtml += `<div style="position:relative;padding-left:36px;margin-bottom:28px;">
-          <div style="position:absolute;left:0;top:4px;width:16px;height:16px;border-radius:50%;background:#0d1117;border:3px solid ${statusColor};box-shadow:0 0 10px ${statusColor}66;z-index:2;"></div>
+          <div style="position:absolute;left:0;top:4px;width:16px;height:16px;border-radius:50%;background:var(--bg-card);border:3px solid ${statusColor};box-shadow:0 0 10px ${statusColor}44;z-index:2;"></div>
           ${date}
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <h4 style="font-size:16px;font-weight:700;color:#fff;margin:0;">${escHtml(item.title || 'Milestone')}</h4>
+            <h4 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0;">${escHtml(item.title || 'Milestone')}</h4>
             <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}44;">${statusLabel}</span>
           </div>
-          <p style="font-size:13.5px;color:#94a3b8;line-height:1.5;margin:0;">${parseRichTextHtml(item.description || '')}</p>
+          <p style="font-size:13.5px;color:var(--text-secondary);line-height:1.5;margin:0;">${parseRichTextHtml(item.description || '')}</p>
         </div>`;
       });
 
       return `<div class="cms-timeline-wrap" style="position:relative;padding:10px 0;margin:24px 0;${customCss}">
-        <div style="position:absolute;top:10px;bottom:10px;left:7px;width:2px;background:rgba(255,255,255,0.1);z-index:1;"></div>
+        <div style="position:absolute;top:10px;bottom:10px;left:7px;width:2px;background:var(--border-subtle);z-index:1;"></div>
         ${nodesHtml}
       </div>`;
     }
@@ -3375,26 +3594,70 @@ function renderBlockInnerHtml(b) {
       const title = escHtml(p.title || 'Get in Touch');
       const desc = escHtml(p.description || 'We would love to hear from you. Leave your details below.');
       const btnLabel = escHtml(p.buttonLabel || 'Send Message');
+      const priority = escHtml(p.priority || 'medium');
+      const labelName = escHtml(p.labelName || 'Website Lead');
+      const successMsg = escHtml(p.successMessage || '✓ Thank you! Your message has been received and added to our workflow.');
+      const targetBoardId = Number(p.targetBoardId) || '';
+      const targetColumnId = Number(p.targetColumnId) || '';
+      const includeSubject = p.includeSubject !== false;
+      const includePhone = !!p.includePhone;
+      const createChecklist = p.createChecklist !== false ? '1' : '0';
 
-      return `<div class="cms-form-card" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:32px 28px;margin:24px 0;box-shadow:0 16px 40px rgba(0,0,0,0.35);${customCss}">
-        <h3 style="font-size:20px;font-weight:800;color:#fff;margin:0 0 6px 0;">${title}</h3>
-        <p style="font-size:13.5px;color:#94a3b8;margin:0 0 20px 0;line-height:1.5;">${desc}</p>
-        <form class="cms-contact-form" onsubmit="event.preventDefault(); this.querySelector('.form-success-alert').style.display='block'; this.reset();" style="display:flex;flex-direction:column;gap:14px;">
-          <div>
-            <label style="display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;">Your Name</label>
-            <input type="text" required placeholder="Alex Mercer" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;" />
+      return `<div class="cms-form-card" style="background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:20px;padding:32px 28px;margin:24px 0;box-shadow:0 16px 40px rgba(0,0,0,0.08);${customCss}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <h3 style="font-size:20px;font-weight:800;color:var(--text-primary);margin:0;">${title}</h3>
+          <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#10b981;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);border-radius:999px;padding:3px 9px;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Active Pipeline
+          </span>
+        </div>
+        <p style="font-size:13.5px;color:var(--text-secondary);margin:0 0 20px 0;line-height:1.5;">${desc}</p>
+        <form class="cms-contact-form"
+              data-board-id="${targetBoardId}"
+              data-column-id="${targetColumnId}"
+              data-priority="${priority}"
+              data-label="${labelName}"
+              data-checklist="${createChecklist}"
+              data-success-msg="${successMsg}"
+              style="display:flex;flex-direction:column;gap:14px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:14px;">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Your Name <span style="color:#ef4444;">*</span></label>
+              <input type="text" name="name" required placeholder="Alex Mercer" style="width:100%;box-sizing:border-box;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:10px 14px;color:var(--text-primary);font-size:13.5px;outline:none;" />
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Email Address <span style="color:#ef4444;">*</span></label>
+              <input type="email" name="email" required placeholder="alex@example.com" style="width:100%;box-sizing:border-box;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:10px 14px;color:var(--text-primary);font-size:13.5px;outline:none;" />
+            </div>
           </div>
+          ${includePhone ? `<div>
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Phone Number (Optional)</label>
+            <input type="tel" name="phone" placeholder="+1 (555) 000-0000" style="width:100%;box-sizing:border-box;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:10px 14px;color:var(--text-primary);font-size:13.5px;outline:none;" />
+          </div>` : ''}
+          ${includeSubject ? `<div>
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Subject / Topic</label>
+            <input type="text" name="subject" placeholder="What is this regarding?" style="width:100%;box-sizing:border-box;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:10px 14px;color:var(--text-primary);font-size:13.5px;outline:none;" />
+          </div>` : ''}
           <div>
-            <label style="display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;">Email Address</label>
-            <input type="email" required placeholder="alex@example.com" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;" />
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Message <span style="color:#ef4444;">*</span></label>
+            <textarea name="message" rows="3" required placeholder="How can we help you?" style="width:100%;box-sizing:border-box;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:10px 14px;color:var(--text-primary);font-size:13.5px;outline:none;resize:vertical;"></textarea>
           </div>
-          <div>
-            <label style="display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;">Message</label>
-            <textarea rows="3" required placeholder="How can we help you?" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;color:#fff;font-size:13.5px;outline:none;resize:vertical;"></textarea>
-          </div>
-          <button type="submit" style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:12px 18px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(99,102,241,0.4);transition:background 0.15s;">${btnLabel}</button>
-          <div class="form-success-alert" style="display:none;padding:10px 14px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#34d399;font-size:13px;border-radius:8px;text-align:center;">✓ Thank you! Your message has been received.</div>
+          <button type="submit" class="cms-form-submit-btn" style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:12px 18px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(99,102,241,0.4);transition:all 0.15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;">
+            <span>${btnLabel}</span>
+          </button>
+          <div class="form-error-alert" style="display:none;padding:10px 14px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:13px;border-radius:8px;text-align:center;"></div>
         </form>
+        <div class="form-success-card" style="display:none;padding:24px 20px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:12px;text-align:center;">
+          <div style="width:44px;height:44px;border-radius:50%;background:#10b981;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;margin:0 auto 12px;box-shadow:0 0 20px rgba(16,185,129,0.4);">✓</div>
+          <h4 style="font-size:16px;font-weight:800;color:var(--text-primary);margin:0 0 6px 0;">Submission Received</h4>
+          <p class="form-success-message-text" style="font-size:13.5px;color:var(--text-secondary);margin:0 0 16px 0;line-height:1.5;">${successMsg}</p>
+          <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#10b981;background:rgba(16,185,129,0.12);padding:4px 12px;border-radius:999px;font-weight:600;margin-bottom:16px;">
+            <span>⚡ Card created in Kanban board</span>
+          </div>
+          <div>
+            <button type="button" class="cms-form-reset-btn" style="background:transparent;border:1px solid var(--border-subtle);color:var(--text-primary);padding:8px 16px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;">Send Another Message</button>
+          </div>
+        </div>
       </div>`;
     }
     case 'audio': {
@@ -3403,11 +3666,11 @@ function renderBlockInnerHtml(b) {
       const duration = escHtml(p.duration || '04:15');
       const cover = p.cover ? `<img src="${escHtml(p.cover)}" style="width:52px;height:52px;border-radius:10px;object-fit:cover;" />` : `<div style="width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;">🎵</div>`;
 
-      return `<div class="cms-audio-card" style="display:flex;align-items:center;gap:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:16px 20px;margin:20px 0;box-shadow:0 10px 30px rgba(0,0,0,0.25);${customCss}">
+      return `<div class="cms-audio-card" style="display:flex;align-items:center;gap:16px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:16px;padding:16px 20px;margin:20px 0;box-shadow:0 10px 30px rgba(0,0,0,0.06);${customCss}">
         ${cover}
         <div style="flex:1;overflow:hidden;">
-          <h4 style="font-size:14.5px;font-weight:700;color:#fff;margin:0 0 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</h4>
-          <div style="font-size:12px;color:#94a3b8;">${artist} • <span style="color:#6366f1;">${duration}</span></div>
+          <h4 style="font-size:14.5px;font-weight:700;color:var(--text-primary);margin:0 0 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</h4>
+          <div style="font-size:12px;color:var(--text-secondary);">${artist} • <span style="color:#6366f1;">${duration}</span></div>
           <div class="cms-waveform-bar" style="display:flex;align-items:flex-end;gap:3px;height:18px;margin-top:8px;">
             <span style="width:3px;height:40%;background:#6366f1;border-radius:2px;"></span>
             <span style="width:3px;height:70%;background:#6366f1;border-radius:2px;"></span>
@@ -3627,18 +3890,21 @@ function renderPublishedPage(page, blocks, tags) {
   let textColor = '#0f172a';
   let borderColor = '#e2e8f0';
 
+  let isDark = false;
   if (bgType === 'pure-black') {
-    pageBg = '#000000'; cardBg = '#050505'; textColor = '#f1f5f9'; borderColor = '#1e293b';
+    pageBg = '#000000'; cardBg = '#050505'; textColor = '#f1f5f9'; borderColor = '#1e293b'; isDark = true;
   } else if (bgType === 'dark-card') {
-    pageBg = '#0b0f17'; cardBg = '#111827'; textColor = '#f1f5f9'; borderColor = '#1f2937';
+    pageBg = '#0b0f17'; cardBg = '#111827'; textColor = '#f1f5f9'; borderColor = '#1f2937'; isDark = true;
   } else if (bgType === 'deep-navy') {
-    pageBg = '#050a14'; cardBg = '#0a1324'; textColor = '#f1f5f9'; borderColor = '#1e293b';
+    pageBg = '#050a14'; cardBg = '#0a1324'; textColor = '#f1f5f9'; borderColor = '#1e293b'; isDark = true;
   } else if (bgType === 'custom' && settings.customBg) {
-    pageBg = settings.customBg; cardBg = settings.customBg; textColor = '#ffffff'; borderColor = 'rgba(255,255,255,0.15)';
+    pageBg = settings.customBg; cardBg = settings.customBg; textColor = '#ffffff'; borderColor = 'rgba(255,255,255,0.15)'; isDark = true;
   } else if (bgType === 'light') {
-    pageBg = '#f1f5f9'; cardBg = '#ffffff'; textColor = '#0f172a'; borderColor = '#e2e8f0';
+    pageBg = '#f1f5f9'; cardBg = '#ffffff'; textColor = '#0f172a'; borderColor = '#e2e8f0'; isDark = false;
   } else if (bgType === 'default' && previewTheme === 'dark') {
-    pageBg = '#0b0f17'; cardBg = '#111827'; textColor = '#f8fafc'; borderColor = '#1f2937';
+    pageBg = '#0b0f17'; cardBg = '#111827'; textColor = '#f8fafc'; borderColor = '#1f2937'; isDark = true;
+  } else if (previewTheme === 'dark') {
+    isDark = true;
   }
 
   const fontMap = {
@@ -3679,7 +3945,7 @@ function renderPublishedPage(page, blocks, tags) {
   </div>` : '';
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="${isDark ? 'theme-dark' : 'theme-light'}" data-theme="${isDark ? 'dark' : 'light'}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -3694,7 +3960,21 @@ function renderPublishedPage(page, blocks, tags) {
       --pub-card-bg: ${cardBg};
       --pub-text-color: ${textColor};
       --pub-border-color: ${borderColor};
+
+      /* Standard theme tokens matching the editor */
+      --text-primary: ${textColor};
+      --text-secondary: ${isDark ? '#94a3b8' : '#475569'};
+      --text-tertiary: ${isDark ? '#64748b' : '#94a3b8'};
+      --border-subtle: ${borderColor};
+      --border-medium: ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'};
+      --bg-card: ${cardBg};
+      --bg-surface: ${isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc'};
+      --bg-surface-elevated: ${isDark ? 'rgba(255,255,255,0.06)' : '#ffffff'};
+      --accent-primary: #6366f1;
+      --pub-tilt-bg: ${isDark ? 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(255,255,255,0.03))' : 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(0,0,0,0.02))'};
+      --pub-tilt-shadow: ${isDark ? '0 20px 50px rgba(0,0,0,0.5)' : '0 12px 30px rgba(0,0,0,0.08)'};
     }
+    @keyframes cmsSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     ${bgType === 'default' && previewTheme === 'auto' ? `
     @media (prefers-color-scheme: dark) {
       :root {
@@ -3702,6 +3982,16 @@ function renderPublishedPage(page, blocks, tags) {
         --pub-card-bg: #111827;
         --pub-text-color: #f8fafc;
         --pub-border-color: #1f2937;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --text-tertiary: #64748b;
+        --border-subtle: #1f2937;
+        --border-medium: rgba(255,255,255,0.14);
+        --bg-card: #111827;
+        --bg-surface: rgba(255,255,255,0.03);
+        --bg-surface-elevated: rgba(255,255,255,0.06);
+        --pub-tilt-bg: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(255,255,255,0.03));
+        --pub-tilt-shadow: 0 20px 50px rgba(0,0,0,0.5);
       }
     }
     @media (prefers-color-scheme: light) {
@@ -3710,6 +4000,16 @@ function renderPublishedPage(page, blocks, tags) {
         --pub-card-bg: #ffffff;
         --pub-text-color: #0f172a;
         --pub-border-color: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-tertiary: #94a3b8;
+        --border-subtle: #e2e8f0;
+        --border-medium: rgba(15,23,42,0.14);
+        --bg-card: #ffffff;
+        --bg-surface: #f8fafc;
+        --bg-surface-elevated: #ffffff;
+        --pub-tilt-bg: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(0,0,0,0.02));
+        --pub-tilt-shadow: 0 12px 30px rgba(0,0,0,0.08);
       }
     }
     ` : ''}
@@ -4482,9 +4782,51 @@ function renderPublishedPage(page, blocks, tags) {
         gap: 12px !important;
       }
     }
+
+    /* Light Theme Adaptive Overrides */
+    .theme-light .cms-header-brand { color: #0f172a; }
+    .theme-light .cms-header-link { color: #475569; }
+    .theme-light .cms-header-link:hover { color: #0f172a; background: rgba(0, 0, 0, 0.05); }
+    .theme-light .cms-header-burger span { background: #0f172a; }
+    .theme-light .cms-header-block.variant-glass {
+      background: rgba(255, 255, 255, 0.85);
+      border-color: rgba(15, 23, 42, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    }
+    .theme-light .cms-header-block.variant-solid {
+      background: #ffffff;
+      border-color: #e2e8f0;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+    .theme-light .cms-header-search {
+      background: rgba(0, 0, 0, 0.04);
+      border-color: rgba(15, 23, 42, 0.12);
+      color: #0f172a;
+    }
+    .theme-light .cms-header-search:focus-within {
+      background: #ffffff;
+      border-color: #6366f1;
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+    }
+    .theme-light .cms-header-topbar { border-bottom-color: rgba(0, 0, 0, 0.08); }
+    .theme-light .cms-header-topbar-link { color: #475569; }
+    .theme-light .cms-header-topbar-link:hover { color: #0f172a; }
+    .theme-light .cms-header-mobile-drawer {
+      border-top-color: rgba(0, 0, 0, 0.08);
+      background: #ffffff;
+    }
+    .theme-light .cms-tilt-card {
+      background: var(--pub-tilt-bg, linear-gradient(135deg, rgba(99,102,241,0.08), rgba(0,0,0,0.02))) !important;
+      border-color: var(--border-subtle) !important;
+      box-shadow: var(--pub-tilt-shadow, 0 12px 30px rgba(0,0,0,0.08)) !important;
+    }
+    .theme-light .cms-tilt-card h3 { color: var(--text-primary) !important; }
+    .theme-light .cms-tilt-card p { color: var(--text-secondary) !important; }
+    .theme-light .cms-timeline-wrap h4 { color: var(--text-primary) !important; }
+    .theme-light .cms-timeline-wrap p { color: var(--text-secondary) !important; }
   </style>
 </head>
-<body>
+<body class="${isDark ? 'theme-dark' : 'theme-light'}" data-theme="${isDark ? 'dark' : 'light'}">
   ${draftBanner}
   <div class="wrap">
     ${body}
@@ -4816,6 +5158,91 @@ function renderPublishedPage(page, blocks, tags) {
       window.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', onScroll);
       update();
+    });
+
+    // Contact Form AJAX Handler ➔ Kanban Card Creation
+    document.querySelectorAll('.cms-contact-form').forEach(form => {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = form.querySelector('.cms-form-submit-btn');
+        const errorAlert = form.querySelector('.form-error-alert');
+        const formCard = form.closest('.cms-form-card');
+        const successCard = formCard ? formCard.querySelector('.form-success-card') : null;
+
+        if (errorAlert) {
+          errorAlert.style.display = 'none';
+          errorAlert.textContent = '';
+        }
+
+        const origBtnText = submitBtn ? submitBtn.innerHTML : '<span>Send Message</span>';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #ffffff44;border-top-color:#fff;border-radius:50%;animation:cmsSpin 0.7s linear infinite;"></span> <span>Sending...</span>';
+        }
+
+        const formData = new FormData(form);
+        const pathSegments = window.location.pathname.split('/').filter(Boolean);
+        const pageSlug = pathSegments[pathSegments.length - 1] || '';
+
+        const payload = {
+          pageSlug: pageSlug,
+          name: formData.get('name') || '',
+          email: formData.get('email') || '',
+          phone: formData.get('phone') || '',
+          subject: formData.get('subject') || '',
+          message: formData.get('message') || '',
+          boardId: form.dataset.boardId || '',
+          columnId: form.dataset.columnId || '',
+          priority: form.dataset.priority || 'medium',
+          labelName: form.dataset.label || 'Website Lead',
+          createChecklist: form.dataset.checklist === '1'
+        };
+
+        try {
+          const resp = await fetch('/api/forms/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await resp.json();
+
+          if (!resp.ok || !result.ok) {
+            throw new Error(result.error || 'Failed to submit form');
+          }
+
+          if (successCard) {
+            form.style.display = 'none';
+            successCard.style.display = 'block';
+            const resetBtn = successCard.querySelector('.cms-form-reset-btn');
+            if (resetBtn) {
+              resetBtn.onclick = () => {
+                form.reset();
+                form.style.display = 'flex';
+                successCard.style.display = 'none';
+                if (submitBtn) {
+                  submitBtn.disabled = false;
+                  submitBtn.innerHTML = origBtnText;
+                }
+              };
+            }
+          } else {
+            alert(form.dataset.successMsg || '✓ Message received! Task created on Kanban board.');
+            form.reset();
+          }
+        } catch (err) {
+          if (errorAlert) {
+            errorAlert.textContent = 'Submission error: ' + (err.message || 'Please check your connection and try again.');
+            errorAlert.style.display = 'block';
+          } else {
+            alert('Error: ' + err.message);
+          }
+        } finally {
+          if (submitBtn && (!successCard || form.style.display !== 'none')) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origBtnText;
+          }
+        }
+      });
     });
   </script>
 </body>

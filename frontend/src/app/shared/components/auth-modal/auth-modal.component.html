@@ -30,37 +30,6 @@
         }
       </div>
 
-      <!-- Quick Switch Demo Users -->
-      <div class="demo-accounts-strip">
-        <div class="strip-header">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-          <span>One-Click Demo Switch:</span>
-        </div>
-
-        <div class="demo-chips">
-          <button type="button" class="demo-chip" (click)="quickLogin('demo')" title="Sign in as Alex Mercer (Dark Theme + Nebula Canvas)">
-            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=64&q=80" alt="Demo" class="chip-avatar" />
-            <div class="chip-info">
-              <span class="chip-name">Alex Mercer</span>
-              <span class="chip-meta dark-mode-tag">Dark / Nebula</span>
-            </div>
-          </button>
-
-          <button type="button" class="demo-chip" (click)="quickLogin('sarah')" title="Sign in as Sarah Chen (Light Theme + Aurora Canvas)">
-            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=64&q=80" alt="Sarah" class="chip-avatar" />
-            <div class="chip-info">
-              <span class="chip-name">Sarah Chen</span>
-              <span class="chip-meta light-mode-tag">Light / Aurora</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
       <!-- Mode Switcher Tabs -->
       <div class="auth-tabs">
         <button type="button" class="auth-tab-btn" [class.active]="authService.authModalMode() === 'login'" (click)="switchMode('login')">
@@ -132,8 +101,13 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn primary btn-submit" [disabled]="authService.isLoading()">
-            @if (authService.isLoading()) {
+          <button type="submit" class="btn primary btn-submit" [disabled]="authService.isLoading() || authService.isTransitioningToDashboard()">
+            @if (authService.isTransitioningToDashboard()) {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>Entering Studio...</span>
+            } @else if (authService.isLoading()) {
               <span class="spinner-dot"></span>
               <span>Processing...</span>
             } @else {

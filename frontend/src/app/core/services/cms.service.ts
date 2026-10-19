@@ -12,6 +12,7 @@ export class CmsService {
 
   pages = signal<CmsPage[]>([]);
   activePage = signal<CmsPage | null>(null);
+  selectedPageId = signal<number | null>(null);
 
   getPages(): Observable<CmsPage[]> {
     return this.http.get<CmsPage[]>(`${this.baseUrl}/pages`);
@@ -29,8 +30,24 @@ export class CmsService {
     return this.http.get<CmsPage>(`${this.baseUrl}/pages/by-slug/${slug}`);
   }
 
-  createPage(data: { title: string; slug: string; status?: string; tags?: string[] }): Observable<{ id: number; slug: string; is_first_page: number }> {
-    return this.http.post<{ id: number; slug: string; is_first_page: number }>(`${this.baseUrl}/pages`, data);
+  switchPage(id: number) {
+    this.selectedPageId.set(id);
+    this.getPage(id).subscribe({
+      next: p => this.activePage.set(p),
+      error: () => {}
+    });
+  }
+
+  createPage(data: string | { title: string; slug?: string; status?: string; tags?: string[] }): Observable<CmsPage> {
+    let payload: { title: string; slug: string; status?: string; tags?: string[] };
+    if (typeof data === 'string') {
+      const slug = data.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `page-${Date.now()}`;
+      payload = { title: data, slug, status: 'draft', tags: [] };
+    } else {
+      const slug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `page-${Date.now()}`;
+      payload = { title: data.title, slug, status: data.status || 'draft', tags: data.tags || [] };
+    }
+    return this.http.post<CmsPage>(`${this.baseUrl}/pages`, payload);
   }
 
   updatePage(id: number, data: Partial<CmsPage> & { blocks?: Block[] | string; tags?: string[] }): Observable<CmsPage> {
